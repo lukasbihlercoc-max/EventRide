@@ -1,0 +1,417 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import 'package:my_app/data/fahrt_service.dart';
+import 'package:my_app/data/anfrage_service.dart';
+import 'package:my_app/data/anfrage_daten.dart';
+import 'package:my_app/data/fahrt_daten.dart';
+import 'package:my_app/data/user_service.dart';
+import 'package:my_app/data/chat_service.dart';
+
+import 'package:my_app/views/widgets/background_widget.dart';
+import 'package:my_app/views/widgets/fahrtencard_widget.dart';
+import 'package:my_app/views/pages/chat_page.dart';
+
+class MeineFahrtenPage extends StatelessWidget {
+  const MeineFahrtenPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final userData = UserService().getCurrentUser();
+    final userId = userData != null ? userData.id : '';
+
+    return DefaultTabController(
+      length: 2,
+      child: AppBackground(
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          body: Column(
+            children: [
+              const TabBar(
+                indicatorColor: Colors.amber,
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.white70,
+                tabs: [
+                  Tab(text: "Angeboten"),
+                  Tab(text: "Angefragt"),
+                ],
+              ),
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    _AngeboteneFahrtenTab(userId: userId),
+                    _AngefragteFahrtenTab(userId: userId),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// ------------------------------------------------------------
+/// TAB 1 – deine angebotenen Fahrten
+/// ------------------------------------------------------------
+class _AngeboteneFahrtenTab extends StatelessWidget {
+  final String userId;
+
+  const _AngeboteneFahrtenTab({required this.userId});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<FahrtService>(
+      builder: (context, fahrtService, _) {
+        final meineFahrten = fahrtService.getFahrtenByUser(userId);
+
+        if (meineFahrten.isEmpty) {
+          return const _EmptyState(
+            icon: Icons.directions_car_filled_outlined,
+            title: "Noch keine Fahrten erstellt",
+            subtitle: "Erstelle eine Fahrt,\num Mitfahrende zu finden.",
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.only(bottom: 120),
+          itemCount: meineFahrten.length,
+          itemBuilder: (context, index) {
+            return FahrtenCard(
+              fahrt: meineFahrten[index],
+              isEditable: true,
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+/// ------------------------------------------------------------
+/// TAB 2 – Fahrten, bei denen du Mitfahrer bist
+/// ------------------------------------------------------------
+class _AngefragteFahrtenTab extends StatelessWidget {
+  final String userId;
+
+  const _AngefragteFahrtenTab({required this.userId});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer2<AnfrageService, FahrtService>(
+      builder: (context, anfrageService, fahrtService, _) {
+        final anfragen = anfrageService.getAnfragenByRequester(userId);
+
+        final items = anfragen.map((a) {
+          FahrtDaten? fahrt;
+          try {
+            fahrt = fahrtService.alleFahrten.firstWhere(
+              (f) => f.id == a.fahrtId,
+            );
+          } catch (_) {
+            fahrt = null;
+          }
+          return _RequestedRideItem(a, fahrt);
+        }).toList();
+
+        if (items.isEmpty) {
+          return const _EmptyState(
+            icon: Icons.chat_bubble_outline,
+            title: "Noch keine Mitfahranfragen",
+            subtitle: "Suche dir eine Fahrt aus\nund sende eine Anfrage.",
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.only(bottom: 120),
+          itemCount: items.length,
+          itemBuilder: (context, index) {
+            final item = items[index];
+
+            if (item.fahrt == null) {
+              return _RequestedRideDeletedCard(anfrage: item.anfrage);
+            }
+
+            return _RequestedRideCard(
+              fahrt: item.fahrt!,
+              anfrage: item.anfrage,
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+/// ------------------------------------------------------------
+/// Helper: Anfrage + Fahrt
+/// ------------------------------------------------------------
+class _RequestedRideItem {
+  final AnfrageDaten anfrage;
+  final FahrtDaten? fahrt;
+
+  _RequestedRideItem(this.anfrage, this.fahrt);
+}
+
+/// ------------------------------------------------------------
+/// Card: angefragte Fahrt (MITFAHRER) + CHAT
+/// ------------------------------------------------------------
+class _RequestedRideCard extends StatelessWidget {
+  final FahrtDaten fahrt;
+  final AnfrageDaten anfrage;
+
+  const _RequestedRideCard({
+    required this.fahrt,
+    required this.anfrage,
+  });
+
+  Color _statusColor(AnfrageStatus status) {
+    switch (status) {
+      case AnfrageStatus.offen:
+        return Colors.blueAccent;
+      case AnfrageStatus.akzeptiert:
+        return Colors.greenAccent;
+      case AnfrageStatus.abgelehnt:
+        return Colors.redAccent;
+    }
+  }
+
+  String _statusText(AnfrageStatus status) {
+    switch (status) {
+      case AnfrageStatus.offen:
+        return "Offen";
+      case AnfrageStatus.akzeptiert:
+        return "Akzeptiert";
+      case AnfrageStatus.abgelehnt:
+        return "Abgelehnt";
+    }
+  }
+
+  /// 🔑 CHAT ÖFFNEN (MITFAHRER → FAHRER)
+  Future<void> _openChat(BuildContext context) async {
+    final chatService = context.read<ChatService>();
+    final user = UserService().safeUser;
+
+    final conversation = await chatService.ensureConversation(
+      fahrtId: fahrt.id,
+      ownerId: fahrt.ownerId,
+      requesterId: anfrage.requesterId,
+      eventName: fahrt.eventName,
+      startOrt: fahrt.abfahrtsort,
+      zielOrt: fahrt.standort,
+      seatsRequested: anfrage.seatsRequested,
+    );
+
+    await chatService.updateSystemMessage(
+      conversationId: conversation.id,
+      eventName: fahrt.eventName,
+      startOrt: fahrt.abfahrtsort,
+      zielOrt: fahrt.standort,
+      seatsRequested: anfrage.seatsRequested,
+      seatsAccepted: anfrage.seatsAccepted ?? 0,
+    );
+
+
+    if (!context.mounted) return;
+
+    if (!context.mounted) return;
+
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: true,
+        pageBuilder: (_, __, ___) => ChatPage(
+          conversationId: conversation.id,
+          otherUserName: anfrage.requesterName,
+        ),
+      ),
+    );
+
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: Colors.black.withOpacity(0.5),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            /// Titel + Status + Chat
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    fahrt.eventName,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _statusColor(anfrage.status).withOpacity(0.8),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    _statusText(anfrage.status),
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.chat_bubble_outline,
+                      color: Colors.white),
+                  onPressed: () => _openChat(context),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 8),
+
+            /// Plätze
+            Row(
+              children: [
+                const Icon(Icons.event_seat,
+                    size: 16, color: Colors.redAccent),
+                const SizedBox(width: 6),
+                Text(
+                  anfrage.status == AnfrageStatus.akzeptiert &&
+                          anfrage.seatsAccepted != null
+                      ? "${anfrage.seatsAccepted} von ${anfrage.seatsRequested} Plätzen akzeptiert"
+                      : "${anfrage.seatsRequested} Plätze angefragt",
+                  style: const TextStyle(color: Colors.white70),
+                ),
+              ],
+            ),
+
+            if (anfrage.message != null &&
+                anfrage.message!.trim().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              const Text(
+                "Deine Nachricht:",
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Text(
+                anfrage.message!,
+                style: const TextStyle(color: Colors.white),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// ------------------------------------------------------------
+/// Card: Fahrt gelöscht
+/// ------------------------------------------------------------
+class _RequestedRideDeletedCard extends StatelessWidget {
+  final AnfrageDaten anfrage;
+
+  const _RequestedRideDeletedCard({required this.anfrage});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: Colors.black.withOpacity(0.5),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              anfrage.eventName,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 6),
+
+            Row(
+              children: [
+                const Icon(Icons.route, size: 16, color: Colors.white70),
+                const SizedBox(width: 6),
+                Text(
+                  "${anfrage.startOrt} → ${anfrage.zielOrt}",
+                  style: const TextStyle(color: Colors.white70),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 8),
+
+            Text(
+              "Fahrt wurde gelöscht",
+              style: TextStyle(
+                color: Colors.redAccent.withOpacity(0.9),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+/// ------------------------------------------------------------
+/// Empty State
+/// ------------------------------------------------------------
+class _EmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  const _EmptyState({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 64, color: Colors.white54),
+          const SizedBox(height: 16),
+          Text(title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white, fontSize: 18)),
+          const SizedBox(height: 8),
+          Text(subtitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white70)),
+        ],
+      ),
+    );
+  }
+}
