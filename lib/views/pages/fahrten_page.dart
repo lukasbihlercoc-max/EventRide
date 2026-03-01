@@ -191,7 +191,6 @@ class _RequestedRideCard extends StatelessWidget {
   /// 🔑 CHAT ÖFFNEN (MITFAHRER → FAHRER)
   Future<void> _openChat(BuildContext context) async {
     final chatService = context.read<ChatService>();
-    final user = UserService().safeUser;
 
     final conversation = await chatService.ensureConversation(
       fahrtId: fahrt.id,

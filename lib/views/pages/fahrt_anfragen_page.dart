@@ -8,7 +8,6 @@ import 'package:my_app/data/anfrage_daten.dart';
 import 'package:my_app/data/anfrage_service.dart';
 import 'package:my_app/data/fahrt_service.dart';
 import 'package:my_app/data/chat_service.dart';
-import 'package:my_app/data/user_service.dart';
 
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/pages/chat_page.dart';
@@ -113,8 +112,6 @@ class _AnfrageCardState extends State<_AnfrageCard> {
 
   Future<void> _openChat(BuildContext context) async {
     final chatService = context.read<ChatService>();
-    final user = UserService().safeUser;
-    final myUserId = user.id;
     final otherUserId = widget.anfrage.requesterId;
 
     final convo = await chatService.ensureConversation(

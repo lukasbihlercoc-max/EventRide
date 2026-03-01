@@ -165,49 +165,6 @@ class ProfilePage extends StatelessWidget {
       ),
     );
   }
-
-  Widget _buildProfileView() {
-    // Hier zeigst du das Profil des eingeloggten Users an
-    return Center(
-      child: Column(
-        children: [
-          const CircleAvatar(
-            radius: 50,
-            backgroundImage: AssetImage("assets/image/default_avatar.png"),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            "Max Mustermann",
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Stern-Anzeige basierend auf Verifikations-Level
-              const Icon(Icons.star, color: Colors.amber, size: 20),
-              const Icon(Icons.star, color: Colors.amber, size: 20),
-              const Icon(Icons.star_border, color: Colors.grey, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                "2/3 Verifizierungen",
-                style: TextStyle(
-                  color: Colors.amber,
-                  fontSize: 16,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          // Weitere Profilinformationen...
-        ],
-      ),
-    );
-  }
 }
 
 class LoggedInProfileView extends StatefulWidget {

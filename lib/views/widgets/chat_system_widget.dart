@@ -71,7 +71,7 @@ for (final l in lines) {
                 const SizedBox(height: 8),
                 if (event != null)
   Text(
-    event!,
+    event,
     style: const TextStyle(
       color: Colors.white,
       fontSize: 16,
@@ -82,7 +82,7 @@ for (final l in lines) {
 if (strecke != null) ...[
   const SizedBox(height: 4),
   Text(
-    strecke!,
+    strecke,
     style: const TextStyle(
       color: Colors.white70,
       fontSize: 14,
@@ -98,12 +98,12 @@ Wrap(
   children: [
     if (angefragt != null)
       _infoChip(
-        text: angefragt!,
+        text: angefragt,
         color: Colors.lightBlueAccent,
       ),
     if (akzeptiert != null)
       _infoChip(
-        text: akzeptiert!,
+        text: akzeptiert,
         color: Colors.greenAccent,
       ),
   ],

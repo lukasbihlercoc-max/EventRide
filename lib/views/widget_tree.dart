@@ -10,9 +10,7 @@ import 'package:my_app/views/widgets/appbar_widget.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/widgets/navbar_widget.dart';
 
-// 🆕 PROVIDER IMPORT HINZUFÜGEN
 import 'package:provider/provider.dart';
-import 'package:my_app/data/fahrt_service.dart';
 
 class PageInfo {
   final Widget page;
