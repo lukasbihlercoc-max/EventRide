@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -6,7 +5,6 @@ import 'package:my_app/data/chat_service.dart';
 import 'package:my_app/data/chat_message.dart';
 import 'package:my_app/data/user_service.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
-import 'package:my_app/views/widgets/chat_system_widget.dart';
 
 class ChatPage extends StatefulWidget {
   final String conversationId;

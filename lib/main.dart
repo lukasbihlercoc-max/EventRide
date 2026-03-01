@@ -1,7 +1,7 @@
 // lib/main.dart
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:my_app/data/app_user.dart';
 import 'package:my_app/data/chat_conversation.dart';
 import 'package:my_app/data/chat_message.dart';
 import 'package:my_app/data/chat_service.dart';
@@ -31,7 +31,6 @@ import 'package:my_app/data/fahrt_service.dart';
 
 // Provider
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -57,12 +56,6 @@ void main() async {
   await Hive.openBox<AnfrageDaten>('anfragen');
   await Hive.openBox<ChatConversation>('chat_conversations');
   await Hive.openBox<ChatMessage>('chat_messages');
-
-  //await Hive.deleteBoxFromDisk("events"); //! gespeicherte Events LÖSCHEN
-  //await Hive.deleteBoxFromDisk("fahrten"); //! gespeicherte Fahrten LÖSCHEN
-  //await Hive.deleteBoxFromDisk("anfragen"); //! gespeicherte Anfragen LÖSCHEN
-  //await Hive.deleteBoxFromDisk("chat_conversations"); //! gespeicherte Chats LÖSCHEN
-  //await Hive.deleteBoxFromDisk("chat_messages"); //! gespeicherte Nachrichten LÖSCHEN
 
   // Favoriten initialisieren
   await initFavouriteEvents();
@@ -95,7 +88,9 @@ void main() async {
   final chatService = ChatService(chatRepository);
 
   // 🔹 Performance Optimierungen
-  debugPrint = (String? message, {int? wrapWidth}) {}; // Debug-Output in Release deaktivieren
+  if (kReleaseMode) {
+    debugPrint = (String? message, {int? wrapWidth}) {};
+  }
 
   // App starten
   runApp(MyApp(

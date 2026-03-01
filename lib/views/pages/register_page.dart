@@ -221,9 +221,9 @@ class _RegisterPageState extends State<RegisterPage> {
                             _acceptTerms = value ?? false;
                           });
                         },
-                        fillColor: MaterialStateProperty.resolveWith<Color>(
-                          (Set<MaterialState> states) {
-                            if (states.contains(MaterialState.selected)) {
+                        fillColor: WidgetStateProperty.resolveWith<Color>(
+                          (Set<WidgetState> states) {
+                            if (states.contains(WidgetState.selected)) {
                               return Colors.blueAccent;
                             }
                             return Colors.white30;

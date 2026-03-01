@@ -9,7 +9,6 @@ import 'package:my_app/data/fahrt_daten.dart';
 import 'package:my_app/data/event_daten.dart';
 import 'package:my_app/data/anfrage_daten.dart';
 import 'package:my_app/data/anfrage_service.dart';
-import 'package:my_app/data/user_service.dart';
 import 'package:my_app/views/pages/fahrt_anbieten_page.dart';
 import 'package:my_app/views/widgets/sizehelper_widget.dart';
 import 'package:my_app/views/pages/fahrt_anfragen_page.dart';
@@ -39,9 +38,6 @@ class FahrtenCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fahrtService = context.read<FahrtService>();
-    final anfrageService = context.read<AnfrageService>();
-
     // 🆕 Anzahl offener Anfragen für diese Fahrt
     final offeneAnfragenCount = context
         .watch<AnfrageService>()
@@ -629,7 +625,6 @@ GestureDetector(
   //! Mitfahr-Fenster
 
 void _handleMitfahren(BuildContext context) async {
-  final user = UserService().safeUser;
   final messageController = TextEditingController();
   final formKey = GlobalKey<FormState>();
 
@@ -888,28 +883,6 @@ void _handleMitfahren(BuildContext context) async {
   );
 
   if (confirmed != true) return;
-
-  // Plätze = die ausgewählte Zahl
-  final seats = selectedSeats;
-
-  final anfrage = AnfrageDaten.create(
-    fahrtId: fahrt.id,
-    eventId: fahrt.eventId,
-    requesterId: user.id,
-    requesterName: user.name,
-    seatsRequested: seats,
-    fahrtOwnerId: fahrt.ownerId,
-
-      // 🔥 SNAPSHOT-DATEN (NEU)
-      eventName: fahrt.eventName,
-      startOrt: fahrt.abfahrtsort,
-      zielOrt: fahrt.standort,
-      fahrerName: fahrt.ownerName,
-
-    message: messageController.text.trim().isEmpty
-        ? null
-        : messageController.text.trim(),
-  );
 
     final rideRequestService = context.read<RideRequestService>();
     final success = await rideRequestService.sendRequest(

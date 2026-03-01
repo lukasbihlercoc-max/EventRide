@@ -7,5 +7,4 @@ class AppUser {
     required this.name,
   });
 
-  void operator [](String other) {}
 }
