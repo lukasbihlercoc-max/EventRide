@@ -1,37 +1,31 @@
 // lib/data/anfrage_service.dart
 import 'package:flutter/foundation.dart';
-import 'package:hive/hive.dart';
 import 'package:my_app/data/anfrage_daten.dart';
 import 'package:my_app/data/fahrt_daten.dart';
+import 'package:my_app/data/interfaces/i_anfrage_repository.dart';
 
-/// AnfrageService
-/// - Kein async im Konstruktor
-/// - public Future<void> init() muss vor der Nutzung aufgerufen werden
-/// - speichert Anfragen keyed unter anfrage.id (box.put(id, anfrage))
 class AnfrageService with ChangeNotifier {
   static final AnfrageService _instance = AnfrageService._internal();
   factory AnfrageService() => _instance;
 
-  // synchroner privater Konstruktor — KEINE async-Aufrufe hier
   AnfrageService._internal();
 
-  late Box<AnfrageDaten> _anfragenBox;
+  late IAnfrageRepository _repository;
   final List<AnfrageDaten> _alleAnfragen = [];
 
   /// Unveränderliche Kopie nach außen
   List<AnfrageDaten> get alleAnfragen => List.unmodifiable(_alleAnfragen);
 
   /// Muss vor der ersten Benutzung aufgerufen werden (z. B. in main)
-  Future<void> init() async {
-    // Erwartet, dass die Box in main bereits geöffnet wurde (await Hive.openBox...)
-    _anfragenBox = Hive.box<AnfrageDaten>('anfragen');
+  Future<void> init(IAnfrageRepository repository) async {
+    _repository = repository;
     _loadAnfragen();
   }
 
   void _loadAnfragen() {
     _alleAnfragen
       ..clear()
-      ..addAll(_anfragenBox.values);
+      ..addAll(_repository.getAll());
     notifyListeners();
   }
 
@@ -39,10 +33,9 @@ class AnfrageService with ChangeNotifier {
   // CRUD
   // -------------------------------------------------------------
 
-  /// Fügt eine Anfrage hinzu. Verwende die eindeutige anfrage.id als Key.
   Future<void> addAnfrage(AnfrageDaten anfrage) async {
     try {
-      await _anfragenBox.put(anfrage.id, anfrage);
+      await _repository.add(anfrage);
       _loadAnfragen();
 
       if (kDebugMode) {
@@ -55,16 +48,15 @@ class AnfrageService with ChangeNotifier {
     }
   }
 
-  /// Aktualisiert eine Anfrage anhand ihrer id.
   /// Rückgabe: true wenn erfolgreich, false wenn nicht gefunden oder Fehler.
   Future<bool> updateAnfrage(String id, AnfrageDaten updated) async {
     try {
-      if (!_anfragenBox.containsKey(id)) {
+      if (!_alleAnfragen.any((a) => a.id == id)) {
         if (kDebugMode) debugPrint('updateAnfrage: id=$id nicht gefunden');
         return false;
       }
 
-      await _anfragenBox.put(id, updated);
+      await _repository.update(updated);
       _loadAnfragen();
 
       if (kDebugMode) debugPrint('🔄 Anfrage mit ID $id aktualisiert');
@@ -79,27 +71,22 @@ class AnfrageService with ChangeNotifier {
   // FILTER-FUNKTIONEN
   // -------------------------------------------------------------
 
-  /// Alle Anfragen zu einer bestimmten Fahrt
   List<AnfrageDaten> getAnfragenForFahrt(String fahrtId) {
     return _alleAnfragen.where((a) => a.fahrtId == fahrtId).toList();
   }
 
-  /// Alle Anfragen, die ein bestimmter Fahrer erhalten hat
   List<AnfrageDaten> getAnfragenForFahrer(String fahrerId) {
     return _alleAnfragen.where((a) => a.fahrtOwnerId == fahrerId).toList();
   }
 
-  /// Alle Anfragen, die EIN User gestellt hat
   List<AnfrageDaten> getAnfragenByRequester(String requesterId) {
     return _alleAnfragen.where((a) => a.requesterId == requesterId).toList();
   }
 
   // -------------------------------------------------------------
-  // STATUS-HILFSMETHODEN: akzeptieren / ablehnen
+  // STATUS-HILFSMETHODEN
   // -------------------------------------------------------------
 
-  /// Akzeptiert eine Anfrage und setzt seatsAccepted
-  /// Rückgabe: true wenn erfolgreich
   Future<bool> akzeptiereAnfrage({
     required AnfrageDaten anfrage,
     required FahrtDaten fahrt,
@@ -119,14 +106,12 @@ class AnfrageService with ChangeNotifier {
       seatsAccepted: erlaubtePlaetze,
     );
 
-    await _anfragenBox.put(anfrage.id, updated);
+    await _repository.update(updated);
     _loadAnfragen();
 
     return true;
   }
 
-
-  /// Lehnt eine Anfrage ab
   Future<bool> ablehnenAnfrage(AnfrageDaten anfrage) async {
     final updated = anfrage.copyWith(status: AnfrageStatus.abgelehnt);
     final ok = await updateAnfrage(anfrage.id, updated);
@@ -144,11 +129,8 @@ class AnfrageService with ChangeNotifier {
   // LÖSCHEN / KASKADIERUNG
   // -------------------------------------------------------------
 
-  /// Setzt alle Anfragen für eine Fahrt auf 'abgelehnt'.
-  /// Rückgabe: true wenn mindestens eine Anfrage verarbeitet wurde oder wenn keine relevant war.
   Future<bool> cancelAnfragenForFahrt(String fahrtId) async {
     try {
-      // Kopie, damit wir während des Loopens gefahrlos updaten können
       final relevant = _alleAnfragen.where((a) => a.fahrtId == fahrtId).toList();
 
       for (final a in relevant) {

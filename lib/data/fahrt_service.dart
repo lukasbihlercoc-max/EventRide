@@ -22,10 +22,15 @@ class FahrtService with ChangeNotifier {
   }
 
   Future<void> add(FahrtDaten fahrt) async {
+    debugPrint('🚗 [FahrtService.add] Starte, id=${fahrt.id}');
     await _repo.add(fahrt);
+    debugPrint('✅ [FahrtService.add] _repo.add() fertig');
     _fahrten.add(fahrt);
+    debugPrint('✅ [FahrtService.add] _fahrten.length=${_fahrten.length}');
     _sort();
+    debugPrint('✅ [FahrtService.add] notifyListeners() wird aufgerufen...');
     notifyListeners();
+    debugPrint('✅ [FahrtService.add] notifyListeners() fertig');
   }
 
   Future<void> update(FahrtDaten fahrt) async {

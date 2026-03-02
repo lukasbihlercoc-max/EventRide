@@ -8,13 +8,12 @@ import 'package:my_app/data/chat_service.dart';
 import 'package:my_app/data/event_repository.dart';
 import 'package:my_app/data/event_service.dart';
 import 'package:my_app/data/fahrt_anfrage_service.dart';
-import 'package:my_app/data/fahrt_daten.dart';
 import 'package:my_app/data/notifiers.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 // Repositories
-import 'package:my_app/data/fahrt_repository.dart';
+import 'package:my_app/data/firebase/firebase_fahrt_repository.dart';
 import 'package:my_app/data/chat_repository.dart';
 
 // Interfaces + lokale Implementierungen
@@ -29,6 +28,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:my_app/views/auth/auth_gate.dart';
 import 'package:my_app/data/anfrage_daten.dart';
+import 'package:my_app/data/hive_anfrage_repository.dart';
 
 // Services
 import 'package:my_app/data/anfrage_service.dart';
@@ -56,8 +56,6 @@ void main() async {
 
   // Adapter registrieren
   Hive.registerAdapter(EventAdapter());
-  Hive.registerAdapter(FahrtDatenAdapter());
-  Hive.registerAdapter(FahrtrichtungAdapter());
   Hive.registerAdapter(AnfrageStatusAdapter());
   Hive.registerAdapter(AnfrageDatenAdapter());
 
@@ -66,7 +64,6 @@ void main() async {
 
   // Boxen öffnen
   await Hive.openBox<Event>('events');
-  await Hive.openBox<FahrtDaten>('fahrten');
   await Hive.openBox<AnfrageDaten>('anfragen');
   await Hive.openBox<ChatConversation>('chat_conversations');
   await Hive.openBox<ChatMessage>('chat_messages');
@@ -81,16 +78,16 @@ void main() async {
   // Services initialisieren
   // ----------------------------
 
+  final anfrageRepository = HiveAnfrageRepository(Hive.box<AnfrageDaten>('anfragen'));
   final anfrageService = AnfrageService();
-  await anfrageService.init();
+  await anfrageService.init(anfrageRepository);
 
   final eventRepository =
       EventRepository(Hive.box<Event>('events'));
   final eventService = EventService(eventRepository);
   await eventService.load();
 
-  final fahrtRepository =
-      FahrtRepository(Hive.box<FahrtDaten>('fahrten'));
+  final fahrtRepository = await FirestoreFahrtRepository.create();
   final fahrtService = FahrtService(fahrtRepository);
   await fahrtService.load();
 

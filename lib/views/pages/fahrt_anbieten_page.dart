@@ -187,8 +187,16 @@ if (fahrtrichtung == Fahrtrichtung.hinUndZurueck && rueckuhrzeit == null) {
 
 
 
-                          final user = context.read<IAuthRepository>().currentUser!;
+                          debugPrint('🚗 [Speichern] Starte...');
 
+                          final user = context.read<IAuthRepository>().currentUser;
+                          if (user == null) {
+                            debugPrint('❌ [Speichern] currentUser ist null!');
+                            if (!context.mounted) return;
+                            AppSnackbar.show(context, message: "Nicht eingeloggt", accentColor: Colors.redAccent);
+                            return;
+                          }
+                          debugPrint('✅ [Speichern] User: ${user.userId}');
 
                           final fahrt = widget.existingFahrt == null
                               ? FahrtDaten.fromTimeOfDay(
@@ -219,15 +227,30 @@ if (fahrtrichtung == Fahrtrichtung.hinUndZurueck && rueckuhrzeit == null) {
                                 );
 
 
-                          if (widget.existingFahrt == null) {
-                            await fahrtService.add(fahrt);
-                          } else {
-                            await fahrtService.update(fahrt);
+                          debugPrint('🚗 [Speichern] Rufe fahrtService.add() auf...');
+                          try {
+                            if (widget.existingFahrt == null) {
+                              await fahrtService.add(fahrt);
+                            } else {
+                              await fahrtService.update(fahrt);
+                            }
+                            debugPrint('✅ [Speichern] fahrtService.add() abgeschlossen');
+                          } catch (e, st) {
+                            debugPrint('❌ [Speichern] Fehler in fahrtService: $e\n$st');
+                            if (!context.mounted) return;
+                            AppSnackbar.show(
+                              context,
+                              message: "Fehler: $e",
+                              accentColor: Colors.redAccent,
+                            );
+                            return;
                           }
 
-                          if (!mounted) return;
+                          debugPrint('🚗 [Speichern] Prüfe context.mounted: ${context.mounted}');
+                          if (!context.mounted) return;
 
                           // ✅ Snackbar anzeigen
+                          debugPrint('🎉 [Speichern] Zeige Snackbar...');
                           AppSnackbar.show(
                             context,
                             message: "Fahrt gespeichert",
@@ -239,6 +262,8 @@ if (fahrtrichtung == Fahrtrichtung.hinUndZurueck && rueckuhrzeit == null) {
                             const Duration(milliseconds: 300),
                           );
 
+                          if (!context.mounted) return;
+                          debugPrint('🔙 [Speichern] Navigator.pop()');
                           Navigator.pop(context);
 
                         },
