@@ -1,10 +1,10 @@
 // fahrt_service.dart
 import 'package:flutter/foundation.dart';
 import 'fahrt_daten.dart';
-import 'fahrt_repository.dart';
+import 'interfaces/i_fahrt_repository.dart';
 
 class FahrtService with ChangeNotifier {
-  final FahrtRepository _repo;
+  final IFahrtRepository _repo;
 
   FahrtService(this._repo);
 
