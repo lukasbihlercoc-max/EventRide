@@ -2,31 +2,29 @@
 import 'package:my_app/data/anfrage_daten.dart';
 import 'package:my_app/data/anfrage_service.dart';
 import 'package:my_app/data/fahrt_daten.dart';
-import 'package:my_app/data/user_service.dart';
 
 class RideRequestService {
   final _anfrageService = AnfrageService();
-  final _userService = UserService();
 
   Future<bool> sendRequest({
     required FahrtDaten fahrt,
     required int seats,
+    required String userId,
+    required String userName,
     String? message,
   }) async {
-    final user = _userService.safeUser;
-
     // Schutz vor Mehrfachanfrage
     final existing = _anfrageService
         .getAnfragenForFahrt(fahrt.id)
-        .any((a) => a.requesterId == user.id);
+        .any((a) => a.requesterId == userId);
 
     if (existing) return false;
 
     final anfrage = AnfrageDaten.create(
       fahrtId: fahrt.id,
       eventId: fahrt.eventId,
-      requesterId: user.id,
-      requesterName: user.name,
+      requesterId: userId,
+      requesterName: userName,
       seatsRequested: seats,
       fahrtOwnerId: fahrt.ownerId,
       eventName: fahrt.eventName,

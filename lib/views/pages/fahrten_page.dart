@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:my_app/data/app_user.dart';
 import 'package:my_app/data/fahrt_service.dart';
 import 'package:my_app/data/anfrage_service.dart';
 import 'package:my_app/data/anfrage_daten.dart';
 import 'package:my_app/data/fahrt_daten.dart';
-import 'package:my_app/data/user_service.dart';
+import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/data/chat_service.dart';
+import 'package:my_app/views/pages/login_page.dart';
 
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/widgets/fahrtencard_widget.dart';
@@ -17,37 +19,98 @@ class MeineFahrtenPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final userData = UserService().getCurrentUser();
-    final userId = userData != null ? userData.id : '';
+    return StreamBuilder<AppUser?>(
+      stream: context.read<IAuthRepository>().authStateChanges,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const AppBackground(
+            child: Scaffold(backgroundColor: Colors.transparent),
+          );
+        }
 
-    return DefaultTabController(
-      length: 2,
-      child: AppBackground(
-        child: Scaffold(
-          backgroundColor: Colors.transparent,
-          body: Column(
-            children: [
-              const TabBar(
-                indicatorColor: Colors.amber,
-                labelColor: Colors.white,
-                unselectedLabelColor: Colors.white70,
-                tabs: [
-                  Tab(text: "Angeboten"),
-                  Tab(text: "Angefragt"),
-                ],
-              ),
-              Expanded(
-                child: TabBarView(
-                  children: [
-                    _AngeboteneFahrtenTab(userId: userId),
-                    _AngefragteFahrtenTab(userId: userId),
-                  ],
+        final user = snapshot.data;
+
+        if (user == null) {
+          return AppBackground(
+            child: Scaffold(
+              backgroundColor: Colors.transparent,
+              body: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.lock_outline, size: 64, color: Colors.white54),
+                      const SizedBox(height: 16),
+                      const Text(
+                        "Nicht angemeldet",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        "Melde dich an, um deine Fahrten zu verwalten.",
+                        style: TextStyle(color: Colors.white70),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton.icon(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const LoginPage()),
+                        ),
+                        icon: const Icon(Icons.login),
+                        label: const Text("Anmelden"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blueAccent,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 28,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ],
+            ),
+          );
+        }
+
+        return DefaultTabController(
+          length: 2,
+          child: AppBackground(
+            child: Scaffold(
+              backgroundColor: Colors.transparent,
+              body: Column(
+                children: [
+                  const TabBar(
+                    indicatorColor: Colors.amber,
+                    labelColor: Colors.white,
+                    unselectedLabelColor: Colors.white70,
+                    tabs: [
+                      Tab(text: "Angeboten"),
+                      Tab(text: "Angefragt"),
+                    ],
+                  ),
+                  Expanded(
+                    child: TabBarView(
+                      children: [
+                        _AngeboteneFahrtenTab(userId: user.userId),
+                        _AngefragteFahrtenTab(userId: user.userId),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

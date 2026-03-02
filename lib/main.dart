@@ -17,12 +17,17 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:my_app/data/fahrt_repository.dart';
 import 'package:my_app/data/chat_repository.dart';
 
+// Interfaces + lokale Implementierungen
+import 'package:my_app/data/interfaces/i_auth_repository.dart';
+import 'package:my_app/data/interfaces/i_fahrt_repository.dart';
+import 'package:my_app/data/firebase/firebase_auth_repository.dart';
+
 // Hive
 import 'package:my_app/data/event_daten.dart';
 import 'package:my_app/data/user_service.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:my_app/views/widget_tree.dart';
+import 'package:my_app/views/auth/auth_gate.dart';
 import 'package:my_app/data/anfrage_daten.dart';
 
 // Services
@@ -32,7 +37,16 @@ import 'package:my_app/data/fahrt_service.dart';
 // Provider
 import 'package:provider/provider.dart';
 
+//Firebase
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+
 void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('de_DE', null);
 
@@ -92,12 +106,16 @@ void main() async {
     debugPrint = (String? message, {int? wrapWidth}) {};
   }
 
+  final authRepository = FirebaseAuthRepository();
+
   // App starten
   runApp(MyApp(
     eventService: eventService,
     fahrtService: fahrtService,
     anfrageService: anfrageService,
     chatService: chatService,
+    authRepository: authRepository,
+    fahrtRepository: fahrtRepository,
   ));
 }
 
@@ -116,7 +134,9 @@ class MyApp extends StatefulWidget {
   final EventService eventService;
   final FahrtService fahrtService;
   final AnfrageService anfrageService;
-  final ChatService chatService; // ✅ NEU
+  final ChatService chatService;
+  final IAuthRepository authRepository;
+  final IFahrtRepository fahrtRepository;
 
   const MyApp({
     super.key,
@@ -124,6 +144,8 @@ class MyApp extends StatefulWidget {
     required this.fahrtService,
     required this.anfrageService,
     required this.chatService,
+    required this.authRepository,
+    required this.fahrtRepository,
   });
 
   @override
@@ -157,8 +179,12 @@ class _MyAppState extends State<MyApp> {
         ),
         
         Provider<RideRequestService>(
-          create: (_) => RideRequestService()
-          ),
+          create: (_) => RideRequestService(),
+        ),
+
+        // Repository-Interfaces (austauschbar gegen Firebase-Implementierungen)
+        Provider<IAuthRepository>.value(value: widget.authRepository),
+        Provider<IFahrtRepository>.value(value: widget.fahrtRepository),
       ],
 
       
@@ -176,7 +202,7 @@ class _MyAppState extends State<MyApp> {
               brightness:
                   isDarkMode ? Brightness.dark : Brightness.light,
             ),
-            home: const WidgetTree(),
+            home: const AuthGate(),
             localizationsDelegates: const [
               GlobalMaterialLocalizations.delegate,
               GlobalWidgetsLocalizations.delegate,

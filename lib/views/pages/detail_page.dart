@@ -6,6 +6,7 @@ import 'package:my_app/data/event_daten.dart';
 import 'package:my_app/views/pages/events_page.dart';
 import 'package:my_app/views/pages/fahrt_anbieten_page.dart';
 import 'package:my_app/views/pages/fahrt_finden_page.dart';
+import 'package:my_app/views/auth/auth_guard.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 
 class DetailPage extends StatelessWidget {
@@ -212,16 +213,18 @@ class DetailPage extends StatelessWidget {
                     ),
                     SizedBox(height: height * 0.011), // 8px Abstand zwischen Buttons
                     ElevatedButton.icon(
-                      onPressed: () {
+                      onPressed: () async {
+                        if (!await requiresLogin(context)) return;
+                        if (!context.mounted) return;
                         Navigator.push(
-                          context, 
+                          context,
                           MaterialPageRoute(
                             builder: (context) => FahrtAnbietenPage(event: event),
                           ),
                         );
                       },
                       icon: Icon(
-                        Icons.directions_car_filled, 
+                        Icons.directions_car_filled,
                         size: width * 0.043, // 16px
                       ),
                       label: Text(

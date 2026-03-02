@@ -1,8 +1,10 @@
 // settings_page.dart
 import 'package:flutter/material.dart';
 import 'dart:ui'; // Für ImageFilter.blur
+import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/data/notifiers.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
+import 'package:provider/provider.dart';
 
 class SettingsPage extends StatefulWidget {
   final String title;
@@ -208,9 +210,10 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   void _showLogoutDialog(BuildContext context) {
+    final authRepository = context.read<IAuthRepository>();
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: Colors.grey[900],
         title: const Text("Ausloggen", style: TextStyle(color: Colors.white)),
         content: const Text(
@@ -219,17 +222,19 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text(
               "Abbrechen",
               style: TextStyle(color: Colors.blueAccent),
             ),
           ),
           TextButton(
-            onPressed: () {
-              // Logout-Logik
-              Navigator.pop(context);
-              Navigator.pop(context); // Zurück zur Profilseite
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await authRepository.signOut();
+              if (context.mounted) {
+                Navigator.popUntil(context, (route) => route.isFirst);
+              }
             },
             child: const Text("Ausloggen", style: TextStyle(color: Colors.red)),
           ),
@@ -260,9 +265,13 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           TextButton(
-            onPressed: () {
-              // Account löschen Logik
+            onPressed: () async {
               Navigator.pop(context);
+              final auth = context.read<IAuthRepository>();
+              await auth.deleteAccount();
+              if (context.mounted) {
+                Navigator.popUntil(context, (route) => route.isFirst);
+              }
             },
             child: const Text("Löschen", style: TextStyle(color: Colors.red)),
           ),

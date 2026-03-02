@@ -12,6 +12,8 @@ import 'package:my_app/data/anfrage_service.dart';
 import 'package:my_app/views/pages/fahrt_anbieten_page.dart';
 import 'package:my_app/views/widgets/sizehelper_widget.dart';
 import 'package:my_app/views/pages/fahrt_anfragen_page.dart';
+import 'package:my_app/views/auth/auth_guard.dart';
+import 'package:my_app/data/interfaces/i_auth_repository.dart';
 
 import 'package:hive/hive.dart';
 import 'package:intl/intl.dart';
@@ -625,6 +627,13 @@ GestureDetector(
   //! Mitfahr-Fenster
 
 void _handleMitfahren(BuildContext context) async {
+  if (!await requiresLogin(context)) return;
+  if (!context.mounted) return;
+
+  final rideRequestService = context.read<RideRequestService>();
+  final currentUser = context.read<IAuthRepository>().currentUser;
+  if (currentUser == null) return;
+
   final messageController = TextEditingController();
   final formKey = GlobalKey<FormState>();
 
@@ -884,10 +893,11 @@ void _handleMitfahren(BuildContext context) async {
 
   if (confirmed != true) return;
 
-    final rideRequestService = context.read<RideRequestService>();
     final success = await rideRequestService.sendRequest(
       fahrt: fahrt,
       seats: selectedSeats,
+      userId: currentUser.userId,
+      userName: currentUser.name,
       message: messageController.text.trim().isEmpty
           ? null
           : messageController.text.trim(),

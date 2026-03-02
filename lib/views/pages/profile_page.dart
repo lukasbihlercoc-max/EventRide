@@ -1,10 +1,12 @@
 // profile_page.dart
 import 'package:flutter/material.dart';
+import 'package:my_app/data/app_user.dart';
+import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/views/pages/login_page.dart';
 import 'package:my_app/views/pages/register_page.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
-import 'package:my_app/data/user_service.dart';
+import 'package:provider/provider.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -15,21 +17,16 @@ class ProfilePage extends StatelessWidget {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         
-        body: FutureBuilder<bool>(
-          future: UserService().isLoggedIn(),
+        body: StreamBuilder<AppUser?>(
+          stream: context.read<IAuthRepository>().authStateChanges,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
-            
-            final isLoggedIn = snapshot.data ?? false;
-            
-            if (isLoggedIn) {
-  return const LoggedInProfileView();
-} else {
-  return _buildLoginOptions(context);
-}
-
+            if (snapshot.data != null) {
+              return const LoggedInProfileView();
+            }
+            return _buildLoginOptions(context);
           },
         ),
       ),
@@ -185,7 +182,7 @@ class _LoggedInProfileViewState extends State<LoggedInProfileView> {
   }
 
   Future<void> _loadHomeTown() async {
-    final town = await UserService().getHomeTown();
+    final town = await context.read<IAuthRepository>().getHomeTown();
     if (!mounted) return;
     _townController.text = town ?? '';
   }
@@ -193,7 +190,7 @@ class _LoggedInProfileViewState extends State<LoggedInProfileView> {
   Future<void> _saveHomeTown() async {
     final town = _townController.text.trim();
     setState(() => _isSaving = true);
-    await UserService().setHomeTown(town);
+    await context.read<IAuthRepository>().setHomeTown(town);
     if (!mounted) return;
     setState(() => _isSaving = false);
 

@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:my_app/data/event_daten.dart';
 import 'package:my_app/data/fahrt_daten.dart';
 import 'package:my_app/data/fahrt_service.dart';
-import 'package:my_app/data/user_service.dart';
+import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
 
@@ -187,7 +187,7 @@ if (fahrtrichtung == Fahrtrichtung.hinUndZurueck && rueckuhrzeit == null) {
 
 
 
-                          final user = UserService().safeUser;
+                          final user = context.read<IAuthRepository>().currentUser!;
 
 
                           final fahrt = widget.existingFahrt == null
@@ -205,7 +205,7 @@ if (fahrtrichtung == Fahrtrichtung.hinUndZurueck && rueckuhrzeit == null) {
                                       : null,
                                   freiePlaetze: freiePlaetze,
                                   richtung: fahrtrichtung,
-                                  ownerId: user.id,
+                                  ownerId: user.userId,
                                   ownerName: user.name,
                                 )
                               : widget.existingFahrt!.copyWith(

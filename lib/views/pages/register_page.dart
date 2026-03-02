@@ -1,9 +1,10 @@
 // register_page.dart
 import 'package:flutter/material.dart';
-import 'package:my_app/views/pages/login_page.dart';
 import 'dart:ui'; // Für ImageFilter.blur
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
-import 'package:my_app/data/user_service.dart';
+import 'package:provider/provider.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -268,12 +269,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   // Login-Link
                   Center(
                     child: GestureDetector(
-                      onTap: () {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (context) => LoginPage()),
-                        );
-                      },
+                      onTap: () => Navigator.pop(context),
                       child: RichText(
                         text: TextSpan(
                           text: "Bereits registriert? ",
@@ -301,23 +297,46 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   void _register() async {
-  if (_formKey.currentState!.validate()) {
+    if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
-
-    await UserService().register(
-      _firstNameController.text.trim(),
-      _lastNameController.text.trim(),
-      _emailController.text.trim(),
-      _phoneController.text.trim(),
-      _passwordController.text, // Passwort-Handling später „richtig“
-    );
-
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-
-    Navigator.pop(context);
+    try {
+      final auth = context.read<IAuthRepository>();
+      await auth.register(
+        firstName: _firstNameController.text.trim(),
+        lastName: _lastNameController.text.trim(),
+        email: _emailController.text.trim(),
+        phone: _phoneController.text.trim(),
+        password: _passwordController.text,
+      );
+      // Zurück zur Root-Route; AuthGate's StreamBuilder zeigt WidgetTree
+      if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_authError(e.code))),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Registrierung fehlgeschlagen')),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
-}
+
+  String _authError(String code) {
+    switch (code) {
+      case 'email-already-in-use':
+        return 'E-Mail bereits registriert';
+      case 'weak-password':
+        return 'Passwort zu schwach (mind. 6 Zeichen)';
+      case 'invalid-email':
+        return 'Ungültige E-Mail-Adresse';
+      default:
+        return 'Registrierung fehlgeschlagen';
+    }
+  }
 
   @override
   void dispose() {

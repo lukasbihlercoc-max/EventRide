@@ -1,10 +1,11 @@
 class AppUser {
-  final String id;
+  final String userId; // Firebase UID (aktuell: Email bis zur Firebase-Migration)
   final String name;
+  final String email;
 
   AppUser({
-    required this.id,
+    required this.userId,
     required this.name,
+    required this.email,
   });
-
 }

@@ -35,7 +35,7 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void initState() {
     super.initState();
-    _myUserId = UserService().safeUser.id;
+    _myUserId = UserService().safeUser.userId;
 
     _scrollController.addListener(() {
       final shouldShowMini = _scrollController.offset > _triggerOffset;

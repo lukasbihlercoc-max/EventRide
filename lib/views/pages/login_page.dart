@@ -1,9 +1,11 @@
 // login_page.dart
 import 'package:flutter/material.dart';
 import 'dart:ui'; // Für ImageFilter.blur
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/pages/register_page.dart';
-import 'package:my_app/data/user_service.dart';
+import 'package:provider/provider.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -34,10 +36,7 @@ class _LoginPageState extends State<LoginPage> {
           appBar: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () => Navigator.pop(context),
-            ),
+            automaticallyImplyLeading: Navigator.canPop(context),
           ),
           body: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
@@ -203,7 +202,7 @@ class _LoginPageState extends State<LoginPage> {
                   Center(
                     child: GestureDetector(
                       onTap: () {
-                        Navigator.pushReplacement(
+                        Navigator.push(
                           context,
                           MaterialPageRoute(builder: (context) => const RegisterPage()),
                         );
@@ -235,22 +234,44 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _login() async {
-  if (_formKey.currentState!.validate()) {
+    if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
-
-    // 🔑 UserService aufrufen
-    await UserService().login(
-      _emailController.text.trim(),
-      _passwordController.text, // echtes Passwort-Handling später
-    );
-
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-
-    // Zurück zur Profilseite
-    Navigator.pop(context);
+    try {
+      final auth = context.read<IAuthRepository>();
+      await auth.signIn(
+        _emailController.text.trim(),
+        _passwordController.text,
+      );
+      if (mounted) Navigator.pop(context);
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_authError(e.code))),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Anmeldung fehlgeschlagen')),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
-}
+
+  String _authError(String code) {
+    switch (code) {
+      case 'user-not-found':
+        return 'E-Mail nicht gefunden';
+      case 'wrong-password':
+        return 'Falsches Passwort';
+      case 'invalid-credential':
+        return 'E-Mail oder Passwort falsch';
+      case 'too-many-requests':
+        return 'Zu viele Versuche – bitte später erneut versuchen';
+      default:
+        return 'Anmeldung fehlgeschlagen';
+    }
+  }
 
   @override
   void dispose() {
