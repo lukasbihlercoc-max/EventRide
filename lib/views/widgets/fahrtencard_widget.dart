@@ -84,19 +84,19 @@ class FahrtenCard extends StatelessWidget {
                         // Linker Teil: Name + Sterne
                         Expanded(
                           child: Row(
-                            children: const [
+                            children: [
                               Text(
-                                "Günther Hiden",
-                                style: TextStyle(
+                                fahrt.ownerName,
+                                style: const TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,
                                 ),
                               ),
-                              SizedBox(width: 12),
-                              Icon(Icons.star, color: Colors.amber, size: 20),
-                              Icon(Icons.star, color: Colors.amber, size: 20),
-                              Icon(Icons.star, color: Colors.amber, size: 20),
+                              const SizedBox(width: 12),
+                              const Icon(Icons.star, color: Colors.amber, size: 20),
+                              const Icon(Icons.star, color: Colors.amber, size: 20),
+                              const Icon(Icons.star, color: Colors.amber, size: 20),
                             ],
                           ),
                         ),

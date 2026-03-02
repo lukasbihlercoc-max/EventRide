@@ -11,14 +11,15 @@ class ChatService {
   ChatService(this._repo);
 
   // ── Conversation-ID ───────────────────────────────────────────────────────
-  /// Deterministisch: sorted([userA, userB]).join('_')
-  /// Kein fahrtId – ein User-Paar hat genau einen Chat.
+  /// Deterministisch: "${fahrtId}_${sorted([userA, userB]).join('_')}"
+  /// Pro Fahrt + User-Paar ein eigener Chat.
   String buildConversationId({
+    required String fahrtId,
     required String userA,
     required String userB,
   }) {
     final ids = [userA, userB]..sort();
-    return '${ids[0]}_${ids[1]}';
+    return '${fahrtId}_${ids[0]}_${ids[1]}';
   }
 
   // ── Streams ───────────────────────────────────────────────────────────────
@@ -41,6 +42,7 @@ class ChatService {
     required int seatsRequested,
   }) async {
     final conversationId = buildConversationId(
+      fahrtId: fahrtId,
       userA: ownerId,
       userB: requesterId,
     );
