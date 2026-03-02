@@ -2,8 +2,6 @@
 import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:my_app/data/chat_conversation.dart';
-import 'package:my_app/data/chat_message.dart';
 import 'package:my_app/data/chat_service.dart';
 import 'package:my_app/data/event_repository.dart';
 import 'package:my_app/data/event_service.dart';
@@ -14,7 +12,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 // Repositories
 import 'package:my_app/data/firebase/firebase_fahrt_repository.dart';
-import 'package:my_app/data/chat_repository.dart';
+import 'package:my_app/data/firebase/firestore_chat_repository.dart';
 
 // Interfaces + lokale Implementierungen
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
@@ -59,14 +57,9 @@ void main() async {
   Hive.registerAdapter(AnfrageStatusAdapter());
   Hive.registerAdapter(AnfrageDatenAdapter());
 
-  Hive.registerAdapter(ChatMessageAdapter());
-  Hive.registerAdapter(ChatConversationAdapter());
-
   // Boxen öffnen
   await Hive.openBox<Event>('events');
   await Hive.openBox<AnfrageDaten>('anfragen');
-  await Hive.openBox<ChatConversation>('chat_conversations');
-  await Hive.openBox<ChatMessage>('chat_messages');
 
   // Favoriten initialisieren
   await initFavouriteEvents();
@@ -91,12 +84,7 @@ void main() async {
   final fahrtService = FahrtService(fahrtRepository);
   await fahrtService.load();
 
-  // ✅ ChatRepository + ChatService (NEU, korrekt)
-  final chatRepository = ChatRepository(
-    Hive.box<ChatConversation>('chat_conversations'),
-    Hive.box<ChatMessage>('chat_messages'),
-  );
-  final chatService = ChatService(chatRepository);
+  final chatService = ChatService(FirestoreChatRepository());
 
   // 🔹 Performance Optimierungen
   if (kReleaseMode) {
@@ -170,8 +158,7 @@ class _MyAppState extends State<MyApp> {
           value: widget.anfrageService,
         ),
 
-        // ✅ ChatService korrekt per value
-        ChangeNotifierProvider<ChatService>.value(
+        Provider<ChatService>.value(
           value: widget.chatService,
         ),
         

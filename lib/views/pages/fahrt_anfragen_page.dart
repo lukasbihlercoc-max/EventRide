@@ -325,7 +325,6 @@ class _AnfrageCardState extends State<_AnfrageCard> {
                       if (!ok) return;
 
                       final conversationId = chatService.buildConversationId(
-                        fahrtId: widget.fahrt.id,
                         userA: widget.fahrt.ownerId,
                         userB: a.requesterId,
                       );

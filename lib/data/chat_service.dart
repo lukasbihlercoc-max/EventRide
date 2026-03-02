@@ -1,32 +1,36 @@
-import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
-import 'chat_repository.dart';
 import 'chat_conversation.dart';
 import 'chat_message.dart';
+import 'interfaces/i_chat_repository.dart';
 
-class ChatService with ChangeNotifier {
-  final ChatRepository _repo;
+class ChatService {
+  final IChatRepository _repo;
   final _uuid = const Uuid();
 
   ChatService(this._repo);
 
-  /// ------------------------------------------------------------
-  /// 🔑 ZENTRALE REGEL: stabile Conversation-ID
-  /// Eine Fahrt + zwei User = genau ein Chat
-  /// ------------------------------------------------------------
+  // ── Conversation-ID ───────────────────────────────────────────────────────
+  /// Deterministisch: sorted([userA, userB]).join('_')
+  /// Kein fahrtId – ein User-Paar hat genau einen Chat.
   String buildConversationId({
-    required String fahrtId,
     required String userA,
     required String userB,
   }) {
     final ids = [userA, userB]..sort();
-    return "${fahrtId}_${ids[0]}_${ids[1]}";
+    return '${ids[0]}_${ids[1]}';
   }
 
-  /// ------------------------------------------------------------
-  /// 🔹 Conversation sicherstellen (existiert oder wird erstellt)
-  /// ------------------------------------------------------------
+  // ── Streams ───────────────────────────────────────────────────────────────
+
+  Stream<List<ChatMessage>> messagesStream(String conversationId) =>
+      _repo.messagesStream(conversationId);
+
+  Stream<List<ChatConversation>> conversationsStream(String userId) =>
+      _repo.conversationsStream(userId);
+
+  // ── Conversation anlegen ──────────────────────────────────────────────────
+
   Future<ChatConversation> ensureConversation({
     required String fahrtId,
     required String ownerId,
@@ -37,15 +41,9 @@ class ChatService with ChangeNotifier {
     required int seatsRequested,
   }) async {
     final conversationId = buildConversationId(
-      fahrtId: fahrtId,
       userA: ownerId,
       userB: requesterId,
     );
-
-    final existing = _repo.getConversation(conversationId);
-    if (existing != null) {
-      return existing;
-    }
 
     final convo = ChatConversation(
       id: conversationId,
@@ -55,20 +53,12 @@ class ChatService with ChangeNotifier {
       lastUpdated: DateTime.now(),
     );
 
-    await _repo.saveConversation(convo);
+    await _repo.ensureConversation(convo);
     return convo;
   }
 
-  /// ------------------------------------------------------------
-  /// 🔹 Nachrichten einer Conversation abrufen
-  /// ------------------------------------------------------------
-  List<ChatMessage> getMessages(String conversationId) {
-    return _repo.getMessages(conversationId);
-  }
+  // ── Nachrichten ───────────────────────────────────────────────────────────
 
-  /// ------------------------------------------------------------
-  /// 🔹 Normale Nachricht senden
-  /// ------------------------------------------------------------
   Future<void> sendMessage({
     required String conversationId,
     required String senderId,
@@ -84,14 +74,11 @@ class ChatService with ChangeNotifier {
       createdAt: DateTime.now(),
     );
 
-    await _repo.addMessage(message);
-    notifyListeners();
+    await _repo.sendMessage(message);
   }
 
-  /// ------------------------------------------------------------
-  /// 🔹 SYSTEMNACHRICHT erstellen ODER aktualisieren
-  /// (wird bei Annahme / Teilannahme verwendet)
-  /// ------------------------------------------------------------
+  /// Erstellt oder überschreibt die Systemnachricht einer Conversation.
+  /// Feste Dokument-ID: '${conversationId}_system' – kein get() nötig.
   Future<void> updateSystemMessage({
     required String conversationId,
     required String eventName,
@@ -100,57 +87,30 @@ class ChatService with ChangeNotifier {
     required int seatsRequested,
     required int seatsAccepted,
   }) async {
-    final messages = _repo.getMessages(conversationId);
-    final systemMessages = messages.where((m) => m.isSystem).toList();
-
     final buffer = StringBuffer()
-      ..writeln("🚗 Mitfahranfrage")
-      ..writeln("")
-      ..writeln("Event: $eventName")
-      ..writeln("Strecke: $startOrt → $zielOrt")
+      ..writeln('🚗 Mitfahranfrage')
+      ..writeln('')
+      ..writeln('Event: $eventName')
+      ..writeln('Strecke: $startOrt → $zielOrt')
       ..writeln(
-        "Angefragt: $seatsRequested Platz${seatsRequested > 1 ? 'e' : ''}",
+        'Angefragt: $seatsRequested Platz${seatsRequested > 1 ? 'e' : ''}',
       );
 
-    // ✅ HIER IST DER ENTSCHEIDENDE TEIL
     if (seatsAccepted > 0) {
       buffer.writeln(
-        "Akzeptiert: $seatsAccepted Platz${seatsAccepted > 1 ? 'e' : ''}",
+        'Akzeptiert: $seatsAccepted Platz${seatsAccepted > 1 ? 'e' : ''}',
       );
     }
 
-    final text = buffer.toString();
-
-    // 🔹 Falls noch keine Systemmessage existiert → neu anlegen
-    if (systemMessages.isEmpty) {
-      final msg = ChatMessage(
-        id: _uuid.v4(),
-        conversationId: conversationId,
-        senderId: 'system',
-        isSystem: true,
-        createdAt: DateTime.now(),
-        text: text,
-      );
-
-      await _repo.addMessage(msg);
-      notifyListeners();
-      return;
-    }
-
-    // 🔹 Bestehende überschreiben (gleiche ID!)
-    final old = systemMessages.last;
-
-    final updated = ChatMessage(
-      id: old.id,
-      conversationId: old.conversationId,
-      senderId: old.senderId,
+    final systemMessage = ChatMessage(
+      id: '${conversationId}_system',
+      conversationId: conversationId,
+      senderId: 'system',
       isSystem: true,
-      createdAt: old.createdAt,
-      text: text,
+      createdAt: DateTime.now(),
+      text: buffer.toString(),
     );
 
-    await _repo.addMessage(updated);
-    notifyListeners();
+    await _repo.sendMessage(systemMessage);
   }
-
 }
