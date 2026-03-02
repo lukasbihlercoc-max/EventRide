@@ -28,7 +28,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:my_app/views/auth/auth_gate.dart';
 import 'package:my_app/data/anfrage_daten.dart';
-import 'package:my_app/data/hive_anfrage_repository.dart';
+import 'package:my_app/data/firebase/firestore_anfrage_repository.dart';
 
 // Services
 import 'package:my_app/data/anfrage_service.dart';
@@ -78,7 +78,7 @@ void main() async {
   // Services initialisieren
   // ----------------------------
 
-  final anfrageRepository = HiveAnfrageRepository(Hive.box<AnfrageDaten>('anfragen'));
+  final anfrageRepository = await FirestoreAnfrageRepository.create();
   final anfrageService = AnfrageService();
   await anfrageService.init(anfrageRepository);
 

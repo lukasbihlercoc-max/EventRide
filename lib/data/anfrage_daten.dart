@@ -113,6 +113,50 @@ class AnfrageDaten {
     );
   }
 
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'fahrtId': fahrtId,
+      'eventId': eventId,
+      'requesterId': requesterId,
+      'requesterName': requesterName,
+      'seatsRequested': seatsRequested,
+      'status': status.index,
+      'createdAt': createdAt.millisecondsSinceEpoch,
+      'message': message,
+      'fahrtOwnerId': fahrtOwnerId,
+      'seatsAccepted': seatsAccepted,
+      'eventName': eventName,
+      'startOrt': startOrt,
+      'zielOrt': zielOrt,
+      'fahrerName': fahrerName,
+    };
+  }
+
+  factory AnfrageDaten.fromMap(Map<String, dynamic> map) {
+    final statusIndex = (map['status'] as int? ?? 0)
+        .clamp(0, AnfrageStatus.values.length - 1);
+
+    return AnfrageDaten(
+      id: map['id'] as String? ?? '',
+      fahrtId: map['fahrtId'] as String? ?? '',
+      eventId: map['eventId'] as String? ?? '',
+      requesterId: map['requesterId'] as String? ?? '',
+      requesterName: map['requesterName'] as String? ?? '',
+      seatsRequested: map['seatsRequested'] as int? ?? 1,
+      status: AnfrageStatus.values[statusIndex],
+      createdAt: DateTime.fromMillisecondsSinceEpoch(
+          map['createdAt'] as int? ?? 0),
+      message: map['message'] as String?,
+      fahrtOwnerId: map['fahrtOwnerId'] as String? ?? '',
+      seatsAccepted: map['seatsAccepted'] as int?,
+      eventName: map['eventName'] as String? ?? '',
+      startOrt: map['startOrt'] as String? ?? '',
+      zielOrt: map['zielOrt'] as String? ?? '',
+      fahrerName: map['fahrerName'] as String? ?? '',
+    );
+  }
+
   AnfrageDaten copyWith({
     AnfrageStatus? status,
     int? seatsAccepted,

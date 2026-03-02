@@ -53,5 +53,28 @@ service cloud.firestore {
                     && resource.data.ownerId == request.auth.uid;
     }
 
+
+    // ----------------------------------------------------------------
+    // anfragen/{anfrageId}
+    //
+    // Lesen:    Alle eingeloggten Nutzer
+    // Erstellen: Eingeloggt + requesterId muss eigene UID sein
+    //            + Pflichtfelder müssen vorhanden sein
+    // Updaten:   Fahrer (fahrtOwnerId) oder Requester (requesterId)
+    // Löschen:   Nicht erlaubt (Status wird auf 'abgelehnt' gesetzt)
+    // ----------------------------------------------------------------
+    match /anfragen/{anfrageId} {
+      allow read:   if isSignedIn();
+      allow create: if isSignedIn()
+                    && request.resource.data.requesterId == request.auth.uid
+                    && request.resource.data.keys().hasAll([
+                         'id', 'fahrtId', 'requesterId', 'fahrtOwnerId', 'status'
+                       ]);
+      allow update: if isSignedIn()
+                    && (resource.data.fahrtOwnerId == request.auth.uid
+                        || resource.data.requesterId == request.auth.uid);
+      allow delete: if false;
+    }
+
   }
 }

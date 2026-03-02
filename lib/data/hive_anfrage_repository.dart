@@ -20,4 +20,9 @@ class HiveAnfrageRepository implements IAnfrageRepository {
   Future<void> update(AnfrageDaten anfrage) async {
     await _box.put(anfrage.id, anfrage);
   }
+
+  @override
+  Future<void> reload() async {
+    // Hive ist lokal — keine Netzwerkoperation nötig
+  }
 }

@@ -1,4 +1,6 @@
 // lib/data/anfrage_service.dart
+import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:my_app/data/anfrage_daten.dart';
 import 'package:my_app/data/fahrt_daten.dart';
@@ -12,14 +14,24 @@ class AnfrageService with ChangeNotifier {
 
   late IAnfrageRepository _repository;
   final List<AnfrageDaten> _alleAnfragen = [];
+  StreamSubscription<User?>? _authSub;
 
   /// Unveränderliche Kopie nach außen
   List<AnfrageDaten> get alleAnfragen => List.unmodifiable(_alleAnfragen);
 
-  /// Muss vor der ersten Benutzung aufgerufen werden (z. B. in main)
+  /// Muss vor der ersten Benutzung aufgerufen werden (z. B. in main).
+  /// Lädt Daten nach Login automatisch nach (z. B. wenn Firestore Auth erfordert).
   Future<void> init(IAnfrageRepository repository) async {
     _repository = repository;
     _loadAnfragen();
+
+    _authSub?.cancel();
+    _authSub = FirebaseAuth.instance.authStateChanges().listen((user) async {
+      if (user != null) {
+        await _repository.reload();
+        _loadAnfragen();
+      }
+    });
   }
 
   void _loadAnfragen() {
