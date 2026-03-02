@@ -1,0 +1,57 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Eingeloggt?
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Greift Nutzer auf sein eigenes Dokument zu?
+    function isOwner(uid) {
+      return request.auth.uid == uid;
+    }
+
+    // ----------------------------------------------------------------
+    // users/{uid}
+    //
+    // Lesen:    Alle eingeloggten Nutzer (Fahrer-/Mitfahrernamen anzeigen)
+    // Erstellen: Nur der eigene Account (uid muss mit auth.uid übereinstimmen)
+    // Updaten:   Nur der eigene Account; email darf nicht geändert werden
+    // Löschen:   Nur der eigene Account
+    // ----------------------------------------------------------------
+    match /users/{uid} {
+      allow read:   if isSignedIn();
+      allow create: if isOwner(uid)
+                    && request.resource.data.keys().hasAll(['firstName', 'lastName', 'email']);
+      allow update: if isOwner(uid)
+                    && request.resource.data.email == resource.data.email;
+      allow delete: if isOwner(uid);
+    }
+
+    // ----------------------------------------------------------------
+    // fahrten/{fahrtId}
+    //
+    // Lesen:    Alle eingeloggten Nutzer (Fahrtensuche)
+    // Erstellen: Eingeloggt + ownerId muss eigene UID sein
+    //            + Pflichtfelder müssen vorhanden sein
+    // Updaten:   Nur der Owner; ownerId darf nicht geändert werden
+    // Löschen:   Nur der Owner
+    // ----------------------------------------------------------------
+    match /fahrten/{fahrtId} {
+      allow read:   if isSignedIn();
+      allow create: if isSignedIn()
+                    && request.resource.data.ownerId == request.auth.uid
+                    && request.resource.data.keys().hasAll([
+                         'id', 'ownerId', 'eventId', 'eventName',
+                         'abfahrtsort', 'standort', 'freiePlaetze'
+                       ]);
+      allow update: if isSignedIn()
+                    && resource.data.ownerId == request.auth.uid
+                    && request.resource.data.ownerId == resource.data.ownerId;
+      allow delete: if isSignedIn()
+                    && resource.data.ownerId == request.auth.uid;
+    }
+
+  }
+}
