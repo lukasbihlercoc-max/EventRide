@@ -1,31 +1,45 @@
 // event_service.dart
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'event_daten.dart';
-import 'event_repository.dart';
+import 'interfaces/i_event_repository.dart';
 
 class EventService with ChangeNotifier {
-  final EventRepository _repo;
+  final IEventRepository _repo;
 
   EventService(this._repo);
 
   final List<Event> _events = [];
+  StreamSubscription<List<Event>>? _subscription;
 
   List<Event> get events => List.unmodifiable(_events);
 
-  /// Initiales Laden (explizit aufrufen!)
+  /// Echtzeit-Stream starten (einmal beim App-Start aufrufen).
+  /// Aktualisiert die Liste automatisch bei Änderungen anderer Geräte.
   Future<void> load() async {
-    _events
-      ..clear()
-      ..addAll(_repo.getAll());
-    _sort();
-    notifyListeners();
+    _subscription?.cancel();
+    _subscription = _repo.watch().listen((events) {
+      _events
+        ..clear()
+        ..addAll(events);
+      _sort();
+      notifyListeners();
+    });
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
   }
 
   Future<void> add(Event event) async {
     await _repo.add(event);
-    _events.add(event);
-    _sort();
-    notifyListeners();
+    if (!_events.any((e) => e.id == event.id)) {
+      _events.add(event);
+      _sort();
+      notifyListeners();
+    }
   }
 
   Future<void> update(Event event) async {

@@ -4,13 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:my_app/data/fahrt_daten.dart';
 import 'package:my_app/data/interfaces/i_fahrt_repository.dart';
 
-/// Firestore-Implementierung von IFahrtRepository.
-///
-/// Hält einen lokalen In-Memory-Cache, damit [getAll] synchron bleibt
-/// und die bestehende Service-API unverändert bleiben kann.
-///
-/// Verwendung in main.dart (wenn Hive ersetzt wird):
-///   final fahrtRepository = await FirestoreFahrtRepository.create();
 class FirestoreFahrtRepository implements IFahrtRepository {
   final FirebaseFirestore _firestore;
   final List<FahrtDaten> _cache = [];
@@ -20,32 +13,33 @@ class FirestoreFahrtRepository implements IFahrtRepository {
   FirestoreFahrtRepository._({FirebaseFirestore? firestore})
       : _firestore = firestore ?? FirebaseFirestore.instance;
 
-  /// Lädt alle Fahrten einmalig aus Firestore, dann ist das Repository bereit.
-  static Future<FirestoreFahrtRepository> create({
-    FirebaseFirestore? firestore,
-  }) async {
-    final repo = FirestoreFahrtRepository._(firestore: firestore);
-    await repo._loadAll();
-    return repo;
-  }
-
-  Future<void> _loadAll() async {
-    final snapshot = await _firestore.collection(_collection).get();
-    _cache
-      ..clear()
-      ..addAll(snapshot.docs.map((doc) => FahrtDaten.fromMap(doc.data())));
-    if (kDebugMode) {
-      debugPrint('🚗 FirestoreFahrtRepository: ${_cache.length} Fahrten geladen');
-    }
+  static FirestoreFahrtRepository create({FirebaseFirestore? firestore}) {
+    return FirestoreFahrtRepository._(firestore: firestore);
   }
 
   // ------------------------------------------------------------------
   // IFahrtRepository
   // ------------------------------------------------------------------
 
-  /// Gibt den lokalen Cache synchron zurück (kompatibel mit FahrtService).
+  /// Gibt den lokalen Cache synchron zurück.
   @override
   List<FahrtDaten> getAll() => List.unmodifiable(_cache);
+
+  /// Echtzeit-Stream: feuert bei jeder Änderung in Firestore.
+  @override
+  Stream<List<FahrtDaten>> watch() {
+    return _firestore.collection(_collection).snapshots().map((snap) {
+      final fahrten =
+          snap.docs.map((doc) => FahrtDaten.fromMap(doc.data())).toList();
+      if (kDebugMode) {
+        debugPrint('🚗 FirestoreFahrtRepository: ${fahrten.length} Fahrten (stream)');
+      }
+      _cache
+        ..clear()
+        ..addAll(fahrten);
+      return List.unmodifiable(_cache);
+    });
+  }
 
   /// Schreibt nach Firestore und fügt dem Cache hinzu.
   @override

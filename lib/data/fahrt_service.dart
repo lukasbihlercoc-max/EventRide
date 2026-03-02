@@ -1,4 +1,5 @@
 // fahrt_service.dart
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'fahrt_daten.dart';
 import 'interfaces/i_fahrt_repository.dart';
@@ -9,28 +10,40 @@ class FahrtService with ChangeNotifier {
   FahrtService(this._repo);
 
   final List<FahrtDaten> _fahrten = [];
+  StreamSubscription<List<FahrtDaten>>? _subscription;
 
   List<FahrtDaten> get alleFahrten => List.unmodifiable(_fahrten);
 
-  /// Initiales Laden (einmal beim App-Start aufrufen)
+  /// Echtzeit-Stream starten (einmal beim App-Start aufrufen).
+  /// Aktualisiert die Liste automatisch bei Änderungen anderer Geräte.
   Future<void> load() async {
-    _fahrten
-      ..clear()
-      ..addAll(_repo.getAll());
-    _sort();
-    notifyListeners();
+    _subscription?.cancel();
+    _subscription = _repo.watch().listen((fahrten) {
+      _fahrten
+        ..clear()
+        ..addAll(fahrten);
+      _sort();
+      notifyListeners();
+    });
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
   }
 
   Future<void> add(FahrtDaten fahrt) async {
     debugPrint('🚗 [FahrtService.add] Starte, id=${fahrt.id}');
     await _repo.add(fahrt);
     debugPrint('✅ [FahrtService.add] _repo.add() fertig');
-    _fahrten.add(fahrt);
-    debugPrint('✅ [FahrtService.add] _fahrten.length=${_fahrten.length}');
-    _sort();
-    debugPrint('✅ [FahrtService.add] notifyListeners() wird aufgerufen...');
-    notifyListeners();
-    debugPrint('✅ [FahrtService.add] notifyListeners() fertig');
+    // Stream-Update kommt automatisch; optimistisch lokal einfügen:
+    if (!_fahrten.any((f) => f.id == fahrt.id)) {
+      _fahrten.add(fahrt);
+      _sort();
+      notifyListeners();
+    }
+    debugPrint('✅ [FahrtService.add] fertig');
   }
 
   Future<void> update(FahrtDaten fahrt) async {

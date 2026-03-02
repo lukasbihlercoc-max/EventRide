@@ -1,4 +1,5 @@
 // lib/data/firebase/firestore_anfrage_repository.dart
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -14,27 +15,8 @@ class FirestoreAnfrageRepository implements IAnfrageRepository {
   FirestoreAnfrageRepository._({FirebaseFirestore? firestore})
       : _firestore = firestore ?? FirebaseFirestore.instance;
 
-  /// Lädt alle Anfragen einmalig aus Firestore, dann ist das Repository bereit.
-  static Future<FirestoreAnfrageRepository> create({
-    FirebaseFirestore? firestore,
-  }) async {
-    final repo = FirestoreAnfrageRepository._(firestore: firestore);
-    await repo._loadAll();
-    return repo;
-  }
-
-  Future<void> _loadAll() async {
-    if (FirebaseAuth.instance.currentUser == null) {
-      if (kDebugMode) debugPrint('📨 FirestoreAnfrageRepository: kein User → übersprungen');
-      return;
-    }
-    final snapshot = await _firestore.collection(_collection).get();
-    _cache
-      ..clear()
-      ..addAll(snapshot.docs.map((doc) => AnfrageDaten.fromMap(doc.data())));
-    if (kDebugMode) {
-      debugPrint('📨 FirestoreAnfrageRepository: ${_cache.length} Anfragen geladen');
-    }
+  static FirestoreAnfrageRepository create({FirebaseFirestore? firestore}) {
+    return FirestoreAnfrageRepository._(firestore: firestore);
   }
 
   // ------------------------------------------------------------------
@@ -43,6 +25,61 @@ class FirestoreAnfrageRepository implements IAnfrageRepository {
 
   @override
   List<AnfrageDaten> getAll() => List.unmodifiable(_cache);
+
+  /// Echtzeit-Stream für Anfragen des aktuellen Nutzers.
+  /// Firestore erlaubt kein OR über zwei Felder in einer Query,
+  /// daher werden zwei Streams gemergt.
+  @override
+  Stream<List<AnfrageDaten>> watch() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return Stream.value([]);
+
+    final controller = StreamController<List<AnfrageDaten>>();
+
+    List<AnfrageDaten> fromRequester = [];
+    List<AnfrageDaten> fromOwner = [];
+
+    void emit() {
+      final seen = <String>{};
+      final combined = [...fromRequester, ...fromOwner]
+          .where((a) => seen.add(a.id))
+          .toList();
+      _cache
+        ..clear()
+        ..addAll(combined);
+      if (kDebugMode) {
+        debugPrint('📨 FirestoreAnfrageRepository: ${_cache.length} Anfragen (stream)');
+      }
+      controller.add(List.unmodifiable(_cache));
+    }
+
+    final subA = _firestore
+        .collection(_collection)
+        .where('requesterId', isEqualTo: uid)
+        .snapshots()
+        .listen((snap) {
+      fromRequester =
+          snap.docs.map((d) => AnfrageDaten.fromMap(d.data())).toList();
+      emit();
+    });
+
+    final subB = _firestore
+        .collection(_collection)
+        .where('fahrtOwnerId', isEqualTo: uid)
+        .snapshots()
+        .listen((snap) {
+      fromOwner =
+          snap.docs.map((d) => AnfrageDaten.fromMap(d.data())).toList();
+      emit();
+    });
+
+    controller.onCancel = () {
+      subA.cancel();
+      subB.cancel();
+    };
+
+    return controller.stream;
+  }
 
   @override
   Future<void> add(AnfrageDaten anfrage) async {
@@ -62,7 +99,4 @@ class FirestoreAnfrageRepository implements IAnfrageRepository {
     final index = _cache.indexWhere((a) => a.id == anfrage.id);
     if (index != -1) _cache[index] = anfrage;
   }
-
-  @override
-  Future<void> reload() => _loadAll();
 }

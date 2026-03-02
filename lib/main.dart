@@ -3,8 +3,8 @@ import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:my_app/data/chat_service.dart';
-import 'package:my_app/data/event_repository.dart';
 import 'package:my_app/data/event_service.dart';
+import 'package:my_app/data/firebase/firestore_event_repository.dart';
 import 'package:my_app/data/fahrt_anfrage_service.dart';
 import 'package:my_app/data/notifiers.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -19,13 +19,8 @@ import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/data/interfaces/i_fahrt_repository.dart';
 import 'package:my_app/data/firebase/firebase_auth_repository.dart';
 
-// Hive
-import 'package:my_app/data/event_daten.dart';
 import 'package:my_app/data/user_service.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:my_app/views/auth/auth_gate.dart';
-import 'package:my_app/data/anfrage_daten.dart';
 import 'package:my_app/data/firebase/firestore_anfrage_repository.dart';
 
 // Services
@@ -48,19 +43,6 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('de_DE', null);
 
-  // Hive initialisieren
-  final dir = await getApplicationDocumentsDirectory();
-  await Hive.initFlutter(dir.path);
-
-  // Adapter registrieren
-  Hive.registerAdapter(EventAdapter());
-  Hive.registerAdapter(AnfrageStatusAdapter());
-  Hive.registerAdapter(AnfrageDatenAdapter());
-
-  // Boxen öffnen
-  await Hive.openBox<Event>('events');
-  await Hive.openBox<AnfrageDaten>('anfragen');
-
   // Favoriten initialisieren
   await initFavouriteEvents();
 
@@ -71,16 +53,18 @@ void main() async {
   // Services initialisieren
   // ----------------------------
 
-  final anfrageRepository = await FirestoreAnfrageRepository.create();
+  final anfrageRepository = FirestoreAnfrageRepository.create();
   final anfrageService = AnfrageService();
   await anfrageService.init(anfrageRepository);
 
-  final eventRepository =
-      EventRepository(Hive.box<Event>('events'));
+  final eventRepository = FirestoreEventRepository.create();
   final eventService = EventService(eventRepository);
   await eventService.load();
+  eventService.addListener(() {
+    eventListNotifier.value = eventService.events.toList();
+  });
 
-  final fahrtRepository = await FirestoreFahrtRepository.create();
+  final fahrtRepository = FirestoreFahrtRepository.create();
   final fahrtService = FahrtService(fahrtRepository);
   await fahrtService.load();
 
@@ -103,17 +87,6 @@ void main() async {
     fahrtRepository: fahrtRepository,
   ));
 }
-
-Future<void> speichereEvent(Event event) async {
-  final box = Hive.box<Event>('events');
-  await box.put(event.id, event);
-}
-
-Future<List<Event>> ladeAlleEvents() async {
-  final box = Hive.box<Event>('events');
-  return box.values.toList();
-}
-
 
 class MyApp extends StatefulWidget {
   final EventService eventService;

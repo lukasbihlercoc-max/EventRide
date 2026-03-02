@@ -14,31 +14,39 @@ class AnfrageService with ChangeNotifier {
 
   late IAnfrageRepository _repository;
   final List<AnfrageDaten> _alleAnfragen = [];
+  StreamSubscription<List<AnfrageDaten>>? _streamSub;
   StreamSubscription<User?>? _authSub;
 
   /// Unveränderliche Kopie nach außen
   List<AnfrageDaten> get alleAnfragen => List.unmodifiable(_alleAnfragen);
 
   /// Muss vor der ersten Benutzung aufgerufen werden (z. B. in main).
-  /// Lädt Daten nach Login automatisch nach (z. B. wenn Firestore Auth erfordert).
   Future<void> init(IAnfrageRepository repository) async {
     _repository = repository;
-    _loadAnfragen();
+    _startListening();
 
     _authSub?.cancel();
-    _authSub = FirebaseAuth.instance.authStateChanges().listen((user) async {
-      if (user != null) {
-        await _repository.reload();
-        _loadAnfragen();
-      }
+    _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
+      // Stream neu starten wenn User einloggt (UID ändert sich)
+      _startListening();
     });
   }
 
-  void _loadAnfragen() {
-    _alleAnfragen
-      ..clear()
-      ..addAll(_repository.getAll());
-    notifyListeners();
+  void _startListening() {
+    _streamSub?.cancel();
+    _streamSub = _repository.watch().listen((anfragen) {
+      _alleAnfragen
+        ..clear()
+        ..addAll(anfragen);
+      notifyListeners();
+    });
+  }
+
+  @override
+  void dispose() {
+    _streamSub?.cancel();
+    _authSub?.cancel();
+    super.dispose();
   }
 
   // -------------------------------------------------------------
@@ -48,7 +56,11 @@ class AnfrageService with ChangeNotifier {
   Future<void> addAnfrage(AnfrageDaten anfrage) async {
     try {
       await _repository.add(anfrage);
-      _loadAnfragen();
+      // Stream-Update kommt automatisch; optimistisch lokal einfügen:
+      if (!_alleAnfragen.any((a) => a.id == anfrage.id)) {
+        _alleAnfragen.add(anfrage);
+        notifyListeners();
+      }
 
       if (kDebugMode) {
         debugPrint("📨 Neue Anfrage gespeichert: ${anfrage.id}");
@@ -63,13 +75,15 @@ class AnfrageService with ChangeNotifier {
   /// Rückgabe: true wenn erfolgreich, false wenn nicht gefunden oder Fehler.
   Future<bool> updateAnfrage(String id, AnfrageDaten updated) async {
     try {
-      if (!_alleAnfragen.any((a) => a.id == id)) {
+      final index = _alleAnfragen.indexWhere((a) => a.id == id);
+      if (index == -1) {
         if (kDebugMode) debugPrint('updateAnfrage: id=$id nicht gefunden');
         return false;
       }
 
       await _repository.update(updated);
-      _loadAnfragen();
+      _alleAnfragen[index] = updated;
+      notifyListeners();
 
       if (kDebugMode) debugPrint('🔄 Anfrage mit ID $id aktualisiert');
       return true;
@@ -119,7 +133,9 @@ class AnfrageService with ChangeNotifier {
     );
 
     await _repository.update(updated);
-    _loadAnfragen();
+    final index = _alleAnfragen.indexWhere((a) => a.id == anfrage.id);
+    if (index != -1) _alleAnfragen[index] = updated;
+    notifyListeners();
 
     return true;
   }
@@ -147,8 +163,11 @@ class AnfrageService with ChangeNotifier {
 
       for (final a in relevant) {
         final updated = a.copyWith(status: AnfrageStatus.abgelehnt);
-        await updateAnfrage(a.id, updated);
+        await _repository.update(updated);
+        final index = _alleAnfragen.indexWhere((x) => x.id == a.id);
+        if (index != -1) _alleAnfragen[index] = updated;
       }
+      notifyListeners();
 
       if (kDebugMode) {
         debugPrint("🚫 Alle Anfragen für Fahrt $fahrtId wurden auf 'abgelehnt' gesetzt");
