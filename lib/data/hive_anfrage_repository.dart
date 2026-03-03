@@ -17,12 +17,12 @@ class HiveAnfrageRepository implements IAnfrageRepository {
   }
 
   @override
-  Future<void> update(AnfrageDaten anfrage) async {
-    await _box.put(anfrage.id, anfrage);
+  Stream<List<AnfrageDaten>> watch() {
+    return _box.watch().map((_) => _box.values.toList());
   }
 
   @override
-  Future<void> reload() async {
-    // Hive ist lokal — keine Netzwerkoperation nötig
+  Future<void> update(AnfrageDaten anfrage) async {
+    await _box.put(anfrage.id, anfrage);
   }
 }

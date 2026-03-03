@@ -30,13 +30,16 @@ class FahrtDatenAdapter extends TypeAdapter<FahrtDaten> {
       ownerId: fields[10] as String,
       ownerName: fields[11] as String,
       id: fields[12] as String,
+      abfahrtsortLat: fields[13] as double?,
+      abfahrtsortLng: fields[14] as double?,
+      abfahrtsortFullAddress: fields[15] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, FahrtDaten obj) {
     writer
-      ..writeByte(13)
+      ..writeByte(16)
       ..writeByte(0)
       ..write(obj.eventId)
       ..writeByte(1)
@@ -62,7 +65,13 @@ class FahrtDatenAdapter extends TypeAdapter<FahrtDaten> {
       ..writeByte(11)
       ..write(obj.ownerName)
       ..writeByte(12)
-      ..write(obj.id);
+      ..write(obj.id)
+      ..writeByte(13)
+      ..write(obj.abfahrtsortLat)
+      ..writeByte(14)
+      ..write(obj.abfahrtsortLng)
+      ..writeByte(15)
+      ..write(obj.abfahrtsortFullAddress);
   }
 
   @override

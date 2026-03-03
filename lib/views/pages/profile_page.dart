@@ -24,7 +24,7 @@ class ProfilePage extends StatelessWidget {
               return const Center(child: CircularProgressIndicator());
             }
             if (snapshot.data != null) {
-              return const LoggedInProfileView();
+              return LoggedInProfileView(user: snapshot.data!);
             }
             return _buildLoginOptions(context);
           },
@@ -165,7 +165,8 @@ class ProfilePage extends StatelessWidget {
 }
 
 class LoggedInProfileView extends StatefulWidget {
-  const LoggedInProfileView({super.key});
+  final AppUser user;
+  const LoggedInProfileView({super.key, required this.user});
 
   @override
   State<LoggedInProfileView> createState() => _LoggedInProfileViewState();
@@ -218,9 +219,9 @@ class _LoggedInProfileViewState extends State<LoggedInProfileView> {
               backgroundImage: AssetImage("assets/image/default_avatar.png"),
             ),
             const SizedBox(height: 16),
-            const Text(
-              "Dein Profil",
-              style: TextStyle(
+            Text(
+              widget.user.name,
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 24,
                 fontWeight: FontWeight.bold,

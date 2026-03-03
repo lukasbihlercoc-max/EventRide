@@ -1,6 +1,8 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:google_places_flutter/google_places_flutter.dart';
+import 'package:google_places_flutter/model/place_type.dart';
 import 'package:provider/provider.dart';
 
 import 'package:my_app/data/event_daten.dart';
@@ -28,6 +30,11 @@ class _FahrtAnbietenPageState extends State<FahrtAnbietenPage> {
   final _formKey = GlobalKey<FormState>();
 
   String abfahrtsort = '';
+  double? _abfahrtsortLat;
+  double? _abfahrtsortLng;
+  String? _abfahrtsortFullAddress;
+  final _abfahrtsortController = TextEditingController();
+
   TimeOfDay? uhrzeit;
   TimeOfDay? rueckuhrzeit;
   int freiePlaetze = 1;
@@ -44,6 +51,9 @@ class _FahrtAnbietenPageState extends State<FahrtAnbietenPage> {
     final f = widget.existingFahrt;
     if (f != null) {
       abfahrtsort = f.abfahrtsort;
+      _abfahrtsortLat = f.abfahrtsortLat;
+      _abfahrtsortLng = f.abfahrtsortLng;
+      _abfahrtsortFullAddress = f.abfahrtsortFullAddress;
       uhrzeit = TimeOfDay(hour: f.uhrzeitHour, minute: f.uhrzeitMinute);
 
       if (f.rueckuhrzeit != null) {
@@ -53,6 +63,13 @@ class _FahrtAnbietenPageState extends State<FahrtAnbietenPage> {
       freiePlaetze = f.freiePlaetze.clamp(1, maxPlaetze);
       fahrtrichtung = f.richtung;
     }
+    _abfahrtsortController.text = abfahrtsort;
+  }
+
+  @override
+  void dispose() {
+    _abfahrtsortController.dispose();
+    super.dispose();
   }
 
   @override
@@ -111,17 +128,80 @@ class _FahrtAnbietenPageState extends State<FahrtAnbietenPage> {
 
                     const SizedBox(height: 24),
 
-                    TextFormField(
-                      decoration: InputDecoration(
+                    GooglePlaceAutoCompleteTextField(
+                      textEditingController: _abfahrtsortController,
+                      googleAPIKey:
+                          "AIzaSyB97RZAMf-fmZKhdFFniU20CqK0QWCV3KE",
+                      inputDecoration: InputDecoration(
                         labelText: fahrtrichtung == Fahrtrichtung.rueckfahrt
                             ? "Zielort"
                             : "Abfahrtsort",
+                        labelStyle:
+                            const TextStyle(color: Colors.white70),
                       ),
-                      style: const TextStyle(color: Colors.amber),
-                      initialValue: abfahrtsort,
-                      onChanged: (v) => abfahrtsort = v,
-                      validator: (v) =>
-                          v == null || v.isEmpty ? "Pflichtfeld" : null,
+                      textStyle: const TextStyle(color: Colors.amber),
+                      boxDecoration: const BoxDecoration(
+                        color: Colors.transparent,
+                      ),
+                      debounceTime: 600,
+                      countries: const ["at"],
+                      placeType: PlaceType.cities,
+                      language: 'de',
+                      isLatLngRequired: true,
+                      itemBuilder: (context, index, prediction) {
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1B3F78),
+                            border: Border(
+                              left: BorderSide(
+                                color: const Color(0xFF5DA9FF).withValues(alpha: 0.6),
+                                width: 3,
+                              ),
+                            ),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 14),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.location_on_outlined,
+                                  color: Color(0xFF5DA9FF), size: 18),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  prediction.description ?? '',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                      seperatedBuilder: Divider(
+                        height: 1,
+                        color: Colors.white.withValues(alpha: 0.12),
+                      ),
+                      getPlaceDetailWithLatLng: (prediction) {
+                        setState(() {
+                          abfahrtsort = prediction.structuredFormatting?.mainText ?? prediction.description ?? '';
+                          _abfahrtsortFullAddress = prediction.description;
+                          _abfahrtsortLat =
+                              double.tryParse(prediction.lat ?? '');
+                          _abfahrtsortLng =
+                              double.tryParse(prediction.lng ?? '');
+                        });
+                      },
+                      itemClick: (prediction) {
+                        _abfahrtsortController.text =
+                            prediction.structuredFormatting?.mainText ?? prediction.description ?? '';
+                        _abfahrtsortController.selection =
+                            TextSelection.fromPosition(TextPosition(
+                                offset:
+                                    _abfahrtsortController.text.length));
+                      },
                     ),
 
                     const SizedBox(height: 24),
@@ -166,6 +246,13 @@ class _FahrtAnbietenPageState extends State<FahrtAnbietenPage> {
                         label: const Text("Fahrt speichern"),
                         onPressed: () async {
                           if (!_formKey.currentState!.validate()) return;
+
+                          if (abfahrtsort.isEmpty) {
+                            AppSnackbar.show(context,
+                                message: "Bitte einen Abfahrtsort wählen",
+                                accentColor: Colors.redAccent);
+                            return;
+                          }
 
 setState(() {
   _timeError = null;
@@ -215,6 +302,9 @@ if (fahrtrichtung == Fahrtrichtung.hinUndZurueck && rueckuhrzeit == null) {
                                   richtung: fahrtrichtung,
                                   ownerId: user.userId,
                                   ownerName: user.name,
+                                  abfahrtsortLat: _abfahrtsortLat,
+                                  abfahrtsortLng: _abfahrtsortLng,
+                                  abfahrtsortFullAddress: _abfahrtsortFullAddress,
                                 )
                               : widget.existingFahrt!.copyWith(
                                   abfahrtsort: abfahrtsort,
@@ -224,6 +314,9 @@ if (fahrtrichtung == Fahrtrichtung.hinUndZurueck && rueckuhrzeit == null) {
                                   rueckuhrzeitMinute: rueckuhrzeit?.minute,
                                   freiePlaetze: freiePlaetze,
                                   richtung: fahrtrichtung,
+                                  abfahrtsortLat: _abfahrtsortLat,
+                                  abfahrtsortLng: _abfahrtsortLng,
+                                  abfahrtsortFullAddress: _abfahrtsortFullAddress,
                                 );
 
 

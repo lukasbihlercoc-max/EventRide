@@ -1,4 +1,5 @@
 // widget_tree.dart
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:my_app/data/notifiers.dart';
 import 'package:my_app/views/pages/events_page.dart';
@@ -54,23 +55,24 @@ class WidgetTree extends StatelessWidget {
                 ),
               ),
 
-              // Floating Action Button - 🟡 UNVERÄNDERT
-              Positioned(
-                bottom: 110,
-                right: 24,
-                child: FloatingActionButton(
-                  backgroundColor: const Color.fromARGB(134, 51, 85, 234),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => EventsPage(event: null),
-                      ),
-                    );
-                  },
-                  child: const Icon(Icons.add),
+              // Floating Action Button – nur für Admin sichtbar
+              if (FirebaseAuth.instance.currentUser?.uid == 'vA8UdBXsdCPD3ePJ88j4C3MQtjJ2')
+                Positioned(
+                  bottom: 110,
+                  right: 24,
+                  child: FloatingActionButton(
+                    backgroundColor: const Color.fromARGB(134, 51, 85, 234),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => EventsPage(event: null),
+                        ),
+                      );
+                    },
+                    child: const Icon(Icons.add),
+                  ),
                 ),
-              ),
 
               // Navigationsleiste - 🟡 UNVERÄNDERT
               Positioned(

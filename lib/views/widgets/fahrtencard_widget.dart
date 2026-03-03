@@ -9,13 +9,13 @@ import 'package:my_app/data/fahrt_daten.dart';
 import 'package:my_app/data/event_daten.dart';
 import 'package:my_app/data/anfrage_daten.dart';
 import 'package:my_app/data/anfrage_service.dart';
+import 'package:my_app/data/event_service.dart';
 import 'package:my_app/views/pages/fahrt_anbieten_page.dart';
 import 'package:my_app/views/widgets/sizehelper_widget.dart';
 import 'package:my_app/views/pages/fahrt_anfragen_page.dart';
 import 'package:my_app/views/auth/auth_guard.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 
-import 'package:hive/hive.dart';
 import 'package:intl/intl.dart';
 
 import 'dart:ui'; // 🔥 NEU für BackdropFilter / Blur
@@ -41,11 +41,11 @@ class FahrtenCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // 🆕 Anzahl offener Anfragen für diese Fahrt
-    final offeneAnfragenCount = context
-        .watch<AnfrageService>()
-        .getAnfragenForFahrt(fahrt.id)
-        .where((a) => a.status == AnfrageStatus.offen)
-        .length;
+    final offeneAnfragenCount = context.select<AnfrageService, int>(
+      (s) => s.getAnfragenForFahrt(fahrt.id)
+          .where((a) => a.status == AnfrageStatus.offen)
+          .length,
+    );
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: ClipRRect(
@@ -180,9 +180,8 @@ GestureDetector(
         Expanded(
           child: Builder(
             builder: (context) {
-              // 🔥 Event über die eventId aus Hive laden
-              final eventBox = Hive.box<Event>("events");
-              final event = eventBox.values.firstWhere(
+              // 🔥 Event über die eventId aus EventService laden
+              final event = context.read<EventService>().events.firstWhere(
                 (e) => e.id == fahrt.eventId,
                 orElse: () => Event(
                   name: fahrt.eventName,
@@ -249,20 +248,20 @@ GestureDetector(
                     ),
                     const SizedBox(height: 6),
 
-                    // ✅ Strecke
-                   // ✅ Strecke mit Richtungspfeilen
-                    Row(
+                    // ✅ Strecke mit Richtungspfeilen
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 2,
                       children: [
                         Text(
-                          fahrt.abfahrtsort,
+                          fahrt.abfahrtsortAnzeige,
                           style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w900,
                             color: Colors.white,
                           ),
                         ),
-
-                        const SizedBox(width: 8),
 
                         // Pfeil abhängig von der Richtung
                         () {
@@ -289,8 +288,6 @@ GestureDetector(
                               );
                           }
                         }(),
-
-                        const SizedBox(width: 8),
 
                         Text(
                           fahrt.standort,
@@ -471,8 +468,7 @@ GestureDetector(
   }
 
   void _showEventDetailsPopup(BuildContext context) {
-  final eventBox = Hive.box<Event>("events");
-  final event = eventBox.values.firstWhere(
+  final event = context.read<EventService>().events.firstWhere(
     (e) => e.id == fahrt.eventId,
     orElse: () => Event(
       name: fahrt.eventName,

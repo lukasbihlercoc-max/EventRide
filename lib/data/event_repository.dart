@@ -13,6 +13,11 @@ class EventRepository implements IEventRepository {
   }
 
   @override
+  Stream<List<Event>> watch() {
+    return _box.watch().map((_) => _box.values.toList());
+  }
+
+  @override
   Future<void> add(Event event) async {
     await _box.put(event.id, event);
   }

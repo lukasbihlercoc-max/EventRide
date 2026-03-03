@@ -15,6 +15,11 @@ class FahrtRepository implements IFahrtRepository {
   }
 
   @override
+  Stream<List<FahrtDaten>> watch() {
+    return _box.watch().map((_) => _box.values.toList());
+  }
+
+  @override
   Future<void> add(FahrtDaten fahrt) async {
     await _box.put(fahrt.id, fahrt);
   }

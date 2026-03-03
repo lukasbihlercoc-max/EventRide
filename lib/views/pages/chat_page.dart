@@ -40,19 +40,14 @@ class _ChatPageState extends State<ChatPage> {
     _scrollController.addListener(() {
       final shouldShowMini = _scrollController.offset > _triggerOffset;
       final shouldShowFull = _scrollController.offset <= _triggerOffset;
+      final scrolling = _scrollController.position.isScrollingNotifier.value;
 
-      if (shouldShowMini != _showMiniInfo || shouldShowFull != _showFullInfo) {
+      if (shouldShowMini != _showMiniInfo ||
+          shouldShowFull != _showFullInfo ||
+          scrolling != _isScrolling) {
         setState(() {
           _showMiniInfo = shouldShowMini;
           _showFullInfo = shouldShowFull;
-        });
-      }
-    });
-
-    _scrollController.addListener(() {
-      final scrolling = _scrollController.position.isScrollingNotifier.value;
-      if (scrolling != _isScrolling) {
-        setState(() {
           _isScrolling = scrolling;
         });
       }

@@ -4,6 +4,11 @@
     android:name="${applicationName}"
     android:icon="@mipmap/ic_launcher"
     android:accessibilityDataSensitive="yes">
+
+    <meta-data
+    android:name="com.google.android.geo.API_KEY"
+    android:value="AIzaSyAw6u3iPrM-_jL0rSI1nsvbQOmJXAkhvtk"/>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -41,6 +46,14 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="google.navigation"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https" android:host="www.google.com"/>
         </intent>
     </queries>
 </manifest>

@@ -1,13 +1,28 @@
 // detail_page.dart
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'dart:ui'; // Für ImageFilter.blur
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:my_app/data/event_daten.dart';
 import 'package:my_app/views/pages/events_page.dart';
 import 'package:my_app/views/pages/fahrt_anbieten_page.dart';
 import 'package:my_app/views/pages/fahrt_finden_page.dart';
 import 'package:my_app/views/auth/auth_guard.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
+
+Future<void> _openEventNavigation(double lat, double lng) async {
+  final mapsUri = Uri.parse('google.navigation:q=$lat,$lng');
+  if (await canLaunchUrl(mapsUri)) {
+    await launchUrl(mapsUri);
+  } else {
+    final fallback = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng',
+    );
+    await launchUrl(fallback, mode: LaunchMode.externalApplication);
+  }
+}
 
 class DetailPage extends StatelessWidget {
   const DetailPage({super.key, required this.event});
@@ -150,25 +165,71 @@ class DetailPage extends StatelessWidget {
                                         color: Colors.white,
                                       ),
                                     ),
-                                    SizedBox(height: height * 0.043), // 32px
-                                    Center(
-                                      child: OutlinedButton(
-                                        onPressed: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (_) => EventsPage(event: event),
+                                    // Mini-Karte + Navigationsbutton
+                                    if (event.latitude != null && event.longitude != null) ...[
+                                      SizedBox(height: height * 0.027),
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(width * 0.032),
+                                        child: SizedBox(
+                                          height: 160,
+                                          child: GoogleMap(
+                                            liteModeEnabled: true,
+                                            initialCameraPosition: CameraPosition(
+                                              target: LatLng(event.latitude!, event.longitude!),
+                                              zoom: 14,
                                             ),
-                                          );
-                                        },
-                                        child: Text(
-                                          "Bearbeiten",
-                                          style: TextStyle(
-                                            fontSize: width * 0.043, // 16px
+                                            markers: {
+                                              Marker(
+                                                markerId: const MarkerId('event'),
+                                                position: LatLng(event.latitude!, event.longitude!),
+                                                infoWindow: InfoWindow(title: event.standort),
+                                              ),
+                                            },
+                                            zoomControlsEnabled: false,
+                                            scrollGesturesEnabled: false,
+                                            zoomGesturesEnabled: false,
+                                            myLocationButtonEnabled: false,
                                           ),
                                         ),
                                       ),
-                                    ),
+                                      SizedBox(height: height * 0.016),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: ElevatedButton.icon(
+                                          onPressed: () => _openEventNavigation(
+                                            event.latitude!,
+                                            event.longitude!,
+                                          ),
+                                          icon: const Icon(Icons.navigation),
+                                          label: const Text('Zum Event navigieren'),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.greenAccent.shade700,
+                                            foregroundColor: Colors.white,
+                                            padding: EdgeInsets.symmetric(vertical: height * 0.018),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                    SizedBox(height: height * 0.043), // 32px
+                                    if (FirebaseAuth.instance.currentUser?.uid == 'vA8UdBXsdCPD3ePJ88j4C3MQtjJ2')
+                                      Center(
+                                        child: OutlinedButton(
+                                          onPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) => EventsPage(event: event),
+                                              ),
+                                            );
+                                          },
+                                          child: Text(
+                                            "Bearbeiten",
+                                            style: TextStyle(
+                                              fontSize: width * 0.043, // 16px
+                                            ),
+                                          ),
+                                        ),
+                                      ),
                                   ],
                                 ),
                               ),

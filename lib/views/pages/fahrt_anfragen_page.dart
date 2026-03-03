@@ -324,12 +324,16 @@ class _AnfrageCardState extends State<_AnfrageCard> {
 
                       if (!ok) return;
 
-                      final conversationId = chatService.buildConversationId(
+                      // Konversation anlegen falls noch nicht vorhanden
+                      final convo = await chatService.ensureConversation(
                         fahrtId: widget.fahrt.id,
-                        userA: widget.fahrt.ownerId,
-                        userB: a.requesterId,
+                        ownerId: widget.fahrt.ownerId,
+                        requesterId: a.requesterId,
+                        eventName: widget.fahrt.eventName,
+                        startOrt: widget.fahrt.abfahrtsort,
+                        zielOrt: widget.fahrt.standort,
+                        seatsRequested: a.seatsRequested,
                       );
-
 
                       final updatedFahrt = aktuelleFahrt.copyWith(
                         freiePlaetze: freie - _acceptedSeats,
@@ -338,7 +342,7 @@ class _AnfrageCardState extends State<_AnfrageCard> {
                       await fahrtService.update(updatedFahrt);
 
                       await chatService.updateSystemMessage(
-                        conversationId: conversationId,
+                        conversationId: convo.id,
                         eventName: widget.fahrt.eventName,
                         startOrt: widget.fahrt.abfahrtsort,
                         zielOrt: widget.fahrt.standort,

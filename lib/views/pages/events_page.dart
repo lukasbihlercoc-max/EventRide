@@ -1,5 +1,6 @@
 // events_page.dart
 import 'package:flutter/material.dart';
+import 'package:google_places_flutter/google_places_flutter.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
 import 'package:provider/provider.dart';
 import 'package:my_app/data/event_daten.dart';
@@ -58,6 +59,8 @@ class _EventsPageState extends State<EventsPage> {
   String? typ = "e0";
   final beschreibungController = TextEditingController();
   final adresseController = TextEditingController();
+  double? _latitude;
+  double? _longitude;
 
   @override
   void initState() {
@@ -70,6 +73,8 @@ class _EventsPageState extends State<EventsPage> {
       typ = widget.event!.typ;
       beschreibungController.text = widget.event!.beschreibung;
       adresseController.text = widget.event!.adresse;
+      _latitude = widget.event!.latitude;
+      _longitude = widget.event!.longitude;
     }
   }
 
@@ -116,6 +121,8 @@ class _EventsPageState extends State<EventsPage> {
           adresse: adresseController.text.trim().isNotEmpty
               ? adresseController.text.trim()
               : "Adresse nicht angegeben",
+          latitude: _latitude,
+          longitude: _longitude,
         );
 
         await eventService.add(newEvent);
@@ -134,6 +141,8 @@ class _EventsPageState extends State<EventsPage> {
           adresse: adresseController.text.trim().isNotEmpty
               ? adresseController.text.trim()
               : widget.event!.adresse,
+          latitude: _latitude,
+          longitude: _longitude,
         );
 
         await eventService.update(updatedEvent);
@@ -210,10 +219,59 @@ class _EventsPageState extends State<EventsPage> {
                   decoration: getInputStyle("Standort"),
                 ),
                 const SizedBox(height: 16),
-                TextField(
-                  controller: adresseController,
-                  style: inputTextStyle,
-                  decoration: getInputStyle("genaue Adresse"),
+                GooglePlaceAutoCompleteTextField(
+                  textEditingController: adresseController,
+                  googleAPIKey: "AIzaSyB97RZAMf-fmZKhdFFniU20CqK0QWCV3KE",
+                  inputDecoration: getInputStyle("genaue Adresse"),
+                  textStyle: inputTextStyle,
+                  boxDecoration: const BoxDecoration(color: Colors.transparent),
+                  debounceTime: 600,
+                  countries: const ["at"],
+                  language: 'de',
+                  isLatLngRequired: true,
+                  itemBuilder: (context, index, prediction) {
+                    return Container(
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF1B3F78),
+                        border: Border(
+                          left: BorderSide(color: Color(0xFF5DA9FF), width: 3),
+                        ),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.location_on_outlined,
+                              color: Color(0xFF5DA9FF), size: 18),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              prediction.description ?? '',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  seperatedBuilder: const Divider(height: 1, color: Colors.white24),
+                  getPlaceDetailWithLatLng: (prediction) {
+                    setState(() {
+                      _latitude = double.tryParse(prediction.lat ?? '');
+                      _longitude = double.tryParse(prediction.lng ?? '');
+                    });
+                  },
+                  itemClick: (prediction) {
+                    adresseController.text = prediction.description ?? '';
+                    adresseController.selection = TextSelection.fromPosition(
+                      TextPosition(offset: adresseController.text.length),
+                    );
+                  },
                 ),
                 const SizedBox(height: 16),
                 DropdownButton(

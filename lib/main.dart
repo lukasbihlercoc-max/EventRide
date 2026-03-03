@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:my_app/data/chat_service.dart';
+import 'package:my_app/data/seen_anfragen_service.dart';
 import 'package:my_app/data/event_service.dart';
 import 'package:my_app/data/firebase/firestore_event_repository.dart';
 import 'package:my_app/data/fahrt_anfrage_service.dart';
@@ -33,6 +34,9 @@ import 'package:provider/provider.dart';
 //Firebase
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+
+//Map Test
+import 'package:my_app/test_map_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -70,6 +74,9 @@ void main() async {
 
   final chatService = ChatService(FirestoreChatRepository());
 
+  final seenAnfragenService = SeenAnfragenService();
+  await seenAnfragenService.init();
+
   // 🔹 Performance Optimierungen
   if (kReleaseMode) {
     debugPrint = (String? message, {int? wrapWidth}) {};
@@ -85,6 +92,7 @@ void main() async {
     chatService: chatService,
     authRepository: authRepository,
     fahrtRepository: fahrtRepository,
+    seenAnfragenService: seenAnfragenService,
   ));
 }
 
@@ -95,6 +103,7 @@ class MyApp extends StatefulWidget {
   final ChatService chatService;
   final IAuthRepository authRepository;
   final IFahrtRepository fahrtRepository;
+  final SeenAnfragenService seenAnfragenService;
 
   const MyApp({
     super.key,
@@ -104,6 +113,7 @@ class MyApp extends StatefulWidget {
     required this.chatService,
     required this.authRepository,
     required this.fahrtRepository,
+    required this.seenAnfragenService,
   });
 
   @override
@@ -129,6 +139,10 @@ class _MyAppState extends State<MyApp> {
 
         ChangeNotifierProvider<AnfrageService>.value(
           value: widget.anfrageService,
+        ),
+
+        ChangeNotifierProvider<SeenAnfragenService>.value(
+          value: widget.seenAnfragenService,
         ),
 
         Provider<ChatService>.value(

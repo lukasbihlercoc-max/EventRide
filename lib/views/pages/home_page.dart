@@ -1,6 +1,5 @@
 // home_page.dart
 import 'package:flutter/material.dart';
-import 'package:hive/hive.dart';
 import 'package:my_app/data/event_daten.dart';
 import 'package:my_app/data/notifiers.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
@@ -29,7 +28,6 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    ladeEventsAusHive(); //!Events beim Start laden
     _loadHomeTown(); // 🔹 Wohnort laden
   }
 
@@ -39,20 +37,6 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _homeTown = town;
     });
-  }
-
-  Future<void> ladeEventsAusHive() async {
-    final box = Hive.box<Event>("events");
-    final alleEvents = box.values.toList();
-    alleEvents.sort((a, b) => a.datum.compareTo(b.datum));
-    eventListNotifier.value = alleEvents;
-  }
-
-  Future<void> reloadEvents() async {
-    final box = Hive.box<Event>('events');
-    final aktualisiert = box.values.toList();
-    aktualisiert.sort((a, b) => a.datum.compareTo(b.datum));
-    eventListNotifier.value = aktualisiert;
   }
 
   //! Filterzeile
@@ -184,7 +168,6 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: Colors.transparent,
         body: RefreshIndicator(
           onRefresh: () async {
-            await reloadEvents(); // ✅ Jetzt wird sie wirklich aufgerufen
             controller.clear(); // ✅ Textfeld leeren
             searchTextNotifier.value = ''; // ✅ Filter zurücksetzen
           },

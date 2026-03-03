@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:my_app/data/event_daten.dart';
-import 'package:hive/hive.dart';
+import 'package:my_app/data/event_service.dart';
+import 'package:provider/provider.dart';
 
 class FahrtenCardEventRow extends StatelessWidget {
   final String eventId;
@@ -15,8 +16,7 @@ class FahrtenCardEventRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final eventBox = Hive.box<Event>('events');
-    final event = eventBox.values.firstWhere(
+    final event = context.read<EventService>().events.firstWhere(
       (e) => e.id == eventId,
       orElse: () => Event(
         name: fallbackName,

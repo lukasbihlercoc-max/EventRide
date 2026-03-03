@@ -8,6 +8,7 @@ import 'package:my_app/data/anfrage_daten.dart';
 import 'package:my_app/data/fahrt_daten.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/data/chat_service.dart';
+import 'package:my_app/data/seen_anfragen_service.dart';
 import 'package:my_app/views/pages/login_page.dart';
 
 import 'package:my_app/views/widgets/background_widget.dart';
@@ -81,32 +82,149 @@ class MeineFahrtenPage extends StatelessWidget {
           );
         }
 
-        return DefaultTabController(
-          length: 2,
-          child: AppBackground(
-            child: Scaffold(
-              backgroundColor: Colors.transparent,
-              body: Column(
-                children: [
-                  const TabBar(
-                    indicatorColor: Colors.amber,
-                    labelColor: Colors.white,
-                    unselectedLabelColor: Colors.white70,
-                    tabs: [
-                      Tab(text: "Angeboten"),
-                      Tab(text: "Angefragt"),
+        return _LoggedInFahrtenView(
+          key: ValueKey(user.userId),
+          user: user,
+        );
+      },
+    );
+  }
+}
+
+/// ------------------------------------------------------------
+/// Eingeloggter Bereich mit TabController + Unseen-Logik
+/// ------------------------------------------------------------
+class _LoggedInFahrtenView extends StatefulWidget {
+  final AppUser user;
+
+  const _LoggedInFahrtenView({super.key, required this.user});
+
+  @override
+  State<_LoggedInFahrtenView> createState() => _LoggedInFahrtenViewState();
+}
+
+class _LoggedInFahrtenViewState extends State<_LoggedInFahrtenView>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(_onTabChange);
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _markCurrentTabAsSeen());
+  }
+
+  @override
+  void dispose() {
+    _tabController.removeListener(_onTabChange);
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _onTabChange() {
+    if (!_tabController.indexIsChanging) {
+      _markCurrentTabAsSeen();
+    }
+  }
+
+  void _markCurrentTabAsSeen() {
+    if (!mounted) return;
+    final anfrageService = context.read<AnfrageService>();
+    final seenService = context.read<SeenAnfragenService>();
+    final userId = widget.user.userId;
+
+    if (_tabController.index == 0) {
+      final ids = anfrageService
+          .getAnfragenForFahrer(userId)
+          .where((a) => a.status == AnfrageStatus.offen)
+          .map((a) => a.id)
+          .toList();
+      seenService.markOwnerAsSeen(userId, ids);
+    } else {
+      final ids = anfrageService
+          .getAnfragenByRequester(userId)
+          .where((a) => a.status != AnfrageStatus.offen)
+          .map((a) => a.id)
+          .toList();
+      seenService.markRequesterAsSeen(userId, ids);
+    }
+  }
+
+  Widget _tabLabel(String text, bool showDot) {
+    return Tab(
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(text),
+          ),
+          if (showDot)
+            Positioned(
+              right: -2,
+              top: 0,
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final userId = widget.user.userId;
+
+    return Consumer2<AnfrageService, SeenAnfragenService>(
+      builder: (context, anfrageService, seenService, _) {
+        final ownerIds = anfrageService
+            .getAnfragenForFahrer(userId)
+            .where((a) => a.status == AnfrageStatus.offen)
+            .map((a) => a.id);
+
+        final requesterIds = anfrageService
+            .getAnfragenByRequester(userId)
+            .where((a) => a.status != AnfrageStatus.offen)
+            .map((a) => a.id);
+
+        final hasUnseenAngeboten =
+            seenService.hasUnseenOwner(userId, ownerIds);
+        final hasUnseenAngefragt =
+            seenService.hasUnseenRequester(userId, requesterIds);
+
+        return AppBackground(
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            body: Column(
+              children: [
+                TabBar(
+                  controller: _tabController,
+                  indicatorColor: Colors.amber,
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Colors.white70,
+                  tabs: [
+                    _tabLabel("Angeboten", hasUnseenAngeboten),
+                    _tabLabel("Angefragt", hasUnseenAngefragt),
+                  ],
+                ),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _AngeboteneFahrtenTab(userId: userId),
+                      _AngefragteFahrtenTab(userId: userId),
                     ],
                   ),
-                  Expanded(
-                    child: TabBarView(
-                      children: [
-                        _AngeboteneFahrtenTab(userId: user.userId),
-                        _AngefragteFahrtenTab(userId: user.userId),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         );
@@ -166,17 +284,8 @@ class _AngefragteFahrtenTab extends StatelessWidget {
       builder: (context, anfrageService, fahrtService, _) {
         final anfragen = anfrageService.getAnfragenByRequester(userId);
 
-        final items = anfragen.map((a) {
-          FahrtDaten? fahrt;
-          try {
-            fahrt = fahrtService.alleFahrten.firstWhere(
-              (f) => f.id == a.fahrtId,
-            );
-          } catch (_) {
-            fahrt = null;
-          }
-          return _RequestedRideItem(a, fahrt);
-        }).toList();
+        final fahrtMap = {for (final f in fahrtService.alleFahrten) f.id: f};
+        final items = anfragen.map((a) => _RequestedRideItem(a, fahrtMap[a.fahrtId])).toList();
 
         if (items.isEmpty) {
           return const _EmptyState(

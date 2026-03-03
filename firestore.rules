@@ -39,7 +39,7 @@ service cloud.firestore {
     // Löschen:   Nur der Owner
     // ----------------------------------------------------------------
     match /fahrten/{fahrtId} {
-      allow read:   if true;
+      allow read:   if isSignedIn();
       allow create: if isSignedIn()
                     && request.resource.data.ownerId == request.auth.uid
                     && request.resource.data.keys().hasAll([
@@ -85,6 +85,17 @@ service cloud.firestore {
     // Updaten:  Nur Teilnehmer (lastMessage / lastMessageAt)
     // Löschen:  Nicht erlaubt
     // ----------------------------------------------------------------
+    // ----------------------------------------------------------------
+    // events/{eventId}
+    //
+    // Lesen:    Alle eingeloggten Nutzer
+    // Schreiben: Nur Admin
+    // ----------------------------------------------------------------
+    match /events/{eventId} {
+      allow read: if true;
+      allow write: if request.auth.uid == 'vA8UdBXsdCPD3ePJ88j4C3MQtjJ2';
+    }
+
     match /chat_conversations/{conversationId} {
       allow read: if isSignedIn()
                   && (resource == null

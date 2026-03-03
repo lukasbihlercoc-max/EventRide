@@ -27,8 +27,10 @@ class AnfrageService with ChangeNotifier {
 
     _authSub?.cancel();
     _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
-      // Stream neu starten wenn User einloggt (UID ändert sich)
-      _startListening();
+      if (user != null) {
+        // Stream neu starten wenn User einloggt (UID ändert sich)
+        _startListening();
+      }
     });
   }
 

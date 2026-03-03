@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(flutter analyze:*)",
-      "Bash(firebase deploy --only firestore:rules)"
+      "Bash(firebase deploy --only firestore:rules)",
+      "Bash(flutter pub run build_runner build --delete-conflicting-outputs)"
     ]
   }
 }

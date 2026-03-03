@@ -26,6 +26,12 @@ class Event extends HiveObject {
   @HiveField(6)
   final String adresse;
 
+  @HiveField(7)
+  final double? latitude;
+
+  @HiveField(8)
+  final double? longitude;
+
   // optional: alias für alte Verwendung
   String get stabileId => id;
 
@@ -37,6 +43,8 @@ class Event extends HiveObject {
     required this.beschreibung,
     required this.typ,
     required this.adresse,
+    this.latitude,
+    this.longitude,
   })  : id = id ?? DateTime.now().millisecondsSinceEpoch.toString(),
         // Normalisiere Datum auf UTC intern, damit Firestore-kompatibel
         datum = datum.toUtc();
@@ -49,6 +57,8 @@ class Event extends HiveObject {
     String? typ,
     String? beschreibung,
     String? adresse,
+    double? latitude,
+    double? longitude,
     // id bleibt absichtlich unverändert
   }) {
     return Event(
@@ -59,6 +69,8 @@ class Event extends HiveObject {
       beschreibung: beschreibung ?? this.beschreibung,
       typ: typ ?? this.typ,
       adresse: adresse ?? this.adresse,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
     );
   }
 
@@ -73,6 +85,8 @@ class Event extends HiveObject {
       'typ': typ,
       'beschreibung': beschreibung,
       'adresse': adresse,
+      'latitude': latitude,
+      'longitude': longitude,
     };
   }
 
@@ -99,6 +113,8 @@ class Event extends HiveObject {
       beschreibung: map['beschreibung'] as String? ?? '',
       typ: map['typ'] as String? ?? '',
       adresse: map['adresse'] as String? ?? '',
+      latitude: (map['latitude'] as num?)?.toDouble(),
+      longitude: (map['longitude'] as num?)?.toDouble(),
     );
   }
 

@@ -57,6 +57,15 @@ class FahrtDaten {
   @HiveField(12)
   final String id;
 
+  @HiveField(13)
+  final double? abfahrtsortLat;
+
+  @HiveField(14)
+  final double? abfahrtsortLng;
+
+  @HiveField(15)
+  final String? abfahrtsortFullAddress;
+
   FahrtDaten({
     required this.eventId,
     required this.eventName,
@@ -71,6 +80,9 @@ class FahrtDaten {
     required this.ownerId,
     required this.ownerName,
     required this.id,
+    this.abfahrtsortLat,
+    this.abfahrtsortLng,
+    this.abfahrtsortFullAddress,
   });
 
   factory FahrtDaten.fromTimeOfDay({
@@ -85,6 +97,9 @@ class FahrtDaten {
     required String ownerId,
     required String ownerName,
     String? id,
+    double? abfahrtsortLat,
+    double? abfahrtsortLng,
+    String? abfahrtsortFullAddress,
   }) {
     return FahrtDaten(
       eventId: eventId,
@@ -100,6 +115,9 @@ class FahrtDaten {
       ownerId: ownerId,
       ownerName: ownerName,
       id: id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      abfahrtsortLat: abfahrtsortLat,
+      abfahrtsortLng: abfahrtsortLng,
+      abfahrtsortFullAddress: abfahrtsortFullAddress,
     );
   }
 
@@ -109,6 +127,9 @@ class FahrtDaten {
     if (rueckuhrzeitHour == null || rueckuhrzeitMinute == null) return null;
     return TimeOfDay(hour: rueckuhrzeitHour!, minute: rueckuhrzeitMinute!);
   }
+
+  // Kurzform für Anzeige (nur Text vor dem ersten Komma)
+  String get abfahrtsortAnzeige => abfahrtsort.split(',').first.trim();
 
   // kompatible Getter
   String get startOrt => abfahrtsort;
@@ -131,6 +152,9 @@ class FahrtDaten {
     String? ownerId,
     String? ownerName,
     String? id,
+    double? abfahrtsortLat,
+    double? abfahrtsortLng,
+    String? abfahrtsortFullAddress,
   }) {
     return FahrtDaten(
       eventId: eventId ?? this.eventId,
@@ -146,6 +170,9 @@ class FahrtDaten {
       ownerId: ownerId ?? this.ownerId,
       ownerName: ownerName ?? this.ownerName,
       id: id ?? this.id,
+      abfahrtsortLat: abfahrtsortLat ?? this.abfahrtsortLat,
+      abfahrtsortLng: abfahrtsortLng ?? this.abfahrtsortLng,
+      abfahrtsortFullAddress: abfahrtsortFullAddress ?? this.abfahrtsortFullAddress,
     );
   }
 
@@ -165,6 +192,9 @@ class FahrtDaten {
       'richtung': richtung.index, // store enum as int
       'ownerId': ownerId,
       'ownerName': ownerName,
+      'abfahrtsortLat': abfahrtsortLat,
+      'abfahrtsortLng': abfahrtsortLng,
+      'abfahrtsortFullAddress': abfahrtsortFullAddress,
     };
   }
 
@@ -199,6 +229,9 @@ class FahrtDaten {
       ownerId: map['ownerId'] as String? ?? '',
       ownerName: map['ownerName'] as String? ?? '',
       id: map['id'] as String? ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      abfahrtsortLat: (map['abfahrtsortLat'] as num?)?.toDouble(),
+      abfahrtsortLng: (map['abfahrtsortLng'] as num?)?.toDouble(),
+      abfahrtsortFullAddress: map['abfahrtsortFullAddress'] as String?,
     );
   }
 
