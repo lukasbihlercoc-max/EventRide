@@ -20,7 +20,6 @@ import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/data/interfaces/i_fahrt_repository.dart';
 import 'package:my_app/data/firebase/firebase_auth_repository.dart';
 
-import 'package:my_app/data/user_service.dart';
 import 'package:my_app/views/auth/auth_gate.dart';
 import 'package:my_app/data/firebase/firestore_anfrage_repository.dart';
 
@@ -50,7 +49,6 @@ void main() async {
   // Favoriten initialisieren
   await initFavouriteEvents();
 
-  await UserService().loadUser();
 
 
   // ----------------------------

@@ -6,7 +6,8 @@ import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/widgets/sizehelper_widget.dart';
 import 'package:my_app/views/widgets/suchleiste_widget.dart';
 import 'package:my_app/views/widgets/eventcard_widget.dart';
-import 'package:my_app/data/user_service.dart';
+import 'package:my_app/data/interfaces/i_auth_repository.dart';
+import 'package:provider/provider.dart';
 
 class HomePage extends StatefulWidget {
   HomePage({super.key});
@@ -32,7 +33,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _loadHomeTown() async {
-    final town = await UserService().getHomeTown();
+    final town = await context.read<IAuthRepository>().getHomeTown();
     if (!mounted) return;
     setState(() {
       _homeTown = town;
