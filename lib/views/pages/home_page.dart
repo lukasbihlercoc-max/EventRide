@@ -1,6 +1,5 @@
 // home_page.dart
 import 'package:flutter/material.dart';
-import 'package:my_app/data/event_daten.dart';
 import 'package:my_app/data/notifiers.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/widgets/sizehelper_widget.dart';
@@ -169,82 +168,63 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: Colors.transparent,
         body: RefreshIndicator(
           onRefresh: () async {
-            controller.clear(); // ✅ Textfeld leeren
-            searchTextNotifier.value = ''; // ✅ Filter zurücksetzen
+            controller.clear();
+            searchTextNotifier.value = '';
           },
-          child: ValueListenableBuilder<String>(
-            valueListenable: searchTextNotifier,
-            builder: (context, searchText, _) {
-              return ValueListenableBuilder<List<Event>>(
-                valueListenable: eventListNotifier,
-                builder: (context, events, _) {
-                  return ValueListenableBuilder<int?>(
-                    valueListenable: selectedRadiusNotifier,
-                    builder: (context, selectedRadius, _) {
-                      final query = searchText.toLowerCase();
+          child: ListenableBuilder(
+            listenable: Listenable.merge([
+              searchTextNotifier,
+              eventListNotifier,
+              selectedRadiusNotifier,
+            ]),
+            builder: (context, _) {
+              final query = searchTextNotifier.value.toLowerCase();
+              final events = eventListNotifier.value;
+              final selectedRadius = selectedRadiusNotifier.value;
 
+              // Alle Filter in einem einzigen Durchlauf
+              final favourites = _showFavourites ? favouriteEventsNotifier.value : null;
+              final townLower = (selectedRadius != null && _homeTown != null && _homeTown!.trim().isNotEmpty)
+                  ? _homeTown!.toLowerCase().trim()
+                  : null;
 
-                      // 🔹 Textsuche
-                      var filteredEvents = events.where((event) {
-                        return event.name.toLowerCase().contains(query) ||
-                            event.standort.toLowerCase().contains(query) ||
-                            event.typ.toLowerCase().contains(query);
-                      }).toList();
+              final filteredEvents = events.where((event) {
+                if (query.isNotEmpty &&
+                    !event.name.toLowerCase().contains(query) &&
+                    !event.standort.toLowerCase().contains(query) &&
+                    !event.typ.toLowerCase().contains(query)) {
+                  return false;
+                }
+                if (favourites != null && !favourites.contains(event.stabileId)) {
+                  return false;
+                }
+                if (townLower != null && event.standort.toLowerCase().trim() != townLower) {
+                  return false;
+                }
+                return true;
+              }).toList();
 
-
-                      // 🔹 Nur Favoriten, falls aktiviert
-                      if (_showFavourites) {
-                        final favourites = favouriteEventsNotifier.value;
-                        filteredEvents = filteredEvents
-                            .where((event) => favourites.contains(event.stabileId))
-                            .toList();
-                      }
-
-                      // 🔹 Radius-Filter (Platzhalter: gleicher Ort = "im Umkreis")
-                      if (selectedRadius != null &&
-                          _homeTown != null &&
-                          _homeTown!.trim().isNotEmpty) {
-                        final townLower = _homeTown!.toLowerCase().trim();
-                        filteredEvents = filteredEvents.where((event) {
-                          return event.standort.toLowerCase().trim() ==
-                              townLower;
-                        }).toList();
-                      }
-
-                      return CustomScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        slivers: [
-                          SliverToBoxAdapter(
-                            child: SizedBox(
-                              height: SizeHelper.h(context, 0.015),
-                            ), // *12
-                          ),
-                          SliverPersistentHeader(
-                            pinned: true,
-                            delegate: SearchBarDelegate(controller: controller),
-                          ),
-
-                          // 🔹 Filterzeile: Favoriten + Radius
-                          SliverToBoxAdapter(child: _buildFilterRow(context)),
-
-
-                          SliverList(
-                            delegate: SliverChildBuilderDelegate(
-                              (context, index) =>
-                                  EventCard(event: filteredEvents[index]),
-                              childCount: filteredEvents.length,
-                            ),
-                          ),
-                          SliverToBoxAdapter(
-                            child: SizedBox(
-                              height: SizeHelper.h(context, 0.13),
-                            ), // *100
-                          ),
-                        ],
-                      );
-                    },
-                  );
-                },
+              return CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: SizedBox(height: SizeHelper.h(context, 0.015)),
+                  ),
+                  SliverPersistentHeader(
+                    pinned: true,
+                    delegate: SearchBarDelegate(controller: controller),
+                  ),
+                  SliverToBoxAdapter(child: _buildFilterRow(context)),
+                  SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) => EventCard(event: filteredEvents[index]),
+                      childCount: filteredEvents.length,
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: SizedBox(height: SizeHelper.h(context, 0.13)),
+                  ),
+                ],
               );
             },
           ),
