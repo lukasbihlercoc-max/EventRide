@@ -148,7 +148,7 @@ class _MyAppState extends State<MyApp> {
         ),
         
         Provider<RideRequestService>(
-          create: (_) => RideRequestService(),
+          create: (_) => RideRequestService(widget.anfrageService),
         ),
 
         // Repository-Interfaces (austauschbar gegen Firebase-Implementierungen)

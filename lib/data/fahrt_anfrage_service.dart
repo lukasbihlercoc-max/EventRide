@@ -4,7 +4,9 @@ import 'package:my_app/data/anfrage_service.dart';
 import 'package:my_app/data/fahrt_daten.dart';
 
 class RideRequestService {
-  final _anfrageService = AnfrageService();
+  final AnfrageService _anfrageService;
+
+  RideRequestService(this._anfrageService);
 
   Future<bool> sendRequest({
     required FahrtDaten fahrt,

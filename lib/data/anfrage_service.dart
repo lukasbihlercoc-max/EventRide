@@ -7,10 +7,7 @@ import 'package:my_app/data/fahrt_daten.dart';
 import 'package:my_app/data/interfaces/i_anfrage_repository.dart';
 
 class AnfrageService with ChangeNotifier {
-  static final AnfrageService _instance = AnfrageService._internal();
-  factory AnfrageService() => _instance;
-
-  AnfrageService._internal();
+  AnfrageService();
 
   late IAnfrageRepository _repository;
   final List<AnfrageDaten> _alleAnfragen = [];
