@@ -28,7 +28,22 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    _loadHomeTown(); // 🔹 Wohnort laden
+    _loadHomeTown();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _precacheImages());
+  }
+
+  void _precacheImages() {
+    const images = [
+      'assets/image/kirchtag2.jpg',
+      'assets/image/feuerwehr.png',
+      'assets/image/disco.png',
+      'assets/image/Ball.png',
+      'assets/image/krampus.jpg',
+      'assets/image/leer.jpg',
+    ];
+    for (final path in images) {
+      precacheImage(AssetImage(path), context);
+    }
   }
 
   Future<void> _loadHomeTown() async {
@@ -64,8 +79,8 @@ class _HomePageState extends State<HomePage> {
                 _showFavourites = selected;
               });
             },
-            selectedColor: Colors.blueAccent.withOpacity(0.8),
-            backgroundColor: Colors.black.withOpacity(0.3),
+            selectedColor: Colors.blueAccent.withValues(alpha: 0.8),
+            backgroundColor: Colors.black.withValues(alpha: 0.3),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
               side: BorderSide(
@@ -125,8 +140,8 @@ class _HomePageState extends State<HomePage> {
                 ),
                 decoration: BoxDecoration(
                   color: hasRadiusFilter
-                      ? Colors.blueAccent.withOpacity(0.8)
-                      : Colors.black, // ← WICHTIG
+                      ? Colors.blueAccent.withValues(alpha: 0.8)
+                      : Colors.black,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: hasRadiusFilter ? Colors.blueAccent : Colors.white24,
@@ -217,7 +232,9 @@ class _HomePageState extends State<HomePage> {
                   SliverToBoxAdapter(child: _buildFilterRow(context)),
                   SliverList(
                     delegate: SliverChildBuilderDelegate(
-                      (context, index) => EventCard(event: filteredEvents[index]),
+                      (context, index) => RepaintBoundary(
+                        child: EventCard(event: filteredEvents[index]),
+                      ),
                       childCount: filteredEvents.length,
                     ),
                   ),
