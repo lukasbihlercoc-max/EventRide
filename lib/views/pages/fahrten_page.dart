@@ -926,10 +926,27 @@ class _RequestedRideCard extends StatelessWidget {
 
   const _RequestedRideCard({required this.fahrt, required this.anfrage});
 
-  Future<void> _openChat(BuildContext context) async {
+  void _openChat(BuildContext context) {
     final chatService = context.read<ChatService>();
 
-    final conversation = await chatService.ensureConversation(
+    final conversationId = chatService.buildConversationId(
+      fahrtId: fahrt.id,
+      userA: fahrt.ownerId,
+      userB: anfrage.requesterId,
+    );
+
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: true,
+        pageBuilder: (_, __, ___) => ChatPage(
+          conversationId: conversationId,
+          otherUserName: anfrage.requesterName,
+        ),
+      ),
+    );
+
+    // Conversation + Systemnachricht im Hintergrund sicherstellen
+    chatService.ensureConversation(
       fahrtId: fahrt.id,
       ownerId: fahrt.ownerId,
       requesterId: anfrage.requesterId,
@@ -937,28 +954,14 @@ class _RequestedRideCard extends StatelessWidget {
       startOrt: fahrt.abfahrtsort,
       zielOrt: fahrt.standort,
       seatsRequested: anfrage.seatsRequested,
-    );
-
-    await chatService.updateSystemMessage(
-      conversationId: conversation.id,
+    ).then((_) => chatService.updateSystemMessage(
+      conversationId: conversationId,
       eventName: fahrt.eventName,
       startOrt: fahrt.abfahrtsort,
       zielOrt: fahrt.standort,
       seatsRequested: anfrage.seatsRequested,
       seatsAccepted: anfrage.seatsAccepted ?? 0,
-    );
-
-    if (!context.mounted) return;
-
-    Navigator.of(context).push(
-      PageRouteBuilder(
-        opaque: true,
-        pageBuilder: (_, __, ___) => ChatPage(
-          conversationId: conversation.id,
-          otherUserName: anfrage.requesterName,
-        ),
-      ),
-    );
+    ));
   }
 
   @override

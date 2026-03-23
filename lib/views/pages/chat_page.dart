@@ -56,6 +56,24 @@ class _ChatPageState extends State<ChatPage> {
     return StreamBuilder<List<ChatMessage>>(
       stream: chatService.messagesStream(widget.conversationId),
       builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
+          return AppBackground(
+            child: Scaffold(
+              backgroundColor: Colors.transparent,
+              appBar: AppBar(
+                backgroundColor: Colors.black.withValues(alpha: 0.18),
+                elevation: 0,
+                surfaceTintColor: Colors.transparent,
+                title: Text(widget.otherUserName),
+              ),
+              body: const Center(
+                child: CircularProgressIndicator(color: Colors.white54),
+              ),
+            ),
+          );
+        }
+
         final messages = snapshot.data ?? [];
         final systemMessages = messages.where((m) => m.isSystem).toList();
         final userMessages = messages.where((m) => !m.isSystem).toList();

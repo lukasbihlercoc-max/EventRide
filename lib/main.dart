@@ -1,4 +1,5 @@
 // lib/main.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -42,6 +43,9 @@ void main() async {
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
+  );
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true,
   );
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('de_DE', null);

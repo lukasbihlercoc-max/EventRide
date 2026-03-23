@@ -110,31 +110,34 @@ class _AnfrageCardState extends State<_AnfrageCard> {
 
   }
 
-  Future<void> _openChat(BuildContext context) async {
+  void _openChat(BuildContext context) {
     final chatService = context.read<ChatService>();
-    final otherUserId = widget.anfrage.requesterId;
 
-    final convo = await chatService.ensureConversation(
+    final conversationId = chatService.buildConversationId(
       fahrtId: widget.fahrt.id,
-      ownerId: widget.fahrt.ownerId,
-      requesterId: otherUserId,
-      eventName: widget.fahrt.eventName,
-      startOrt: widget.fahrt.abfahrtsort,
-      zielOrt: widget.fahrt.standort,
-      seatsRequested: widget.anfrage.seatsRequested,
+      userA: widget.fahrt.ownerId,
+      userB: widget.anfrage.requesterId,
     );
-
-
-    if (!mounted) return;
 
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => ChatPage(
-          conversationId: convo.id,
+          conversationId: conversationId,
           otherUserName: widget.anfrage.requesterName,
         ),
       ),
+    );
+
+    // Conversation im Hintergrund sicherstellen
+    chatService.ensureConversation(
+      fahrtId: widget.fahrt.id,
+      ownerId: widget.fahrt.ownerId,
+      requesterId: widget.anfrage.requesterId,
+      eventName: widget.fahrt.eventName,
+      startOrt: widget.fahrt.abfahrtsort,
+      zielOrt: widget.fahrt.standort,
+      seatsRequested: widget.anfrage.seatsRequested,
     );
   }
 
