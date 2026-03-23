@@ -25,9 +25,7 @@ class _ChatPageState extends State<ChatPage> {
   final _scrollController = ScrollController();
   late final String _myUserId;
 
-  bool _showMiniInfo = false;
-  bool _showFullInfo = true;
-  bool _isScrolling = false;
+  final _scrolledPast = ValueNotifier<bool>(false);
 
   static const double _triggerOffset = 100;
   static const double _systemBoxHeight = 260;
@@ -38,24 +36,14 @@ class _ChatPageState extends State<ChatPage> {
     _myUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
     _scrollController.addListener(() {
-      final shouldShowMini = _scrollController.offset > _triggerOffset;
-      final shouldShowFull = _scrollController.offset <= _triggerOffset;
-      final scrolling = _scrollController.position.isScrollingNotifier.value;
-
-      if (shouldShowMini != _showMiniInfo ||
-          shouldShowFull != _showFullInfo ||
-          scrolling != _isScrolling) {
-        setState(() {
-          _showMiniInfo = shouldShowMini;
-          _showFullInfo = shouldShowFull;
-          _isScrolling = scrolling;
-        });
-      }
+      final past = _scrollController.offset > _triggerOffset;
+      if (past != _scrolledPast.value) _scrolledPast.value = past;
     });
   }
 
   @override
   void dispose() {
+    _scrolledPast.dispose();
     _scrollController.dispose();
     _controller.dispose();
     super.dispose();
@@ -112,31 +100,37 @@ class _ChatPageState extends State<ChatPage> {
               ),
 
               if (systemMessages.isNotEmpty)
-                Positioned(
-                  top: MediaQuery.of(context).padding.top + kToolbarHeight + 8,
-                  left: 16,
-                  right: 16,
-                  child: AnimatedOpacity(
-                    duration: const Duration(milliseconds: 200),
-                    opacity: _showFullInfo ? 1 : 0,
-                    child: IgnorePointer(
-                      ignoring: !_showFullInfo,
-                      child: _buildSystemMessage(
-                        context,
-                        systemMessages.last,
+                ValueListenableBuilder<bool>(
+                  valueListenable: _scrolledPast,
+                  builder: (context, past, _) => Positioned(
+                    top: MediaQuery.of(context).padding.top + kToolbarHeight + 8,
+                    left: 16,
+                    right: 16,
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 200),
+                      opacity: past ? 0 : 1,
+                      child: IgnorePointer(
+                        ignoring: past,
+                        child: _buildSystemMessage(
+                          context,
+                          systemMessages.last,
+                        ),
                       ),
                     ),
                   ),
                 ),
 
               if (systemMessages.isNotEmpty)
-                Positioned(
-                  top: MediaQuery.of(context).padding.top + kToolbarHeight + 8,
-                  left: 16,
-                  child: _MiniRideInfo(
-                    visible: _showMiniInfo,
-                    onTap: () =>
-                        _showInfoBottomSheet(context, systemMessages.last),
+                ValueListenableBuilder<bool>(
+                  valueListenable: _scrolledPast,
+                  builder: (context, past, _) => Positioned(
+                    top: MediaQuery.of(context).padding.top + kToolbarHeight + 8,
+                    left: 16,
+                    child: _MiniRideInfo(
+                      visible: past,
+                      onTap: () =>
+                          _showInfoBottomSheet(context, systemMessages.last),
+                    ),
                   ),
                 ),
             ],
