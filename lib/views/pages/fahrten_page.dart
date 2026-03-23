@@ -376,7 +376,10 @@ class _AngeboteneFahrtenTab extends StatefulWidget {
   State<_AngeboteneFahrtenTab> createState() => _AngeboteneFahrtenTabState();
 }
 
-class _AngeboteneFahrtenTabState extends State<_AngeboteneFahrtenTab> {
+class _AngeboteneFahrtenTabState extends State<_AngeboteneFahrtenTab>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
   static const _hintKey = 'swipe_delete_hint_shown';
   bool _showHint = false;
 
@@ -497,6 +500,7 @@ class _AngeboteneFahrtenTabState extends State<_AngeboteneFahrtenTab> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Consumer<FahrtService>(
       builder: (context, fahrtService, _) {
         final es = context.read<EventService>();
@@ -524,13 +528,15 @@ class _AngeboteneFahrtenTabState extends State<_AngeboteneFahrtenTab> {
                 itemCount: meineFahrten.length,
                 itemBuilder: (context, index) {
                   final fahrt = meineFahrten[index];
-                  return Dismissible(
-                    key: ValueKey(fahrt.id),
-                    direction: DismissDirection.endToStart,
-                    confirmDismiss: (_) => _confirmDelete(fahrt),
-                    onDismissed: (_) => _deleteFahrt(fahrt),
-                    background: const _SwipeDeleteBackground(),
-                    child: _FahrerGlassCard(fahrt: fahrt),
+                  return RepaintBoundary(
+                    child: Dismissible(
+                      key: ValueKey(fahrt.id),
+                      direction: DismissDirection.endToStart,
+                      confirmDismiss: (_) => _confirmDelete(fahrt),
+                      onDismissed: (_) => _deleteFahrt(fahrt),
+                      background: const _SwipeDeleteBackground(),
+                      child: _FahrerGlassCard(fahrt: fahrt),
+                    ),
                   );
                 },
               ),
@@ -607,13 +613,23 @@ class _SwipeHint extends StatelessWidget {
 /// ------------------------------------------------------------
 /// TAB 2 – angefragte Fahrten (nach Datum sortiert)
 /// ------------------------------------------------------------
-class _AngefragteFahrtenTab extends StatelessWidget {
+class _AngefragteFahrtenTab extends StatefulWidget {
   final String userId;
 
   const _AngefragteFahrtenTab({required this.userId});
 
   @override
+  State<_AngefragteFahrtenTab> createState() => _AngefragteFahrtenTabState();
+}
+
+class _AngefragteFahrtenTabState extends State<_AngefragteFahrtenTab>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Consumer2<AnfrageService, FahrtService>(
       builder: (context, anfrageService, fahrtService, _) {
         final es = context.read<EventService>();
@@ -621,7 +637,7 @@ class _AngefragteFahrtenTab extends StatelessWidget {
         final datumCache = {for (final e in es.events) e.id: e.datum};
 
         final items = anfrageService
-            .getAnfragenByRequester(userId)
+            .getAnfragenByRequester(widget.userId)
             .map((a) => _RequestedRideItem(a, fahrtMap[a.fahrtId]))
             .toList()
           ..sort((a, b) {
@@ -649,9 +665,13 @@ class _AngefragteFahrtenTab extends StatelessWidget {
           itemBuilder: (context, index) {
             final item = items[index];
             if (item.fahrt == null) {
-              return _RequestedRideDeletedCard(anfrage: item.anfrage);
+              return RepaintBoundary(
+                child: _RequestedRideDeletedCard(anfrage: item.anfrage),
+              );
             }
-            return _RequestedRideCard(fahrt: item.fahrt!, anfrage: item.anfrage);
+            return RepaintBoundary(
+              child: _RequestedRideCard(fahrt: item.fahrt!, anfrage: item.anfrage),
+            );
           },
         );
       },
