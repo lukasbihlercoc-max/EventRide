@@ -14,11 +14,13 @@ import 'package:my_app/data/event_daten.dart';
 import 'package:my_app/data/event_service.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/data/chat_service.dart';
+import 'package:my_app/data/interessenten_service.dart';
 import 'package:my_app/data/seen_anfragen_service.dart';
 import 'package:my_app/views/pages/login_page.dart';
 import 'package:my_app/views/pages/fahrt_anfragen_page.dart';
 import 'package:my_app/views/pages/fahrt_anbieten_page.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
+import 'package:my_app/views/widgets/fahrtencard_widget/interessenten_bottom_sheet.dart';
 
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/pages/chat_page.dart';
@@ -797,6 +799,9 @@ class _FahrerGlassCard extends StatelessWidget {
       );
     });
 
+    final interessentenCount = context.select<InteressentenService, int>(
+        (s) => s.countForEvent(fahrt.eventId));
+
     final gesamtPlaetze = fahrt.freiePlaetze + counts.belegt;
     final uhrzeit = fahrt.uhrzeit.format(context);
     final rueckuhrzeit = fahrt.rueckuhrzeit?.format(context);
@@ -1057,6 +1062,59 @@ class _FahrerGlassCard extends StatelessWidget {
                               ),
                             ),
                           ),
+                          if (interessentenCount > 0) ...[
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 44,
+                              child: OutlinedButton.icon(
+                                onPressed: () =>
+                                    showInteressentenSheet(context, fahrt),
+                                icon: const Icon(
+                                    Icons.people_outline,
+                                    size: 16),
+                                label: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text('Interessenten'),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 7, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        borderRadius:
+                                            BorderRadius.circular(12),
+                                        color: Colors.amber
+                                            .withValues(alpha: 0.15),
+                                        border: Border.all(
+                                          color: Colors.amber
+                                              .withValues(alpha: 0.4),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        '$interessentenCount',
+                                        style: const TextStyle(
+                                          color: Colors.amber,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.amber,
+                                  side: BorderSide(
+                                    color: Colors.amber
+                                        .withValues(alpha: 0.5),
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
