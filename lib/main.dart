@@ -23,9 +23,11 @@ import 'package:my_app/data/firebase/firebase_auth_repository.dart';
 
 import 'package:my_app/views/auth/auth_gate.dart';
 import 'package:my_app/data/firebase/firestore_anfrage_repository.dart';
+import 'package:my_app/data/firebase/firestore_interessenten_repository.dart';
 
 // Services
 import 'package:my_app/data/anfrage_service.dart';
+import 'package:my_app/data/interessenten_service.dart';
 import 'package:my_app/data/fahrt_service.dart';
 
 // Provider
@@ -34,9 +36,6 @@ import 'package:provider/provider.dart';
 //Firebase
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-
-//Map Test
-import 'package:my_app/test_map_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -79,6 +78,9 @@ void main() async {
   final seenAnfragenService = SeenAnfragenService();
   await seenAnfragenService.init();
 
+  final interessentenService =
+      InteressentenService(FirestoreInteressentenRepository());
+
   // 🔹 Performance Optimierungen
   if (kReleaseMode) {
     debugPrint = (String? message, {int? wrapWidth}) {};
@@ -95,6 +97,7 @@ void main() async {
     authRepository: authRepository,
     fahrtRepository: fahrtRepository,
     seenAnfragenService: seenAnfragenService,
+    interessentenService: interessentenService,
   ));
 }
 
@@ -106,6 +109,7 @@ class MyApp extends StatefulWidget {
   final IAuthRepository authRepository;
   final IFahrtRepository fahrtRepository;
   final SeenAnfragenService seenAnfragenService;
+  final InteressentenService interessentenService;
 
   const MyApp({
     super.key,
@@ -116,6 +120,7 @@ class MyApp extends StatefulWidget {
     required this.authRepository,
     required this.fahrtRepository,
     required this.seenAnfragenService,
+    required this.interessentenService,
   });
 
   @override
@@ -145,6 +150,10 @@ class _MyAppState extends State<MyApp> {
 
         ChangeNotifierProvider<SeenAnfragenService>.value(
           value: widget.seenAnfragenService,
+        ),
+
+        ChangeNotifierProvider<InteressentenService>.value(
+          value: widget.interessentenService,
         ),
 
         Provider<ChatService>.value(
