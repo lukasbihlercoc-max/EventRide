@@ -7,11 +7,13 @@ import 'package:my_app/views/widgets/sizehelper_widget.dart';
 class AppBarWidget extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final Widget? rightWidget;
+  final bool showLogo;
 
   const AppBarWidget({
-    super.key, 
+    super.key,
     required this.title,
     this.rightWidget,
+    this.showLogo = false,
   });
 
   @override
@@ -29,14 +31,35 @@ class AppBarWidget extends StatelessWidget implements PreferredSizeWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold, 
-                  fontSize: SizeHelper.w(context, 0.045),
-                  color: Colors.white
+              if (showLogo)
+                RichText(
+                  text: TextSpan(
+                    style: TextStyle(
+                      fontSize: SizeHelper.w(context, 0.055),
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                    children: const [
+                      TextSpan(
+                        text: 'Event',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      TextSpan(
+                        text: 'Ride',
+                        style: TextStyle(color: Color(0xFFF5A623)),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: SizeHelper.w(context, 0.045),
+                    color: Colors.white,
+                  ),
                 ),
-              ),
               rightWidget ?? _buildDefaultCalendarButton(context),
             ],
           ),

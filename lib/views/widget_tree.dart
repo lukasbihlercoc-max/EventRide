@@ -55,6 +55,29 @@ class WidgetTree extends StatelessWidget {
                 ),
               ),
 
+              // Bottom Scrim – dunkelt den Hintergrund hinter der Navbar ab
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: 130,
+                child: IgnorePointer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.6),
+                          Colors.black.withValues(alpha: 1.2),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
               // Floating Action Button – nur für Admin sichtbar
               if (FirebaseAuth.instance.currentUser?.uid == 'vA8UdBXsdCPD3ePJ88j4C3MQtjJ2')
                 Positioned(
@@ -92,6 +115,10 @@ class WidgetTree extends StatelessWidget {
   AppBarWidget _buildAppBar(BuildContext context, int selectedPage) {
     switch (selectedPage) {
       case 0: // HomePage
+        return AppBarWidget(
+          title: pages[selectedPage].title,
+          showLogo: true,
+        );
       case 1: // FahrtenPage
         return AppBarWidget(
           title: pages[selectedPage].title,
@@ -110,16 +137,31 @@ class WidgetTree extends StatelessWidget {
 
   // 🔥 Settings-Button - 🟡 UNVERÄNDERT
   Widget _buildSettingsButton(BuildContext context) {
-    return IconButton(
-      icon: const Icon(Icons.settings, size: 20, color: Colors.white),
-      onPressed: () {
-        Navigator.push(
-          context, 
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: GestureDetector(
+        onTap: () => Navigator.push(
+          context,
           MaterialPageRoute(
             builder: (context) => SettingsPage(title: "Einstellungen"),
           ),
-        );
-      },
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.25),
+            ),
+          ),
+          child: const Icon(
+            Icons.settings_rounded,
+            size: 20,
+            color: Colors.white,
+          ),
+        ),
+      ),
     );
   }
 }

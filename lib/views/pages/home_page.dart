@@ -39,7 +39,7 @@ class _HomePageState extends State<HomePage> {
       'assets/image/disco.png',
       'assets/image/Ball.png',
       'assets/image/krampus.jpg',
-      'assets/image/leer.jpg',
+      'assets/image/kirchtag.jpg',
     ];
     for (final path in images) {
       precacheImage(AssetImage(path), context);
@@ -222,9 +222,6 @@ class _HomePageState extends State<HomePage> {
               return CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
-                  SliverToBoxAdapter(
-                    child: SizedBox(height: SizeHelper.h(context, 0.015)),
-                  ),
                   SliverPersistentHeader(
                     pinned: true,
                     delegate: SearchBarDelegate(controller: controller),
@@ -239,7 +236,7 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                   SliverToBoxAdapter(
-                    child: SizedBox(height: SizeHelper.h(context, 0.13)),
+                    child: SizedBox(height: SizeHelper.h(context, 0.15)),
                   ),
                 ],
               );

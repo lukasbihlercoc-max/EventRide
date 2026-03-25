@@ -18,9 +18,20 @@ class FahrtFindenPage extends StatelessWidget {
     return Stack(
       children: [
         AppBackground(child: Container()),
-        Container(color: Colors.black.withOpacity(0.4)),
+        Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.black.withValues(alpha: 0.5),
+                const Color(0xFF0F172A).withValues(alpha: 0.72),
+              ],
+            ),
+          ),
+        ),
         BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+          filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
           child: Container(color: Colors.transparent),
         ),
 
@@ -29,62 +40,107 @@ class FahrtFindenPage extends StatelessWidget {
           appBar: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
-            title: Text("Fahrten zu: ${event.name}"),
+            title: const Text('Fahrten finden'),
             leading: BackButton(onPressed: () => Navigator.pop(context)),
           ),
-          // 🆕 CONSUMER FÜR FAHRTSERVICE VERWENDEN
           body: Consumer<FahrtService>(
             builder: (context, fahrtService, child) {
-              // 🆕 FAHRTEN AUS DEM SERVICE HOLEN
               final fahrtenFuerEvent = fahrtService.alleFahrten
-                  .where(
-                    (fahrt) =>
-                        fahrt.eventId == event.stabileId &&
-                        fahrt.freiePlaetze > 0,
-                  ) // 🔥 nur Fahrten mit freien Plätzen
+                  .where((fahrt) =>
+                      fahrt.eventId == event.stabileId &&
+                      fahrt.freiePlaetze > 0)
                   .toList();
 
-              // Debug-Ausgabe
-              print("🔍 DEBUG: Event ID: ${event.stabileId}");
-              print(
-                "🔍 DEBUG: Gefundene Fahrten für Event: ${fahrtenFuerEvent.length}",
-              );
+              if (fahrtenFuerEvent.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.directions_car_filled_outlined,
+                          size: 64,
+                          color: Colors.white.withValues(alpha: 0.5)),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Noch keine Mitfahrgelegenheiten\nfür dieses Event',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.8),
+                          fontSize: 18,
+                          fontWeight: FontWeight.w300,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
 
-              return fahrtenFuerEvent.isEmpty
-                  ? Center(
+              return CustomScrollView(
+                slivers: [
+                  // ── Event-Header ──
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(
-                            Icons.directions_car_filled_outlined,
-                            size: 64,
-                            color: Colors.white.withOpacity(0.5),
-                          ),
-                          SizedBox(height: 16),
                           Text(
-                            "Noch keine Mitfahrgelegenheiten\nfür dieses Event",
-                            textAlign: TextAlign.center,
+                            'Fahrten zu',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.8),
-                              fontSize: 18,
-                              fontWeight: FontWeight.w300,
+                              color: Colors.white.withValues(alpha: 0.6),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          GestureDetector(
+                            onTap: () =>
+                                showEventDetailsPopup(context, event),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  event.name,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                const Icon(
+                                  Icons.info_outline,
+                                  color: Colors.white38,
+                                  size: 18,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${fahrtenFuerEvent.length} Fahrt${fahrtenFuerEvent.length == 1 ? '' : 'en'} verfügbar',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.5),
+                              fontSize: 13,
                             ),
                           ),
                         ],
                       ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.only(bottom: 24),
-                      itemCount: fahrtenFuerEvent.length,
-                      itemBuilder: (context, index) {
-                        final fahrt = fahrtenFuerEvent[index];
-                        return FahrtenCard(
-                          fahrt: fahrt,
-                          isEditable:
-                              false, // Zeigt "Mitfahren" Button (oder weglassen, da false default ist)
-                        );
-                      },
-                    );
+                    ),
+                  ),
+                  // ── Karten ──
+                  SliverPadding(
+                    padding: const EdgeInsets.only(bottom: 32, top: 8),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) => RepaintBoundary(
+                          child: FahrtenCard(fahrt: fahrtenFuerEvent[index]),
+                        ),
+                        childCount: fahrtenFuerEvent.length,
+                      ),
+                    ),
+                  ),
+                ],
+              );
             },
           ),
         ),

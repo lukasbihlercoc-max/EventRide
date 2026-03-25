@@ -19,7 +19,7 @@ String? getBackgroundImage(String typ) {
     case "e5":
       return "assets/image/krampus.jpg";
     default:
-      return "assets/image/leer.jpg";
+      return "assets/image/default.jpg";
   }
 }
 

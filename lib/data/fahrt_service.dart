@@ -18,13 +18,20 @@ class FahrtService with ChangeNotifier {
   /// Aktualisiert die Liste automatisch bei Änderungen anderer Geräte.
   Future<void> load() async {
     _subscription?.cancel();
-    _subscription = _repo.watch().listen((fahrten) {
-      _fahrten
-        ..clear()
-        ..addAll(fahrten);
-      _sort();
-      notifyListeners();
-    });
+    _subscription = _repo.watch().listen(
+      (fahrten) {
+        _fahrten
+          ..clear()
+          ..addAll(fahrten);
+        _sort();
+        notifyListeners();
+      },
+      onError: (_) {
+        // z. B. Firestore PERMISSION_DENIED im ausgeloggten Zustand → ignorieren
+        _fahrten.clear();
+        notifyListeners();
+      },
+    );
   }
 
   @override

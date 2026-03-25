@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'dart:ui'; // Für ImageFilter.blur
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:my_app/data/fahrt_service.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/pages/register_page.dart';
@@ -242,6 +243,8 @@ class _LoginPageState extends State<LoginPage> {
         _emailController.text.trim(),
         _passwordController.text,
       );
+      if (!mounted) return;
+      await context.read<FahrtService>().load();
       if (mounted) Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
