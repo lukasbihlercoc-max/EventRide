@@ -1,0 +1,307 @@
+// lib/views/widgets/fahrtencard_widget/interessenten_bottom_sheet.dart
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:my_app/data/anfrage_daten.dart';
+import 'package:my_app/data/anfrage_service.dart';
+import 'package:my_app/data/fahrt_daten.dart';
+import 'package:my_app/data/interessenten_daten.dart';
+import 'package:my_app/data/interessenten_service.dart';
+import 'package:my_app/data/interfaces/i_auth_repository.dart';
+
+void showInteressentenSheet(BuildContext context, FahrtDaten fahrt) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => _InteressentenSheet(fahrt: fahrt),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sheet-Widget
+// ---------------------------------------------------------------------------
+class _InteressentenSheet extends StatefulWidget {
+  const _InteressentenSheet({required this.fahrt});
+  final FahrtDaten fahrt;
+
+  @override
+  State<_InteressentenSheet> createState() => _InteressentenSheetState();
+}
+
+class _InteressentenSheetState extends State<_InteressentenSheet> {
+  /// UserIds die in dieser Session bereits eingeladen wurden
+  final Set<String> _eingeladen = {};
+
+  /// UserIds bei denen gerade eine Anfrage läuft
+  final Set<String> _loading = {};
+
+  @override
+  Widget build(BuildContext context) {
+    final interessenten = context
+        .watch<InteressentenService>()
+        .getForEvent(widget.fahrt.eventId);
+
+    final alleAnfragen = context.watch<AnfrageService>().alleAnfragen;
+
+    // Nur Leute zeigen, die noch keine offene/akzeptierte Anfrage für diese Fahrt haben
+    final filtered = interessenten.where((i) {
+      final hatAnfrage = alleAnfragen.any((a) =>
+          a.fahrtId == widget.fahrt.id &&
+          a.requesterId == i.userId &&
+          a.status != AnfrageStatus.abgelehnt);
+      return !hatAnfrage;
+    }).toList();
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.5,
+      minChildSize: 0.3,
+      maxChildSize: 0.85,
+      expand: false,
+      builder: (_, scrollController) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFF1A2744),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              // ── Drag-Handle ──
+              Padding(
+                padding: const EdgeInsets.only(top: 12, bottom: 8),
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+
+              // ── Header ──
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.people_outline,
+                        color: Colors.amber, size: 22),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Interessenten · ${widget.fahrt.eventName}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const Divider(color: Colors.white12, height: 1),
+
+              // ── Inhalt ──
+              Expanded(
+                child: filtered.isEmpty
+                    ? _emptyState()
+                    : ListView.separated(
+                        controller: scrollController,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, __) =>
+                            const Divider(color: Colors.white10, height: 1),
+                        itemBuilder: (_, i) => _InteressentTile(
+                          interessent: filtered[i],
+                          istEingeladen:
+                              _eingeladen.contains(filtered[i].userId),
+                          isLoading: _loading.contains(filtered[i].userId),
+                          onEinladen: () => _einladen(filtered[i]),
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _emptyState() {
+    return const Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.sentiment_neutral, color: Colors.white24, size: 48),
+          SizedBox(height: 12),
+          Text(
+            'Niemand wartet auf eine Mitfahrt',
+            style: TextStyle(color: Colors.white38, fontSize: 15),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _einladen(InteressentenDaten interessent) async {
+    if (_eingeladen.contains(interessent.userId) ||
+        _loading.contains(interessent.userId)) return;
+
+    setState(() => _loading.add(interessent.userId));
+
+    final currentUser = context.read<IAuthRepository>().currentUser;
+    if (currentUser == null) {
+      setState(() => _loading.remove(interessent.userId));
+      return;
+    }
+
+    final anfrageService = context.read<AnfrageService>();
+
+    // Spam-Schutz: prüfe nochmal direkt vor dem Schreiben
+    if (!anfrageService.hatOffeneEinladungFuer(
+        widget.fahrt.id, interessent.userId)) {
+      final anfrage = AnfrageDaten.create(
+        fahrtId: widget.fahrt.id,
+        eventId: widget.fahrt.eventId,
+        requesterId: interessent.userId,
+        requesterName: interessent.userName,
+        seatsRequested: 1,
+        fahrtOwnerId: currentUser.userId,
+        eventName: widget.fahrt.eventName,
+        startOrt: widget.fahrt.abfahrtsortAnzeige,
+        zielOrt: widget.fahrt.standort,
+        fahrerName: currentUser.name,
+      );
+      await anfrageService.addAnfrage(anfrage);
+    }
+
+    if (!mounted) { return; }
+    setState(() {
+      _loading.remove(interessent.userId);
+      _eingeladen.add(interessent.userId);
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Einzelner Eintrag
+// ---------------------------------------------------------------------------
+class _InteressentTile extends StatelessWidget {
+  const _InteressentTile({
+    required this.interessent,
+    required this.istEingeladen,
+    required this.isLoading,
+    required this.onEinladen,
+  });
+
+  final InteressentenDaten interessent;
+  final bool istEingeladen;
+  final bool isLoading;
+  final VoidCallback onEinladen;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          // Avatar
+          Container(
+            width: 40,
+            height: 40,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Color(0xFF2F5ED6),
+            ),
+            child: Center(
+              child: Text(
+                _initials(interessent.userName),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          // Name + Bezirk
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  interessent.userName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                  ),
+                ),
+                if (interessent.bezirk != null &&
+                    interessent.bezirk!.isNotEmpty)
+                  Text(
+                    interessent.bezirk!,
+                    style:
+                        const TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+              ],
+            ),
+          ),
+
+          const SizedBox(width: 8),
+
+          // Button-Bereich
+          if (isLoading)
+            const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: Colors.amber),
+            )
+          else if (istEingeladen)
+            OutlinedButton(
+              onPressed: null,
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Colors.white24),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text(
+                'Angefragt',
+                style: TextStyle(color: Colors.white38, fontSize: 13),
+              ),
+            )
+          else
+            ElevatedButton(
+              onPressed: onEinladen,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.amber.shade700,
+                foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text('Einladen', style: TextStyle(fontSize: 13)),
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _initials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.isEmpty || parts.first.isEmpty) return '?';
+    if (parts.length == 1) return parts.first[0].toUpperCase();
+    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+  }
+}

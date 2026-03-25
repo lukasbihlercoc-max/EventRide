@@ -96,6 +96,15 @@ class AnfrageService with ChangeNotifier {
   // FILTER-FUNKTIONEN
   // -------------------------------------------------------------
 
+  /// Gibt true zurück wenn für diese Fahrt bereits eine offene
+  /// Einladung an den Interessenten existiert (Spam-Schutz).
+  bool hatOffeneEinladungFuer(String fahrtId, String interessentId) {
+    return _alleAnfragen.any((a) =>
+        a.fahrtId == fahrtId &&
+        a.requesterId == interessentId &&
+        a.status == AnfrageStatus.offen);
+  }
+
   List<AnfrageDaten> getAnfragenForFahrt(String fahrtId) {
     return _alleAnfragen.where((a) => a.fahrtId == fahrtId).toList();
   }
