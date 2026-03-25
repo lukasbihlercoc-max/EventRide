@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:my_app/data/anfrage_daten.dart';
 import 'package:my_app/data/fahrt_daten.dart';
+import 'package:my_app/data/interessenten_daten.dart';
 import 'package:my_app/data/interfaces/i_anfrage_repository.dart';
 
 class AnfrageService with ChangeNotifier {
@@ -103,6 +104,31 @@ class AnfrageService with ChangeNotifier {
         a.fahrtId == fahrtId &&
         a.requesterId == interessentId &&
         a.status == AnfrageStatus.offen);
+  }
+
+  /// Fahrer lädt einen Interessenten ein (vonFahrer = true).
+  /// Gibt false zurück wenn bereits eine offene Einladung existiert.
+  Future<bool> einladenVomFahrer({
+    required FahrtDaten fahrt,
+    required InteressentenDaten interessent,
+    required String fahrerName,
+  }) async {
+    if (hatOffeneEinladungFuer(fahrt.id, interessent.userId)) return false;
+    final anfrage = AnfrageDaten.create(
+      fahrtId: fahrt.id,
+      eventId: fahrt.eventId,
+      requesterId: interessent.userId,
+      requesterName: interessent.userName,
+      seatsRequested: 1,
+      fahrtOwnerId: fahrt.ownerId,
+      eventName: fahrt.eventName,
+      startOrt: fahrt.abfahrtsortAnzeige,
+      zielOrt: fahrt.standort,
+      fahrerName: fahrerName,
+      vonFahrer: true,
+    );
+    await addAnfrage(anfrage);
+    return true;
   }
 
   List<AnfrageDaten> getAnfragenForFahrt(String fahrtId) {

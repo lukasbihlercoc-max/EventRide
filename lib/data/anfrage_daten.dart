@@ -22,6 +22,8 @@ class AnfrageDaten {
   final String startOrt;
   final String zielOrt;
   final String fahrerName;
+  /// true = Fahrer hat den Gast eingeladen (umgekehrte Richtung)
+  final bool vonFahrer;
 
   AnfrageDaten({
     required this.id,
@@ -39,6 +41,7 @@ class AnfrageDaten {
     required this.startOrt,
     required this.zielOrt,
     required this.fahrerName,
+    this.vonFahrer = false,
   });
 
   factory AnfrageDaten.create({
@@ -55,6 +58,7 @@ class AnfrageDaten {
     required String fahrerName,
 
     String? message,
+    bool vonFahrer = false,
   }) {
     return AnfrageDaten(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -72,6 +76,7 @@ class AnfrageDaten {
       startOrt: startOrt,
       zielOrt: zielOrt,
       fahrerName: fahrerName,
+      vonFahrer: vonFahrer,
     );
   }
 
@@ -92,6 +97,7 @@ class AnfrageDaten {
       'startOrt': startOrt,
       'zielOrt': zielOrt,
       'fahrerName': fahrerName,
+      'vonFahrer': vonFahrer,
     };
   }
 
@@ -116,6 +122,7 @@ class AnfrageDaten {
       startOrt: map['startOrt'] as String? ?? '',
       zielOrt: map['zielOrt'] as String? ?? '',
       fahrerName: map['fahrerName'] as String? ?? '',
+      vonFahrer: map['vonFahrer'] as bool? ?? false,
     );
   }
 
@@ -139,6 +146,7 @@ class AnfrageDaten {
       startOrt: startOrt,
       zielOrt: zielOrt,
       fahrerName: fahrerName,
+      vonFahrer: vonFahrer,
     );
   }
 }

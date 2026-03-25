@@ -18,6 +18,7 @@ import 'package:my_app/views/pages/fahrt_finden_page.dart';
 import 'package:my_app/views/auth/auth_guard.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
+import 'package:my_app/views/widgets/fahrtencard_widget/interessenten_bottom_sheet.dart';
 
 Future<void> _openEventNavigation(double lat, double lng) async {
   final mapsUri = Uri.parse('google.navigation:q=$lat,$lng');
@@ -326,7 +327,7 @@ class DetailPage extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// "Ich will hin" Button — eigenes Widget für saubere Trennung
+// "Ich will hin" Button — drei Fälle: Fahrer / Gast / deaktiviert
 // ---------------------------------------------------------------------------
 class _IchWillHinButton extends StatelessWidget {
   const _IchWillHinButton({
@@ -345,26 +346,50 @@ class _IchWillHinButton extends StatelessWidget {
     if (currentUser == null) return const SizedBox.shrink();
 
     final interessentenService = context.watch<InteressentenService>();
-    final fahrtService = context.read<FahrtService>();
-    final anfrageService = context.read<AnfrageService>();
+    final fahrtService = context.watch<FahrtService>();
+    final anfrageService = context.watch<AnfrageService>();
 
-    // Prüfe ob User schon eine Fahrt für dieses Event hat
-    final hatEigeneFahrt = fahrtService.alleFahrten
-        .any((f) => f.eventId == event.id && f.ownerId == currentUser.userId);
+    final count = interessentenService.countForEvent(event.id);
 
+    // ── FALL 1: User hat selbst eine Fahrt → Fahrer-Sicht ──
+    final eigeneFahrt = fahrtService.alleFahrten
+        .where((f) => f.eventId == event.id && f.ownerId == currentUser.userId)
+        .firstOrNull;
+
+    if (eigeneFahrt != null) {
+      if (count == 0) return const SizedBox.shrink();
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: () => showInteressentenSheet(context, eigeneFahrt),
+          icon: const Icon(Icons.people_outline, color: Colors.white),
+          label: Text(
+            count == 1 ? '1 will hin' : '$count wollen hin',
+            style: TextStyle(
+              fontSize: width * 0.04,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.amber.shade700,
+            foregroundColor: Colors.white,
+            padding: EdgeInsets.symmetric(
+              vertical: height * 0.020,
+              horizontal: width * 0.05,
+            ),
+          ),
+        ),
+      );
+    }
+
+    // ── FALL 2: Akzeptierte Anfrage → deaktiviert ──
     final hatAkzeptierteAnfrage = anfrageService.alleAnfragen.any((a) =>
         a.eventId == event.id &&
         a.requesterId == currentUser.userId &&
         a.status == AnfrageStatus.akzeptiert);
 
-    final hatFahrt = hatEigeneFahrt || hatAkzeptierteAnfrage;
-
-    final interessiertList = interessentenService.getForEvent(event.id);
-    final count = interessiertList.length;
-    final ichBinInteressiert =
-        interessentenService.isInteressiert(event.id, currentUser.userId);
-
-    if (hatFahrt) {
+    if (hatAkzeptierteAnfrage) {
       return Opacity(
         opacity: 0.5,
         child: OutlinedButton.icon(
@@ -385,20 +410,26 @@ class _IchWillHinButton extends StatelessWidget {
       );
     }
 
+    // ── FALL 3: Gast-Sicht — "Ich will hin" Toggle ──
+    final ichBinInteressiert =
+        interessentenService.isInteressiert(event.id, currentUser.userId);
+
     return Row(
       children: [
         Expanded(
           child: ichBinInteressiert
               ? ElevatedButton.icon(
-                  onPressed: () => _toggle(context, currentUser.userId,
-                      currentUser.name, interessentenService),
+                  onPressed: () => _toggle(
+                      context, currentUser.userId, currentUser.name,
+                      interessentenService),
                   icon: const Icon(Icons.check, color: Colors.white),
                   label: Text(
-                    'Ich will hin',
+                    'Du willst hin',
                     style: TextStyle(
-                        fontSize: width * 0.04,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white),
+                      fontSize: width * 0.04,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.amber.shade700,
@@ -410,15 +441,15 @@ class _IchWillHinButton extends StatelessWidget {
                   ),
                 )
               : OutlinedButton.icon(
-                  onPressed: () => _toggle(context, currentUser.userId,
-                      currentUser.name, interessentenService),
+                  onPressed: () => _toggle(
+                      context, currentUser.userId, currentUser.name,
+                      interessentenService),
                   icon: Icon(Icons.emoji_people,
                       color: Colors.amber.shade400, size: width * 0.043),
                   label: Text(
                     'Ich will hin',
                     style: TextStyle(
-                        fontSize: width * 0.04,
-                        color: Colors.amber.shade400),
+                        fontSize: width * 0.04, color: Colors.amber.shade400),
                   ),
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(color: Colors.amber.shade400),
@@ -444,8 +475,8 @@ class _IchWillHinButton extends StatelessWidget {
               ),
               Text(
                 count == 1 ? 'will hin' : 'wollen hin',
-                style: TextStyle(
-                    color: Colors.white54, fontSize: width * 0.03),
+                style:
+                    TextStyle(color: Colors.white54, fontSize: width * 0.03),
               ),
             ],
           ),
@@ -460,10 +491,7 @@ class _IchWillHinButton extends StatelessWidget {
     String userName,
     InteressentenService service,
   ) async {
-    // Hole HomeTown als Bezirk (optional)
-    final authRepo = context.read<IAuthRepository>();
-    final bezirk = await authRepo.getHomeTown();
-
+    final bezirk = await context.read<IAuthRepository>().getHomeTown();
     if (!context.mounted) return;
 
     final eingetragen = await service.toggle(

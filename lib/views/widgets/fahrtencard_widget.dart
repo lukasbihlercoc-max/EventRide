@@ -2,9 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:my_app/data/fahrt_anfrage_service.dart';
 import 'package:my_app/data/fahrt_service.dart';
-import 'package:my_app/data/interessenten_service.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
-import 'package:my_app/views/widgets/fahrtencard_widget/interessenten_bottom_sheet.dart';
 import 'package:provider/provider.dart';
 
 import 'package:my_app/data/fahrt_daten.dart';
@@ -205,10 +203,6 @@ class _FahrtenCardState extends State<FahrtenCard> {
           .length,
     );
 
-    final interessentenCount = isEditable
-        ? context.select<InteressentenService, int>(
-            (s) => s.countForEvent(fahrt.eventId))
-        : 0;
 
     final screenHeight = MediaQuery.of(context).size.height;
 
@@ -331,96 +325,49 @@ class _FahrtenCardState extends State<FahrtenCard> {
                       Positioned(
                         top: 8,
                         right: 8,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
+                        child: Stack(
+                          clipBehavior: Clip.none,
                           children: [
-                            // Interessenten-Badge (nur wenn > 0)
-                            if (interessentenCount > 0)
-                              Stack(
-                                clipBehavior: Clip.none,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.people_outline,
-                                      color: Colors.white,
-                                      size: 26,
-                                    ),
-                                    onPressed: () =>
-                                        showInteressentenSheet(context, fahrt),
-                                  ),
-                                  Positioned(
-                                    right: 4,
-                                    top: 4,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(4),
-                                      decoration: const BoxDecoration(
-                                        color: Colors.amber,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      constraints: const BoxConstraints(
-                                        minWidth: 18,
-                                        minHeight: 18,
-                                      ),
-                                      child: Center(
-                                        child: Text(
-                                          interessentenCount.toString(),
-                                          style: const TextStyle(
-                                            color: Colors.black87,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                            IconButton(
+                              icon: const Icon(
+                                Icons.chat_bubble_outline,
+                                color: Colors.white,
+                                size: 26,
                               ),
-                            // Chat-Icon
-                            Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.chat_bubble_outline,
-                                    color: Colors.white,
-                                    size: 26,
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      FahrtAnfragenPage(fahrt: fahrt),
+                                ),
+                              ),
+                            ),
+                            if (offeneAnfragenCount > 0)
+                              Positioned(
+                                right: 4,
+                                top: 4,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.redAccent,
+                                    shape: BoxShape.circle,
                                   ),
-                                  onPressed: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          FahrtAnfragenPage(fahrt: fahrt),
+                                  constraints: const BoxConstraints(
+                                    minWidth: 18,
+                                    minHeight: 18,
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      offeneAnfragenCount.toString(),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                 ),
-                                if (offeneAnfragenCount > 0)
-                                  Positioned(
-                                    right: 4,
-                                    top: 4,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(4),
-                                      decoration: const BoxDecoration(
-                                        color: Colors.redAccent,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      constraints: const BoxConstraints(
-                                        minWidth: 18,
-                                        minHeight: 18,
-                                      ),
-                                      child: Center(
-                                        child: Text(
-                                          offeneAnfragenCount.toString(),
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
+                              ),
                           ],
                         ),
                       ),

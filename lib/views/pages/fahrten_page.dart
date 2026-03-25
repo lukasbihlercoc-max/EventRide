@@ -20,7 +20,6 @@ import 'package:my_app/views/pages/login_page.dart';
 import 'package:my_app/views/pages/fahrt_anfragen_page.dart';
 import 'package:my_app/views/pages/fahrt_anbieten_page.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
-import 'package:my_app/views/widgets/fahrtencard_widget/interessenten_bottom_sheet.dart';
 
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/pages/chat_page.dart';
@@ -799,8 +798,6 @@ class _FahrerGlassCard extends StatelessWidget {
       );
     });
 
-    final interessentenCount = context.select<InteressentenService, int>(
-        (s) => s.countForEvent(fahrt.eventId));
 
     final gesamtPlaetze = fahrt.freiePlaetze + counts.belegt;
     final uhrzeit = fahrt.uhrzeit.format(context);
@@ -1062,59 +1059,6 @@ class _FahrerGlassCard extends StatelessWidget {
                               ),
                             ),
                           ),
-                          if (interessentenCount > 0) ...[
-                            const SizedBox(height: 8),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 44,
-                              child: OutlinedButton.icon(
-                                onPressed: () =>
-                                    showInteressentenSheet(context, fahrt),
-                                icon: const Icon(
-                                    Icons.people_outline,
-                                    size: 16),
-                                label: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Text('Interessenten'),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 7, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        borderRadius:
-                                            BorderRadius.circular(12),
-                                        color: Colors.amber
-                                            .withValues(alpha: 0.15),
-                                        border: Border.all(
-                                          color: Colors.amber
-                                              .withValues(alpha: 0.4),
-                                        ),
-                                      ),
-                                      child: Text(
-                                        '$interessentenCount',
-                                        style: const TextStyle(
-                                          color: Colors.amber,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: Colors.amber,
-                                  side: BorderSide(
-                                    color: Colors.amber
-                                        .withValues(alpha: 0.5),
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
                         ],
                       ),
                     ),
@@ -1248,6 +1192,34 @@ class _RequestedRideCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+          // Einladungs-Label (nur bei vonFahrer)
+          if (anfrage.vonFahrer) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.mail_outline, color: Colors.amber.shade400, size: 12),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Einladung',
+                    style: TextStyle(
+                      color: Colors.amber.shade400,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           // Event-Name (anklickbar) + Status-Badge
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1392,23 +1364,29 @@ class _RequestedRideCard extends StatelessWidget {
 
                   const SizedBox(height: 12),
 
-                  // Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blueAccent.withValues(alpha: 0.75),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                  // Buttons: Annehmen/Ablehnen (offene Einladung) oder Chat
+                  if (anfrage.vonFahrer &&
+                      anfrage.status == AnfrageStatus.offen)
+                    _EinladungButtons(anfrage: anfrage, fahrt: fahrt)
+                  else
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor:
+                              Colors.blueAccent.withValues(alpha: 0.75),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        onPressed: () => _openChat(context),
+                        child: const Text('Chat öffnen',
+                            style: TextStyle(fontSize: 13)),
                       ),
-                      onPressed: () => _openChat(context),
-                      child: const Text('Chat öffnen', style: TextStyle(fontSize: 13)),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -1418,6 +1396,122 @@ class _RequestedRideCard extends StatelessWidget {
     ),
   ),
 );
+  }
+}
+
+/// ------------------------------------------------------------
+/// Annehmen / Ablehnen — nur für offene Einladungen (vonFahrer)
+/// ------------------------------------------------------------
+class _EinladungButtons extends StatefulWidget {
+  final AnfrageDaten anfrage;
+  final FahrtDaten fahrt;
+
+  const _EinladungButtons({required this.anfrage, required this.fahrt});
+
+  @override
+  State<_EinladungButtons> createState() => _EinladungButtonsState();
+}
+
+class _EinladungButtonsState extends State<_EinladungButtons> {
+  bool _loading = false;
+
+  Future<void> _annehmen() async {
+    setState(() => _loading = true);
+    final anfrageService = context.read<AnfrageService>();
+    final fahrtService = context.read<FahrtService>();
+    final interessentenService = context.read<InteressentenService>();
+    final currentUser = context.read<IAuthRepository>().currentUser;
+
+    final aktuelleFahrt = fahrtService.alleFahrten
+        .firstWhere((f) => f.id == widget.fahrt.id, orElse: () => widget.fahrt);
+
+    if (aktuelleFahrt.freiePlaetze <= 0) {
+      if (mounted) {
+        AppSnackbar.show(context,
+            message: 'Leider keine Plätze mehr frei.');
+        setState(() => _loading = false);
+      }
+      return;
+    }
+
+    final ok = await anfrageService.akzeptiereAnfrage(
+      anfrage: widget.anfrage,
+      fahrt: aktuelleFahrt,
+      seatsAccepted: 1,
+    );
+
+    if (!ok || !mounted) {
+      setState(() => _loading = false);
+      return;
+    }
+
+    // Platz in Fahrt belegen
+    await fahrtService.update(
+      aktuelleFahrt.copyWith(
+          freiePlaetze: aktuelleFahrt.freiePlaetze - 1),
+    );
+
+    // Aus Interessenten entfernen
+    if (currentUser != null) {
+      await interessentenService.removeForUser(
+          widget.fahrt.eventId, currentUser.userId);
+    }
+
+    if (mounted) AppSnackbar.show(context, message: 'Einladung angenommen!');
+  }
+
+  Future<void> _ablehnen() async {
+    setState(() => _loading = true);
+    await context.read<AnfrageService>().ablehnenAnfrage(widget.anfrage);
+    if (mounted) {
+      AppSnackbar.show(context, message: 'Einladung abgelehnt.');
+      setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(
+        child: SizedBox(
+          height: 36,
+          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.amber),
+        ),
+      );
+    }
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton(
+            onPressed: _ablehnen,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white54,
+              side: const BorderSide(color: Colors.white24),
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text('Ablehnen', style: TextStyle(fontSize: 13)),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: ElevatedButton(
+            onPressed: _annehmen,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade600,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text('Annehmen', style: TextStyle(fontSize: 13)),
+          ),
+        ),
+      ],
+    );
   }
 }
 

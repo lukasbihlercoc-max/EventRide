@@ -8,6 +8,7 @@ import 'package:my_app/data/interessenten_daten.dart';
 import 'package:my_app/data/interessenten_service.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 
+
 void showInteressentenSheet(BuildContext context, FahrtDaten fahrt) {
   showModalBottomSheet(
     context: context,
@@ -147,7 +148,9 @@ class _InteressentenSheetState extends State<_InteressentenSheet> {
 
   Future<void> _einladen(InteressentenDaten interessent) async {
     if (_eingeladen.contains(interessent.userId) ||
-        _loading.contains(interessent.userId)) return;
+        _loading.contains(interessent.userId)) {
+      return;
+    }
 
     setState(() => _loading.add(interessent.userId));
 
@@ -159,23 +162,11 @@ class _InteressentenSheetState extends State<_InteressentenSheet> {
 
     final anfrageService = context.read<AnfrageService>();
 
-    // Spam-Schutz: prüfe nochmal direkt vor dem Schreiben
-    if (!anfrageService.hatOffeneEinladungFuer(
-        widget.fahrt.id, interessent.userId)) {
-      final anfrage = AnfrageDaten.create(
-        fahrtId: widget.fahrt.id,
-        eventId: widget.fahrt.eventId,
-        requesterId: interessent.userId,
-        requesterName: interessent.userName,
-        seatsRequested: 1,
-        fahrtOwnerId: currentUser.userId,
-        eventName: widget.fahrt.eventName,
-        startOrt: widget.fahrt.abfahrtsortAnzeige,
-        zielOrt: widget.fahrt.standort,
-        fahrerName: currentUser.name,
-      );
-      await anfrageService.addAnfrage(anfrage);
-    }
+    await anfrageService.einladenVomFahrer(
+      fahrt: widget.fahrt,
+      interessent: interessent,
+      fahrerName: currentUser.name,
+    );
 
     if (!mounted) { return; }
     setState(() {
