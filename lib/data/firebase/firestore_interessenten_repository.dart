@@ -1,4 +1,5 @@
 // lib/data/firebase/firestore_interessenten_repository.dart
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:my_app/data/interessenten_daten.dart';
 import 'package:my_app/data/interfaces/i_interessenten_repository.dart';
@@ -18,7 +19,11 @@ class FirestoreInteressentenRepository implements IInteressentenRepository {
         .map((snap) => snap.docs
             .map((d) => InteressentenDaten.fromMap(
                 d.id, d.data() as Map<String, dynamic>))
-            .toList());
+            .toList())
+        .transform(StreamTransformer.fromHandlers(
+          handleData: (data, sink) => sink.add(data),
+          handleError: (_, __, sink) => sink.add([]),
+        ));
   }
 
   @override

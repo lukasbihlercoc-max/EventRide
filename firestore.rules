@@ -65,8 +65,10 @@ service cloud.firestore {
     // ----------------------------------------------------------------
     match /anfragen/{anfrageId} {
       allow read:   if isSignedIn();
+      // Mitfahrer erstellt eigene Anfrage ODER Fahrer lädt Interessenten ein
       allow create: if isSignedIn()
-                    && request.resource.data.requesterId == request.auth.uid
+                    && (request.resource.data.requesterId == request.auth.uid
+                        || request.resource.data.fahrtOwnerId == request.auth.uid)
                     && request.resource.data.keys().hasAll([
                          'id', 'fahrtId', 'requesterId', 'fahrtOwnerId', 'status'
                        ]);
@@ -74,6 +76,26 @@ service cloud.firestore {
                     && (resource.data.fahrtOwnerId == request.auth.uid
                         || resource.data.requesterId == request.auth.uid);
       allow delete: if false;
+    }
+
+    // ----------------------------------------------------------------
+    // interessenten/{docId}   (Dokument-ID: {eventId}_{userId})
+    //
+    // Lesen:    Alle eingeloggten Nutzer (Fahrer sehen die Liste)
+    // Erstellen: Nur der eigene User (userId muss eigene UID sein)
+    // Löschen:   Nur der eigene User
+    // Updaten:   Nicht nötig (toggle = delete + create)
+    // ----------------------------------------------------------------
+    match /interessenten/{docId} {
+      allow read:   if isSignedIn();
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.keys().hasAll([
+                         'eventId', 'userId', 'userName'
+                       ]);
+      allow delete: if isSignedIn()
+                    && resource.data.userId == request.auth.uid;
+      allow update: if false;
     }
 
     // ----------------------------------------------------------------
