@@ -1,35 +1,13 @@
 // lib/data/event_daten.dart
-import 'package:hive/hive.dart';
-
-part 'event_daten.g.dart'; // wird automatisch generiert
-
-@HiveType(typeId: 0)
-class Event extends HiveObject {
-  @HiveField(0)
+class Event {
   final String id; // 🔑 endgültige, unveränderliche ID
-
-  @HiveField(1)
   final String name;
-
-  @HiveField(2)
   final DateTime datum;
-
-  @HiveField(3)
   final String standort;
-
-  @HiveField(4)
   final String typ;
-
-  @HiveField(5)
   final String beschreibung;
-
-  @HiveField(6)
   final String adresse;
-
-  @HiveField(7)
   final double? latitude;
-
-  @HiveField(8)
   final double? longitude;
 
   // optional: alias für alte Verwendung

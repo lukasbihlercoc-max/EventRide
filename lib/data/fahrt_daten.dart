@@ -1,69 +1,33 @@
 // lib/data/fahrt_daten.dart
 import 'package:flutter/material.dart';
-import 'package:hive/hive.dart';
 
-part 'fahrt_daten.g.dart';
-
-@HiveType(typeId: 1)
 enum Fahrtrichtung {
-  @HiveField(0)
   hinfahrt,
-  @HiveField(1)
   rueckfahrt,
-  @HiveField(2)
   hinUndZurueck,
 }
 
-@HiveType(typeId: 2)
 class FahrtDaten {
-  @HiveField(0)
   final String eventId;
-
-  @HiveField(1)
   final String eventName;
-
-  @HiveField(2)
   final String standort;
-
-  @HiveField(3)
   final String abfahrtsort;
 
   // Uhrzeit intern als separate hour/min ints -> einfach serialisierbar
-  @HiveField(4)
   final int uhrzeitHour;
-
-  @HiveField(5)
   final int uhrzeitMinute;
-
-  @HiveField(6)
   final int? rueckuhrzeitHour;
-
-  @HiveField(7)
   final int? rueckuhrzeitMinute;
-
-  @HiveField(8)
   final int freiePlaetze;
-
-  @HiveField(9)
   final Fahrtrichtung richtung;
-
-  @HiveField(10)
   final String ownerId;
-
-  @HiveField(11)
   final String ownerName;
 
   // Eindeutige, stabile ID (final)
-  @HiveField(12)
   final String id;
 
-  @HiveField(13)
   final double? abfahrtsortLat;
-
-  @HiveField(14)
   final double? abfahrtsortLng;
-
-  @HiveField(15)
   final String? abfahrtsortFullAddress;
 
   FahrtDaten({
