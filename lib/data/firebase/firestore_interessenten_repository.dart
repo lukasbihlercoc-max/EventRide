@@ -14,7 +14,6 @@ class FirestoreInteressentenRepository implements IInteressentenRepository {
   Stream<List<InteressentenDaten>> watchForEvent(String eventId) {
     return _col
         .where('eventId', isEqualTo: eventId)
-        .orderBy('timestamp', descending: false)
         .snapshots()
         .map((snap) => snap.docs
             .map((d) => InteressentenDaten.fromMap(
