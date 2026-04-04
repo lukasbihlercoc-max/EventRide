@@ -88,12 +88,18 @@ class ChatService {
     required String zielOrt,
     required int seatsRequested,
     required int seatsAccepted,
+    required String uhrzeit,
+    required String richtung,
+    required String ownerName,
   }) async {
     final buffer = StringBuffer()
       ..writeln('🚗 Mitfahranfrage')
       ..writeln('')
       ..writeln('Event: $eventName')
       ..writeln('Strecke: $startOrt → $zielOrt')
+      ..writeln('Uhrzeit: $uhrzeit')
+      ..writeln('Richtung: $richtung')
+      ..writeln('Fahrer: $ownerName')
       ..writeln(
         'Angefragt: $seatsRequested Platz${seatsRequested > 1 ? 'e' : ''}',
       );

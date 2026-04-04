@@ -7,6 +7,7 @@ import 'package:my_app/data/fahrt_daten.dart';
 import 'package:my_app/data/interessenten_daten.dart';
 import 'package:my_app/data/interessenten_service.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
+import 'package:my_app/views/widgets/app_snackbar.dart';
 
 
 void showInteressentenSheet(BuildContext context, FahrtDaten fahrt) {
@@ -44,13 +45,12 @@ class _InteressentenSheetState extends State<_InteressentenSheet> {
 
     final alleAnfragen = context.watch<AnfrageService>().alleAnfragen;
 
-    // Nur Leute zeigen, die noch keine offene/akzeptierte Anfrage für diese Fahrt haben
+    // Nur Leute ausblenden, die bereits eine akzeptierte Anfrage haben
     final filtered = interessenten.where((i) {
-      final hatAnfrage = alleAnfragen.any((a) =>
+      return !alleAnfragen.any((a) =>
           a.fahrtId == widget.fahrt.id &&
           a.requesterId == i.userId &&
-          a.status != AnfrageStatus.abgelehnt);
-      return !hatAnfrage;
+          a.status == AnfrageStatus.akzeptiert);
     }).toList();
 
     return DraggableScrollableSheet(
@@ -114,13 +114,27 @@ class _InteressentenSheetState extends State<_InteressentenSheet> {
                         itemCount: filtered.length,
                         separatorBuilder: (_, __) =>
                             const Divider(color: Colors.white10, height: 1),
-                        itemBuilder: (_, i) => _InteressentTile(
-                          interessent: filtered[i],
-                          istEingeladen:
-                              _eingeladen.contains(filtered[i].userId),
-                          isLoading: _loading.contains(filtered[i].userId),
-                          onEinladen: () => _einladen(filtered[i]),
-                        ),
+                        itemBuilder: (_, i) {
+                          final person = filtered[i];
+                          final bereitsEingeladen =
+                              _eingeladen.contains(person.userId) ||
+                                  alleAnfragen.any((a) =>
+                                      a.fahrtId == widget.fahrt.id &&
+                                      a.requesterId == person.userId &&
+                                      a.vonFahrer &&
+                                      a.status == AnfrageStatus.offen);
+                          return _InteressentTile(
+                            interessent: person,
+                            istEingeladen: bereitsEingeladen,
+                            isLoading: _loading.contains(person.userId),
+                            onEinladen: () => _einladen(person),
+                            onBereitsEingeladen: () => AppSnackbar.show(
+                              context,
+                              message:
+                                  '${person.userName} wurde bereits eingeladen.',
+                            ),
+                          );
+                        },
                       ),
               ),
             ],
@@ -183,6 +197,7 @@ class _InteressentTile extends StatelessWidget {
   const _InteressentTile({
     required this.interessent,
     required this.istEingeladen,
+    required this.onBereitsEingeladen,
     required this.isLoading,
     required this.onEinladen,
   });
@@ -191,6 +206,7 @@ class _InteressentTile extends StatelessWidget {
   final bool istEingeladen;
   final bool isLoading;
   final VoidCallback onEinladen;
+  final VoidCallback onBereitsEingeladen;
 
   @override
   Widget build(BuildContext context) {
@@ -255,7 +271,7 @@ class _InteressentTile extends StatelessWidget {
             )
           else if (istEingeladen)
             OutlinedButton(
-              onPressed: null,
+              onPressed: onBereitsEingeladen,
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: Colors.white24),
                 padding:

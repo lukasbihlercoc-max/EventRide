@@ -57,9 +57,13 @@ class InteressentenService extends ChangeNotifier {
   }
 
   /// Entfernt den User aus allen Events (z. B. wenn er eine Fahrt bekommt).
+  /// Macht nichts, wenn der User gar nicht in der Liste ist.
   Future<void> removeForUser(String eventId, String userId) async {
     final id = InteressentenDaten.buildId(eventId, userId);
-    await _repository.remove(id);
+    final existing = await _repository.get(id);
+    if (existing != null) {
+      await _repository.remove(id);
+    }
   }
 
   void _ensureWatching(String eventId) {

@@ -285,7 +285,7 @@ class _LoggedInFahrtenViewState extends State<_LoggedInFahrtenView>
     } else {
       final ids = anfrageService
           .getAnfragenByRequester(userId)
-          .where((a) => a.status != AnfrageStatus.offen)
+          .where((a) => a.status != AnfrageStatus.offen || a.vonFahrer)
           .map((a) => a.id)
           .toList();
       seenService.markRequesterAsSeen(userId, ids);
@@ -364,7 +364,7 @@ class _FahrtenTabBar extends StatelessWidget {
 
         final requesterIds = anfrageService
             .getAnfragenByRequester(userId)
-            .where((a) => a.status != AnfrageStatus.offen)
+            .where((a) => a.status != AnfrageStatus.offen || a.vonFahrer)
             .map((a) => a.id);
 
         return TabBar(
@@ -714,28 +714,49 @@ class _AngefragteFahrtenTabState extends State<_AngefragteFahrtenTab>
   @override
   bool get wantKeepAlive => true;
 
+  /// Unabhängig vom SeenAnfragenService — wird nur durch echte Interaktion geleert.
+  final Set<String> _unseenCardIds = {};
+
+  /// Fügt neue unseen-IDs aus dem SeenService hinzu (ohne setState — wird in build aufgerufen).
+  void _syncUnseenIds(List<_RequestedRideItem> items, SeenAnfragenService seenService) {
+    for (final item in items) {
+      if (item.fahrt != null) {
+        final id = item.anfrage.id;
+        if (seenService.hasUnseenRequester(widget.userId, [id])) {
+          _unseenCardIds.add(id);
+        }
+      }
+    }
+  }
+
+  /// Wird aufgerufen wenn der User mit der Card interagiert (Chat öffnen / Annehmen / Ablehnen).
+  void _markCardSeen(String anfrageId) {
+    if (_unseenCardIds.contains(anfrageId)) {
+      setState(() => _unseenCardIds.remove(anfrageId));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return Consumer2<AnfrageService, FahrtService>(
-      builder: (context, anfrageService, fahrtService, _) {
-        final es = context.read<EventService>();
+    return Consumer3<AnfrageService, FahrtService, SeenAnfragenService>(
+      builder: (context, anfrageService, fahrtService, seenService, _) {
         final fahrtMap = {for (final f in fahrtService.alleFahrten) f.id: f};
-        final datumCache = {for (final e in es.events) e.id: e.datum};
 
         final items = anfrageService
             .getAnfragenByRequester(widget.userId)
             .map((a) => _RequestedRideItem(a, fahrtMap[a.fahrtId]))
-            .toList()
-          ..sort((a, b) {
+            .toList();
+
+        _syncUnseenIds(items, seenService);
+
+        items.sort((a, b) {
             // gelöschte Fahrten ans Ende
-            final fA = a.fahrt;
-            final fB = b.fahrt;
-            if (fA == null && fB == null) return 0;
-            if (fA == null) return 1;
-            if (fB == null) return -1;
-            return (datumCache[fA.eventId] ?? DateTime(9999))
-                .compareTo(datumCache[fB.eventId] ?? DateTime(9999));
+            if (a.fahrt == null && b.fahrt == null) return 0;
+            if (a.fahrt == null) return 1;
+            if (b.fahrt == null) return -1;
+            // neueste Aktivität zuerst (WhatsApp-Stil)
+            return b.anfrage.updatedAt.compareTo(a.anfrage.updatedAt);
           });
 
         if (items.isEmpty) {
@@ -756,8 +777,14 @@ class _AngefragteFahrtenTabState extends State<_AngefragteFahrtenTab>
                 child: _RequestedRideDeletedCard(anfrage: item.anfrage),
               );
             }
+            final anfrageId = item.anfrage.id;
             return RepaintBoundary(
-              child: _RequestedRideCard(fahrt: item.fahrt!, anfrage: item.anfrage),
+              child: _RequestedRideCard(
+                fahrt: item.fahrt!,
+                anfrage: item.anfrage,
+                isUnseen: _unseenCardIds.contains(anfrageId),
+                onInteracted: () => _markCardSeen(anfrageId),
+              ),
             );
           },
         );
@@ -1077,10 +1104,18 @@ class _FahrerGlassCard extends StatelessWidget {
 class _RequestedRideCard extends StatelessWidget {
   final FahrtDaten fahrt;
   final AnfrageDaten anfrage;
+  final bool isUnseen;
+  final VoidCallback? onInteracted;
 
-  const _RequestedRideCard({required this.fahrt, required this.anfrage});
+  const _RequestedRideCard({
+    required this.fahrt,
+    required this.anfrage,
+    required this.isUnseen,
+    this.onInteracted,
+  });
 
   void _openChat(BuildContext context) {
+    onInteracted?.call();
     final chatService = context.read<ChatService>();
 
     final conversationId = chatService.buildConversationId(
@@ -1115,6 +1150,14 @@ class _RequestedRideCard extends StatelessWidget {
       zielOrt: fahrt.standort,
       seatsRequested: anfrage.seatsRequested,
       seatsAccepted: anfrage.seatsAccepted ?? 0,
+      uhrzeit:
+          '${fahrt.uhrzeitHour.toString().padLeft(2, '0')}:${fahrt.uhrzeitMinute.toString().padLeft(2, '0')}',
+      richtung: switch (fahrt.richtung) {
+        Fahrtrichtung.hinfahrt => 'Hinfahrt',
+        Fahrtrichtung.rueckfahrt => 'Rückfahrt',
+        Fahrtrichtung.hinUndZurueck => 'Hin und Zurück',
+      },
+      ownerName: fahrt.ownerName,
     ));
   }
 
@@ -1150,10 +1193,16 @@ class _RequestedRideCard extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: AppCard(
-        padding: EdgeInsets.zero,
-        borderRadius: 22,
-        child: IntrinsicHeight(
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          AppCard(
+            padding: EdgeInsets.zero,
+            borderRadius: 22,
+            gradientColors: isUnseen
+                ? const [Color(0xFF1D3A6E), Color(0xFF2B5BA8)]
+                : null,
+            child: IntrinsicHeight(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -1366,8 +1415,9 @@ class _RequestedRideCard extends StatelessWidget {
 
                   // Buttons: Annehmen/Ablehnen (offene Einladung) oder Chat
                   if (anfrage.vonFahrer &&
-                      anfrage.status == AnfrageStatus.offen)
-                    _EinladungButtons(anfrage: anfrage, fahrt: fahrt)
+                      anfrage.status == AnfrageStatus.offen &&
+                      context.read<IAuthRepository>().currentUser?.userId == anfrage.requesterId)
+                    _EinladungButtons(anfrage: anfrage, fahrt: fahrt, onInteracted: onInteracted)
                   else
                     SizedBox(
                       width: double.infinity,
@@ -1394,8 +1444,23 @@ class _RequestedRideCard extends StatelessWidget {
         ],
       ),
     ),
-  ),
-);
+          ),
+          if (isUnseen)
+            Positioned(
+              right: 6,
+              top: 6,
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }
 
@@ -1405,8 +1470,13 @@ class _RequestedRideCard extends StatelessWidget {
 class _EinladungButtons extends StatefulWidget {
   final AnfrageDaten anfrage;
   final FahrtDaten fahrt;
+  final VoidCallback? onInteracted;
 
-  const _EinladungButtons({required this.anfrage, required this.fahrt});
+  const _EinladungButtons({
+    required this.anfrage,
+    required this.fahrt,
+    this.onInteracted,
+  });
 
   @override
   State<_EinladungButtons> createState() => _EinladungButtonsState();
@@ -1441,7 +1511,7 @@ class _EinladungButtonsState extends State<_EinladungButtons> {
     );
 
     if (!ok || !mounted) {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
       return;
     }
 
@@ -1457,13 +1527,17 @@ class _EinladungButtonsState extends State<_EinladungButtons> {
           widget.fahrt.eventId, currentUser.userId);
     }
 
-    if (mounted) AppSnackbar.show(context, message: 'Einladung angenommen!');
+    if (mounted) {
+      widget.onInteracted?.call();
+      AppSnackbar.show(context, message: 'Einladung angenommen!');
+    }
   }
 
   Future<void> _ablehnen() async {
     setState(() => _loading = true);
     await context.read<AnfrageService>().ablehnenAnfrage(widget.anfrage);
     if (mounted) {
+      widget.onInteracted?.call();
       AppSnackbar.show(context, message: 'Einladung abgelehnt.');
       setState(() => _loading = false);
     }

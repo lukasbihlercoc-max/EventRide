@@ -304,6 +304,7 @@ class _AnfragenButtonState extends State<_AnfragenButton> {
         zielOrt: widget.fahrt.standort,
         fahrerName: widget.fahrt.ownerName,
         message: 'Ich habe noch einen Platz frei — möchtest du mitfahren?',
+        vonFahrer: true,
       );
 
       await widget.anfrageService.addAnfrage(anfrage);
@@ -502,7 +503,7 @@ class _AnfrageCardState extends State<_AnfrageCard> {
                   style: const TextStyle(color: Colors.white)),
             ],
 
-            if (a.status == AnfrageStatus.offen) ...[
+            if (a.status == AnfrageStatus.offen && !a.vonFahrer) ...[
               const SizedBox(height: 12),
               const Text(
                 "Plätze annehmen",
@@ -606,6 +607,14 @@ class _AnfrageCardState extends State<_AnfrageCard> {
                         zielOrt: widget.fahrt.standort,
                         seatsRequested: a.seatsRequested,
                         seatsAccepted: _acceptedSeats,
+                        uhrzeit:
+                            '${widget.fahrt.uhrzeitHour.toString().padLeft(2, '0')}:${widget.fahrt.uhrzeitMinute.toString().padLeft(2, '0')}',
+                        richtung: switch (widget.fahrt.richtung) {
+                          Fahrtrichtung.hinfahrt => 'Hinfahrt',
+                          Fahrtrichtung.rueckfahrt => 'Rückfahrt',
+                          Fahrtrichtung.hinUndZurueck => 'Hin und Zurück',
+                        },
+                        ownerName: widget.fahrt.ownerName,
                       );
                     },
                     icon: const Icon(Icons.check, color: Colors.greenAccent),

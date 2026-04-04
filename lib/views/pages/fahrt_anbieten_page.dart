@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:my_app/data/event_daten.dart';
 import 'package:my_app/data/fahrt_daten.dart';
 import 'package:my_app/data/fahrt_service.dart';
+import 'package:my_app/data/interessenten_service.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
@@ -26,8 +27,11 @@ class FahrtAnbietenPage extends StatefulWidget {
   State<FahrtAnbietenPage> createState() => _FahrtAnbietenPageState();
 }
 
-class _FahrtAnbietenPageState extends State<FahrtAnbietenPage> {
+class _FahrtAnbietenPageState extends State<FahrtAnbietenPage>
+    with WidgetsBindingObserver {
   final _formKey = GlobalKey<FormState>();
+  final _scrollController = ScrollController();
+  final _abfahrtsortFieldKey = GlobalKey();
 
   String abfahrtsort = '';
   double? _abfahrtsortLat;
@@ -47,6 +51,7 @@ class _FahrtAnbietenPageState extends State<FahrtAnbietenPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
     final f = widget.existingFahrt;
     if (f != null) {
@@ -68,13 +73,35 @@ class _FahrtAnbietenPageState extends State<FahrtAnbietenPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _scrollController.dispose();
     _abfahrtsortController.dispose();
     super.dispose();
   }
 
   @override
+  void didChangeMetrics() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final keyboardVisible = MediaQuery.of(context).viewInsets.bottom > 100;
+      if (keyboardVisible) {
+        final ctx = _abfahrtsortFieldKey.currentContext;
+        if (ctx != null) {
+          Scrollable.ensureVisible(
+            ctx,
+            alignment: 0.0,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final fahrtService = context.read<FahrtService>();
+    final interessentenService = context.read<InteressentenService>();
 
     return Stack(
       children: [
@@ -90,7 +117,10 @@ class _FahrtAnbietenPageState extends State<FahrtAnbietenPage> {
             backgroundColor: Colors.transparent,
             title: const Text("Fahrt anbieten"),
           ),
-          body: SingleChildScrollView(
+          body: Listener(
+            onPointerDown: (_) => FocusScope.of(context).unfocus(),
+            child: SingleChildScrollView(
+            controller: _scrollController,
             child: Padding(
               padding: const EdgeInsets.all(24),
               child: Form(
@@ -128,7 +158,9 @@ class _FahrtAnbietenPageState extends State<FahrtAnbietenPage> {
 
                     const SizedBox(height: 24),
 
-                    GooglePlaceAutoCompleteTextField(
+                    Container(
+                      key: _abfahrtsortFieldKey,
+                      child: GooglePlaceAutoCompleteTextField(
                       textEditingController: _abfahrtsortController,
                       googleAPIKey:
                           "AIzaSyB97RZAMf-fmZKhdFFniU20CqK0QWCV3KE",
@@ -202,6 +234,7 @@ class _FahrtAnbietenPageState extends State<FahrtAnbietenPage> {
                                 offset:
                                     _abfahrtsortController.text.length));
                       },
+                    ),
                     ),
 
                     const SizedBox(height: 24),
@@ -324,6 +357,9 @@ if (fahrtrichtung == Fahrtrichtung.hinUndZurueck && rueckuhrzeit == null) {
                           try {
                             if (widget.existingFahrt == null) {
                               await fahrtService.add(fahrt);
+                              // Fahrer aus Interessentenliste entfernen
+                              await interessentenService
+                                  .removeForUser(widget.event.id, fahrt.ownerId);
                             } else {
                               await fahrtService.update(fahrt);
                             }
@@ -366,12 +402,13 @@ if (fahrtrichtung == Fahrtrichtung.hinUndZurueck && rueckuhrzeit == null) {
                 ),
               ),
             ),
+            ),
           ),
         ),
       ],
     );
   }
- 
+
   Widget _timePickerRow({
     required String label,
     required TimeOfDay? time,

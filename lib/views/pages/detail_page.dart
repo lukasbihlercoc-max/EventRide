@@ -8,12 +8,15 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:my_app/data/anfrage_daten.dart';
 import 'package:my_app/data/anfrage_service.dart';
+import 'package:my_app/data/chat_service.dart';
 import 'package:my_app/data/event_daten.dart';
+import 'package:my_app/data/fahrt_daten.dart';
 import 'package:my_app/data/fahrt_service.dart';
 import 'package:my_app/data/interessenten_service.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/views/pages/events_page.dart';
 import 'package:my_app/views/pages/fahrt_anbieten_page.dart';
+import 'package:my_app/views/pages/chat_page.dart';
 import 'package:my_app/views/pages/fahrt_finden_page.dart';
 import 'package:my_app/views/auth/auth_guard.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
@@ -257,13 +260,16 @@ class DetailPage extends StatelessWidget {
                 ),
               ),
               Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: width * 0.064,
-                  vertical: height * 0.016,
+                padding: EdgeInsets.fromLTRB(
+                  width * 0.064,
+                  0,
+                  width * 0.064,
+                  height * 0.016,
                 ),
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // PRIMARY: Fahrten finden
                     ElevatedButton.icon(
                       onPressed: () {
                         Navigator.push(
@@ -280,14 +286,13 @@ class DetailPage extends StatelessWidget {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.orangeAccent,
                         foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(
-                          vertical: height * 0.020,
-                          horizontal: width * 0.05,
-                        ),
+                        padding:
+                            EdgeInsets.symmetric(vertical: height * 0.020),
                       ),
                     ),
-                    SizedBox(height: height * 0.011),
-                    ElevatedButton.icon(
+                    SizedBox(height: height * 0.010),
+                    // SECONDARY: Fahrt anbieten (outlined, kleiner)
+                    OutlinedButton.icon(
                       onPressed: () async {
                         if (!await requiresLogin(context)) return;
                         if (!context.mounted) return;
@@ -300,21 +305,22 @@ class DetailPage extends StatelessWidget {
                         );
                       },
                       icon: Icon(Icons.directions_car_filled,
-                          size: width * 0.043),
+                          size: width * 0.038),
                       label: Text("Fahrt anbieten",
-                          style: TextStyle(fontSize: width * 0.04)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blueAccent,
-                        foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(
-                          vertical: height * 0.020,
-                          horizontal: width * 0.05,
+                          style: TextStyle(fontSize: width * 0.038)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.lightBlueAccent,
+                        side: BorderSide(
+                          color: Colors.lightBlueAccent
+                              .withValues(alpha: 0.55),
                         ),
+                        padding:
+                            EdgeInsets.symmetric(vertical: height * 0.013),
                       ),
                     ),
-                    SizedBox(height: height * 0.011),
-                    // ── "Ich will hin" Button ──
-                    _IchWillHinButton(event: event, width: width, height: height),
+                    // SOCIAL PILL: Ich will hin
+                    _IchWillHinPill(
+                        event: event, width: width, height: height),
                   ],
                 ),
               ),
@@ -327,10 +333,10 @@ class DetailPage extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// "Ich will hin" Button — drei Fälle: Fahrer / Gast / deaktiviert
+// "Ich will hin" Pill — soziales Element, kein klassischer Button
 // ---------------------------------------------------------------------------
-class _IchWillHinButton extends StatelessWidget {
-  const _IchWillHinButton({
+class _IchWillHinPill extends StatefulWidget {
+  const _IchWillHinPill({
     required this.event,
     required this.width,
     required this.height,
@@ -341,147 +347,332 @@ class _IchWillHinButton extends StatelessWidget {
   final double height;
 
   @override
+  State<_IchWillHinPill> createState() => _IchWillHinPillState();
+}
+
+class _IchWillHinPillState extends State<_IchWillHinPill>
+    with SingleTickerProviderStateMixin {
+  bool _pressed = false;
+  late final AnimationController _pulseCtrl;
+  late final Animation<double> _pulseAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _pulseAnim = Tween<double>(begin: 0.0, end: 1.0).animate(_pulseCtrl);
+  }
+
+  @override
+  void dispose() {
+    _pulseCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final currentUser = context.read<IAuthRepository>().currentUser;
-    if (currentUser == null) return const SizedBox.shrink();
-
     final interessentenService = context.watch<InteressentenService>();
+    final count = interessentenService.countForEvent(widget.event.id);
+
+    // ── Nicht eingeloggt ──
+    if (currentUser == null) {
+      return _pill(
+        onTap: () => requiresLogin(context),
+        bgColor: Colors.white.withValues(alpha: 0.07),
+        borderColor: Colors.amber.withValues(alpha: 0.35),
+        child: _pillRow(
+          icon: Icon(Icons.emoji_people,
+              color: Colors.amber.shade400, size: widget.width * 0.048),
+          label: 'Ich will hin',
+          labelColor: Colors.amber.shade300,
+          count: count,
+        ),
+      );
+    }
+
     final fahrtService = context.watch<FahrtService>();
     final anfrageService = context.watch<AnfrageService>();
 
-    final count = interessentenService.countForEvent(event.id);
-
-    // ── FALL 1: User hat selbst eine Fahrt → Fahrer-Sicht ──
+    // ── FALL 1: Fahrer-Sicht ──
     final eigeneFahrt = fahrtService.alleFahrten
-        .where((f) => f.eventId == event.id && f.ownerId == currentUser.userId)
+        .where((f) =>
+            f.eventId == widget.event.id && f.ownerId == currentUser.userId)
         .firstOrNull;
 
     if (eigeneFahrt != null) {
-      if (count == 0) return const SizedBox.shrink();
-      return SizedBox(
-        width: double.infinity,
-        child: ElevatedButton.icon(
-          onPressed: () => showInteressentenSheet(context, eigeneFahrt),
-          icon: const Icon(Icons.people_outline, color: Colors.white),
-          label: Text(
-            count == 1 ? '1 will hin' : '$count wollen hin',
-            style: TextStyle(
-              fontSize: width * 0.04,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-            ),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.amber.shade700,
-            foregroundColor: Colors.white,
-            padding: EdgeInsets.symmetric(
-              vertical: height * 0.020,
-              horizontal: width * 0.05,
-            ),
-          ),
+      final active = count > 0;
+      return _pill(
+        onTap: active
+            ? () => showInteressentenSheet(context, eigeneFahrt)
+            : null,
+        bgColor: active
+            ? Colors.amber.withValues(alpha: 0.18)
+            : Colors.white.withValues(alpha: 0.05),
+        borderColor: active
+            ? Colors.amber.withValues(alpha: 0.50)
+            : Colors.white.withValues(alpha: 0.10),
+        child: _pillRow(
+          icon: Icon(Icons.people_outline,
+              color: active ? Colors.amber.shade300 : Colors.white30,
+              size: widget.width * 0.048),
+          label: count == 0
+              ? 'Noch niemand interessiert'
+              : count == 1
+                  ? '1 will hin'
+                  : '$count wollen hin',
+          labelColor: active ? Colors.amber.shade200 : Colors.white30,
+          trailing: active
+              ? Icon(Icons.chevron_right,
+                  color: Colors.amber.shade300, size: widget.width * 0.048)
+              : null,
+        ),
+      );
+    }
+
+    // ── FALL 0: Offene Einladungen vom Fahrer (vor Gast-Zuständen) ──
+    final einladungen = anfrageService.alleAnfragen
+        .where((a) =>
+            a.eventId == widget.event.id &&
+            a.requesterId == currentUser.userId &&
+            a.vonFahrer &&
+            a.status == AnfrageStatus.offen)
+        .toList();
+
+    if (einladungen.isNotEmpty) {
+      final n = einladungen.length;
+      return _pill(
+        onTap: () => _showEinladungsSheet(context, einladungen, fahrtService),
+        bgColor: Colors.amber.withValues(alpha: 0.07),
+        borderColor: Colors.amber.withValues(alpha: 0.30),
+        pulse: true,
+        child: _pillRow(
+          icon: Icon(Icons.mail_outline,
+              color: Colors.amber.shade200, size: widget.width * 0.048),
+          label: n == 1
+              ? 'Fahrer hat dich eingeladen'
+              : '$n Fahrer haben dich eingeladen',
+          labelColor: Colors.amber.shade100,
+          labelBold: true,
+          trailing: Icon(Icons.chevron_right,
+              color: Colors.amber.shade300, size: widget.width * 0.048),
         ),
       );
     }
 
     // ── FALL 2: Akzeptierte Anfrage → deaktiviert ──
     final hatAkzeptierteAnfrage = anfrageService.alleAnfragen.any((a) =>
-        a.eventId == event.id &&
+        a.eventId == widget.event.id &&
         a.requesterId == currentUser.userId &&
         a.status == AnfrageStatus.akzeptiert);
 
     if (hatAkzeptierteAnfrage) {
-      return Opacity(
-        opacity: 0.5,
-        child: OutlinedButton.icon(
-          onPressed: null,
-          icon: const Icon(Icons.check_circle_outline, color: Colors.white70),
-          label: Text(
-            'Du hast bereits eine Fahrt',
-            style: TextStyle(fontSize: width * 0.035, color: Colors.white70),
-          ),
-          style: OutlinedButton.styleFrom(
-            side: const BorderSide(color: Colors.white30),
-            padding: EdgeInsets.symmetric(
-              vertical: height * 0.015,
-              horizontal: width * 0.04,
-            ),
-          ),
+      return _pill(
+        onTap: null,
+        bgColor: Colors.white.withValues(alpha: 0.05),
+        borderColor: Colors.white.withValues(alpha: 0.10),
+        child: _pillRow(
+          icon: Icon(Icons.check_circle_outline,
+              color: Colors.white38, size: widget.width * 0.048),
+          label: 'Du hast eine Fahrt',
+          labelColor: Colors.white38,
         ),
       );
     }
 
-    // ── FALL 3: Gast-Sicht — "Ich will hin" Toggle ──
+    // ── FALL 3: Gast-Toggle ──
     final ichBinInteressiert =
-        interessentenService.isInteressiert(event.id, currentUser.userId);
+        interessentenService.isInteressiert(widget.event.id, currentUser.userId);
 
+    return _pill(
+      onTap: () => _toggle(
+          context, currentUser.userId, currentUser.name, interessentenService),
+      bgColor: ichBinInteressiert
+          ? Colors.amber.withValues(alpha: 0.20)
+          : Colors.white.withValues(alpha: 0.07),
+      borderColor: ichBinInteressiert
+          ? Colors.amber.withValues(alpha: 0.60)
+          : Colors.amber.withValues(alpha: 0.30),
+      child: _pillRow(
+        icon: Icon(
+          ichBinInteressiert ? Icons.check : Icons.emoji_people,
+          color: ichBinInteressiert
+              ? Colors.amber.shade200
+              : Colors.amber.shade400,
+          size: widget.width * 0.048,
+        ),
+        label: ichBinInteressiert ? 'Du willst hin' : 'Ich will hin',
+        labelColor:
+            ichBinInteressiert ? Colors.amber.shade200 : Colors.amber.shade300,
+        labelBold: ichBinInteressiert,
+        count: count,
+      ),
+    );
+  }
+
+  Widget _pill({
+    required Widget child,
+    required Color bgColor,
+    required Color borderColor,
+    VoidCallback? onTap,
+    bool pulse = false,
+  }) {
+    final inner = pulse
+        ? AnimatedBuilder(
+            animation: _pulseAnim,
+            builder: (_, __) => Container(
+              margin: EdgeInsets.only(top: widget.height * 0.016),
+              padding: EdgeInsets.symmetric(
+                horizontal: widget.width * 0.05,
+                vertical: widget.height * 0.014,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.amber
+                    .withValues(alpha: 0.12 + 0.12 * _pulseAnim.value),
+                borderRadius: BorderRadius.circular(widget.width * 0.032),
+                border: Border.all(
+                  color: Colors.amber
+                      .withValues(alpha: 0.40 + 0.35 * _pulseAnim.value),
+                ),
+              ),
+              child: child,
+            ),
+          )
+        : Container(
+            margin: EdgeInsets.only(top: widget.height * 0.016),
+            padding: EdgeInsets.symmetric(
+              horizontal: widget.width * 0.05,
+              vertical: widget.height * 0.014,
+            ),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(widget.width * 0.032),
+              border: Border.all(color: borderColor),
+            ),
+            child: child,
+          );
+
+    return GestureDetector(
+      onTapDown: onTap != null ? (_) => setState(() => _pressed = true) : null,
+      onTapUp: onTap != null ? (_) => setState(() => _pressed = false) : null,
+      onTapCancel: onTap != null ? () => setState(() => _pressed = false) : null,
+      onTap: onTap,
+      child: AnimatedScale(
+        scale: _pressed ? 0.97 : 1.0,
+        duration: const Duration(milliseconds: 80),
+        child: inner,
+      ),
+    );
+  }
+
+  Widget _pillRow({
+    required Icon icon,
+    required String label,
+    required Color labelColor,
+    bool labelBold = false,
+    int count = 0,
+    Widget? trailing,
+  }) {
     return Row(
       children: [
+        icon,
+        SizedBox(width: widget.width * 0.025),
         Expanded(
-          child: ichBinInteressiert
-              ? ElevatedButton.icon(
-                  onPressed: () => _toggle(
-                      context, currentUser.userId, currentUser.name,
-                      interessentenService),
-                  icon: const Icon(Icons.check, color: Colors.white),
-                  label: Text(
-                    'Du willst hin',
-                    style: TextStyle(
-                      fontSize: width * 0.04,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.amber.shade700,
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(
-                      vertical: height * 0.020,
-                      horizontal: width * 0.05,
-                    ),
-                  ),
-                )
-              : OutlinedButton.icon(
-                  onPressed: () => _toggle(
-                      context, currentUser.userId, currentUser.name,
-                      interessentenService),
-                  icon: Icon(Icons.emoji_people,
-                      color: Colors.amber.shade400, size: width * 0.043),
-                  label: Text(
-                    'Ich will hin',
-                    style: TextStyle(
-                        fontSize: width * 0.04, color: Colors.amber.shade400),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: Colors.amber.shade400),
-                    padding: EdgeInsets.symmetric(
-                      vertical: height * 0.020,
-                      horizontal: width * 0.05,
-                    ),
-                  ),
-                ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: labelColor,
+              fontSize: widget.width * 0.038,
+              fontWeight: labelBold ? FontWeight.w600 : FontWeight.normal,
+            ),
+          ),
         ),
-        if (count > 0) ...[
-          SizedBox(width: width * 0.03),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '$count',
-                style: TextStyle(
-                  color: Colors.amber.shade300,
-                  fontSize: width * 0.05,
-                  fontWeight: FontWeight.bold,
-                ),
+        if (trailing != null) trailing,
+        if (count > 0 && trailing == null) ...[
+          SizedBox(width: widget.width * 0.02),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.amber.withValues(alpha: 0.25),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              '$count',
+              style: TextStyle(
+                color: Colors.amber.shade200,
+                fontSize: widget.width * 0.035,
+                fontWeight: FontWeight.bold,
               ),
-              Text(
-                count == 1 ? 'will hin' : 'wollen hin',
-                style:
-                    TextStyle(color: Colors.white54, fontSize: width * 0.03),
-              ),
-            ],
+            ),
           ),
         ],
       ],
+    );
+  }
+
+  void _showEinladungsSheet(
+      BuildContext context,
+      List<AnfrageDaten> einladungen,
+      FahrtService fahrtService) {
+    FahrtDaten? fahrtFuer(AnfrageDaten e) => fahrtService.alleFahrten
+        .where((f) => f.id == e.fahrtId)
+        .firstOrNull;
+
+    if (einladungen.length == 1) {
+      final einladung = einladungen.first;
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => _EinladungsBottomSheet(
+          einladung: einladung,
+          fahrt: fahrtFuer(einladung),
+          onChatPressed: () => _openChatFromPill(context, einladung),
+        ),
+      );
+    } else {
+      final pairs = einladungen
+          .map((e) => (e, fahrtFuer(e)))
+          .toList();
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => _EinladungenListSheet(
+          einladungen: pairs,
+          onChatPressed: (e) => _openChatFromPill(context, e),
+        ),
+      );
+    }
+  }
+
+  void _openChatFromPill(BuildContext context, AnfrageDaten einladung) {
+    final chatService = context.read<ChatService>();
+    final conversationId = chatService.buildConversationId(
+      fahrtId: einladung.fahrtId,
+      userA: einladung.fahrtOwnerId,
+      userB: einladung.requesterId,
+    );
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: true,
+        pageBuilder: (_, __, ___) => ChatPage(
+          conversationId: conversationId,
+          otherUserName: einladung.fahrerName,
+        ),
+      ),
+    );
+    chatService.ensureConversation(
+      fahrtId: einladung.fahrtId,
+      ownerId: einladung.fahrtOwnerId,
+      requesterId: einladung.requesterId,
+      eventName: einladung.eventName,
+      startOrt: einladung.startOrt,
+      zielOrt: einladung.zielOrt,
+      seatsRequested: einladung.seatsRequested,
     );
   }
 
@@ -495,7 +686,7 @@ class _IchWillHinButton extends StatelessWidget {
     if (!context.mounted) return;
 
     final eingetragen = await service.toggle(
-      eventId: event.id,
+      eventId: widget.event.id,
       userId: userId,
       userName: userName,
       bezirk: bezirk,
@@ -507,6 +698,588 @@ class _IchWillHinButton extends StatelessWidget {
       message: eingetragen
           ? 'Du wurdest als Interessent eingetragen!'
           : 'Interesse zurückgezogen.',
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Bottom Sheet — Fahrer-Einladung annehmen oder ablehnen
+// ---------------------------------------------------------------------------
+class _EinladungsBottomSheet extends StatefulWidget {
+  const _EinladungsBottomSheet({
+    required this.einladung,
+    required this.onChatPressed,
+    this.fahrt,
+  });
+
+  final AnfrageDaten einladung;
+  final FahrtDaten? fahrt;
+  final VoidCallback onChatPressed;
+
+  @override
+  State<_EinladungsBottomSheet> createState() =>
+      _EinladungsBottomSheetState();
+}
+
+class _EinladungsBottomSheetState extends State<_EinladungsBottomSheet> {
+  bool _loading = false;
+  bool _angenommen = false;
+
+  Future<void> _annehmen() async {
+    setState(() => _loading = true);
+    final anfrageService = context.read<AnfrageService>();
+    final fahrtService = context.read<FahrtService>();
+    final interessentenService = context.read<InteressentenService>();
+    final currentUser = context.read<IAuthRepository>().currentUser;
+
+    final aktuelleFahrt = fahrtService.alleFahrten
+            .where((f) => f.id == widget.einladung.fahrtId)
+            .firstOrNull ??
+        widget.fahrt;
+
+    if (aktuelleFahrt == null || aktuelleFahrt.freiePlaetze <= 0) {
+      if (mounted) {
+        AppSnackbar.show(context, message: 'Leider keine freien Plätze mehr.');
+        setState(() => _loading = false);
+      }
+      return;
+    }
+
+    final ok = await anfrageService.akzeptiereAnfrage(
+      anfrage: widget.einladung,
+      fahrt: aktuelleFahrt,
+      seatsAccepted: 1,
+    );
+
+    if (!ok || !mounted) {
+      setState(() => _loading = false);
+      return;
+    }
+
+    await fahrtService.update(
+      aktuelleFahrt.copyWith(freiePlaetze: aktuelleFahrt.freiePlaetze - 1),
+    );
+
+    if (currentUser != null) {
+      await interessentenService.removeForUser(
+          widget.einladung.eventId, currentUser.userId);
+    }
+
+    if (mounted) setState(() { _loading = false; _angenommen = true; });
+  }
+
+  Future<void> _ablehnen() async {
+    setState(() => _loading = true);
+    await context.read<AnfrageService>().ablehnenAnfrage(widget.einladung);
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF1A2744),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.white24,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 20),
+          if (_angenommen)
+            ..._buildSuccessContent()
+          else
+            ..._buildInviteContent(),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildInviteContent() {
+    final fahrt = widget.fahrt;
+    final uhrzeit = fahrt?.uhrzeit.format(context);
+
+    return [
+      Row(
+        children: [
+          Icon(Icons.mail_outline, color: Colors.amber.shade300, size: 24),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Einladung von ${widget.einladung.fahrerName}',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 20),
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.07),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        ),
+        child: Column(
+          children: [
+            _detailRow(Icons.location_on, 'Von', widget.einladung.startOrt),
+            const Divider(color: Colors.white12, height: 16),
+            _detailRow(Icons.flag, 'Nach', widget.einladung.zielOrt),
+            if (uhrzeit != null) ...[
+              const Divider(color: Colors.white12, height: 16),
+              _detailRow(Icons.access_time, 'Abfahrt', uhrzeit),
+            ],
+            if (fahrt != null) ...[
+              const Divider(color: Colors.white12, height: 16),
+              _detailRow(
+                  Icons.event_seat, 'Freie Plätze', '${fahrt.freiePlaetze}'),
+            ],
+          ],
+        ),
+      ),
+      const SizedBox(height: 24),
+      if (_loading)
+        const Center(
+          child: CircularProgressIndicator(
+              color: Colors.amber, strokeWidth: 2),
+        )
+      else
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _ablehnen,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white54,
+                  side: const BorderSide(color: Colors.white24),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Ablehnen'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: _annehmen,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green.shade600,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Annehmen',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ),
+    ];
+  }
+
+  List<Widget> _buildSuccessContent() {
+    return [
+      Icon(Icons.check_circle_rounded,
+          color: Colors.green.shade400, size: 56),
+      const SizedBox(height: 12),
+      const Text(
+        'Fahrt angenommen!',
+        style: TextStyle(
+            color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+      ),
+      const SizedBox(height: 6),
+      const Text(
+        'Schreib dem Fahrer, damit er Bescheid weiß.',
+        style: TextStyle(color: Colors.white54, fontSize: 14),
+        textAlign: TextAlign.center,
+      ),
+      const SizedBox(height: 24),
+      SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: () {
+            Navigator.pop(context);
+            widget.onChatPressed();
+          },
+          icon: const Icon(Icons.chat_bubble_outline),
+          label: const Text('Chat öffnen'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.blueAccent,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+      ),
+      const SizedBox(height: 10),
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Schließen',
+            style: TextStyle(color: Colors.white38)),
+      ),
+    ];
+  }
+
+  Widget _detailRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, color: Colors.white38, size: 16),
+        const SizedBox(width: 8),
+        Text('$label: ',
+            style: const TextStyle(color: Colors.white38, fontSize: 13)),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w500),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// List-Sheet — mehrere Fahrer-Einladungen auf einmal
+// ---------------------------------------------------------------------------
+class _EinladungenListSheet extends StatelessWidget {
+  const _EinladungenListSheet({
+    required this.einladungen,
+    required this.onChatPressed,
+  });
+
+  final List<(AnfrageDaten, FahrtDaten?)> einladungen;
+  final void Function(AnfrageDaten) onChatPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize: 0.4,
+      maxChildSize: 0.9,
+      expand: false,
+      builder: (_, scrollController) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFF1A2744),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 12, bottom: 8),
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+                child: Row(
+                  children: [
+                    Icon(Icons.mail_outline,
+                        color: Colors.amber.shade300, size: 22),
+                    const SizedBox(width: 10),
+                    Text(
+                      '${einladungen.length} Einladungen',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView.separated(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  itemCount: einladungen.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (_, i) {
+                    final (einladung, fahrt) = einladungen[i];
+                    return _EinladungCard(
+                      einladung: einladung,
+                      fahrt: fahrt,
+                      onChatPressed: () => onChatPressed(einladung),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Einzelne Einladungs-Karte innerhalb des List-Sheets
+// ---------------------------------------------------------------------------
+class _EinladungCard extends StatefulWidget {
+  const _EinladungCard({
+    required this.einladung,
+    required this.onChatPressed,
+    this.fahrt,
+  });
+
+  final AnfrageDaten einladung;
+  final FahrtDaten? fahrt;
+  final VoidCallback onChatPressed;
+
+  @override
+  State<_EinladungCard> createState() => _EinladungCardState();
+}
+
+class _EinladungCardState extends State<_EinladungCard> {
+  bool _loading = false;
+  bool _angenommen = false;
+  bool _abgelehnt = false;
+
+  Future<void> _annehmen() async {
+    setState(() => _loading = true);
+    final anfrageService = context.read<AnfrageService>();
+    final fahrtService = context.read<FahrtService>();
+    final interessentenService = context.read<InteressentenService>();
+    final currentUser = context.read<IAuthRepository>().currentUser;
+
+    final aktuelleFahrt = fahrtService.alleFahrten
+            .where((f) => f.id == widget.einladung.fahrtId)
+            .firstOrNull ??
+        widget.fahrt;
+
+    if (aktuelleFahrt == null || aktuelleFahrt.freiePlaetze <= 0) {
+      if (mounted) {
+        AppSnackbar.show(context, message: 'Leider keine freien Plätze mehr.');
+        setState(() => _loading = false);
+      }
+      return;
+    }
+
+    final ok = await anfrageService.akzeptiereAnfrage(
+      anfrage: widget.einladung,
+      fahrt: aktuelleFahrt,
+      seatsAccepted: 1,
+    );
+
+    if (!ok || !mounted) {
+      setState(() => _loading = false);
+      return;
+    }
+
+    await fahrtService.update(
+      aktuelleFahrt.copyWith(freiePlaetze: aktuelleFahrt.freiePlaetze - 1),
+    );
+
+    if (currentUser != null) {
+      await interessentenService.removeForUser(
+          widget.einladung.eventId, currentUser.userId);
+    }
+
+    if (mounted) setState(() { _loading = false; _angenommen = true; });
+  }
+
+  Future<void> _ablehnen() async {
+    setState(() => _loading = true);
+    await context.read<AnfrageService>().ablehnenAnfrage(widget.einladung);
+    if (mounted) setState(() { _loading = false; _abgelehnt = true; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_abgelehnt) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.block, color: Colors.white24, size: 16),
+            const SizedBox(width: 8),
+            Text(
+              'Einladung von ${widget.einladung.fahrerName} abgelehnt',
+              style: const TextStyle(color: Colors.white38, fontSize: 13),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_angenommen) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.green.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.green.withValues(alpha: 0.35)),
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Icon(Icons.check_circle_rounded,
+                    color: Colors.green.shade400, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Fahrt bei ${widget.einladung.fahrerName} angenommen!',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  widget.onChatPressed();
+                },
+                icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                label: const Text('Chat öffnen'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.lightBlueAccent,
+                  side: BorderSide(
+                      color: Colors.lightBlueAccent.withValues(alpha: 0.5)),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final uhrzeit = widget.fahrt?.uhrzeit.format(context);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.amber.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.person_outline,
+                  color: Colors.amber.shade300, size: 18),
+              const SizedBox(width: 6),
+              Text(
+                widget.einladung.fahrerName,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _row(Icons.location_on, widget.einladung.startOrt),
+          const SizedBox(height: 4),
+          _row(Icons.flag, widget.einladung.zielOrt),
+          if (uhrzeit != null) ...[
+            const SizedBox(height: 4),
+            _row(Icons.access_time, uhrzeit),
+          ],
+          if (widget.fahrt != null) ...[
+            const SizedBox(height: 4),
+            _row(Icons.event_seat, '${widget.fahrt!.freiePlaetze} freie Plätze'),
+          ],
+          const SizedBox(height: 14),
+          if (_loading)
+            const Center(
+              child: CircularProgressIndicator(
+                  color: Colors.amber, strokeWidth: 2),
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _ablehnen,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white54,
+                      side: const BorderSide(color: Colors.white24),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: const Text('Ablehnen',
+                        style: TextStyle(fontSize: 13)),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _annehmen,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green.shade600,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: const Text('Annehmen',
+                        style: TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _row(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, color: Colors.white38, size: 14),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(color: Colors.white70, fontSize: 13),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
 }

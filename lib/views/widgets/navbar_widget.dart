@@ -291,7 +291,7 @@ class _NavItemFahrten extends StatelessWidget {
 
                   final requesterIds = anfrageService
                       .getAnfragenByRequester(uid)
-                      .where((a) => a.status != AnfrageStatus.offen)
+                      .where((a) => a.status != AnfrageStatus.offen || a.vonFahrer)
                       .map((a) => a.id);
 
                   hasUnseen = seenService.hasUnseenOwner(uid, ownerIds) ||
