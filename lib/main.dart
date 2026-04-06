@@ -15,10 +15,12 @@ import 'package:google_fonts/google_fonts.dart';
 // Repositories
 import 'package:my_app/data/firebase/firebase_fahrt_repository.dart';
 import 'package:my_app/data/firebase/firestore_chat_repository.dart';
+import 'package:my_app/data/firebase/firestore_user_repository.dart';
 
 // Interfaces + lokale Implementierungen
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/data/interfaces/i_fahrt_repository.dart';
+import 'package:my_app/data/interfaces/i_user_repository.dart';
 import 'package:my_app/data/firebase/firebase_auth_repository.dart';
 
 import 'package:my_app/views/auth/auth_gate.dart';
@@ -167,6 +169,9 @@ class _MyAppState extends State<MyApp> {
         // Repository-Interfaces (austauschbar gegen Firebase-Implementierungen)
         Provider<IAuthRepository>.value(value: widget.authRepository),
         Provider<IFahrtRepository>.value(value: widget.fahrtRepository),
+        Provider<IUserRepository>(
+          create: (_) => FirestoreUserRepository(),
+        ),
       ],
 
       
