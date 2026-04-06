@@ -109,6 +109,12 @@ class FirebaseAuthRepository implements IAuthRepository {
   Future<void> deleteAccount() async {
     final user = _auth.currentUser;
     if (user == null) return;
+
+    // Profilbild aus Storage entfernen (ignorieren falls nicht vorhanden)
+    try {
+      await _storage.ref('users/${user.uid}/profile.jpg').delete();
+    } catch (_) {}
+
     await _firestore.collection('users').doc(user.uid).delete();
     await user.delete();
   }
