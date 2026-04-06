@@ -1,6 +1,6 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:my_app/data/interfaces/i_auth_repository.dart';
 
 import 'package:my_app/data/chat_service.dart';
 import 'package:my_app/data/chat_message.dart';
@@ -36,7 +36,7 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void initState() {
     super.initState();
-    _myUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    _myUserId = context.read<IAuthRepository>().currentUser?.userId ?? '';
 
     _scrollController.addListener(() {
       final past = _scrollController.offset > _triggerOffset;

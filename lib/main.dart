@@ -58,9 +58,11 @@ void main() async {
   // Services initialisieren
   // ----------------------------
 
+  final authRepository = FirebaseAuthRepository();
+
   final anfrageRepository = FirestoreAnfrageRepository.create();
   final anfrageService = AnfrageService();
-  await anfrageService.init(anfrageRepository);
+  await anfrageService.init(anfrageRepository, authRepository);
 
   final eventRepository = FirestoreEventRepository.create();
   final eventService = EventService(eventRepository);
@@ -85,8 +87,6 @@ void main() async {
   if (kReleaseMode) {
     debugPrint = (String? message, {int? wrapWidth}) {};
   }
-
-  final authRepository = FirebaseAuthRepository();
 
   // App starten
   runApp(MyApp(

@@ -1,11 +1,12 @@
 // lib/data/anfrage_service.dart
 import 'dart:async';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:my_app/data/anfrage_daten.dart';
+import 'package:my_app/data/app_user.dart';
 import 'package:my_app/data/fahrt_daten.dart';
 import 'package:my_app/data/interessenten_daten.dart';
 import 'package:my_app/data/interfaces/i_anfrage_repository.dart';
+import 'package:my_app/data/interfaces/i_auth_repository.dart';
 
 class AnfrageService with ChangeNotifier {
   AnfrageService();
@@ -13,18 +14,18 @@ class AnfrageService with ChangeNotifier {
   late IAnfrageRepository _repository;
   final List<AnfrageDaten> _alleAnfragen = [];
   StreamSubscription<List<AnfrageDaten>>? _streamSub;
-  StreamSubscription<User?>? _authSub;
+  StreamSubscription<AppUser?>? _authSub;
 
   /// Unveränderliche Kopie nach außen
   List<AnfrageDaten> get alleAnfragen => List.unmodifiable(_alleAnfragen);
 
   /// Muss vor der ersten Benutzung aufgerufen werden (z. B. in main).
-  Future<void> init(IAnfrageRepository repository) async {
+  Future<void> init(IAnfrageRepository repository, IAuthRepository auth) async {
     _repository = repository;
     _startListening();
 
     _authSub?.cancel();
-    _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
+    _authSub = auth.authStateChanges.listen((user) {
       if (user != null) {
         // Stream neu starten wenn User einloggt (UID ändert sich)
         _startListening();

@@ -1,6 +1,6 @@
 // navbar_widget.dart
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/data/anfrage_daten.dart';
 import 'package:my_app/data/anfrage_service.dart';
 import 'package:my_app/data/notifiers.dart';
@@ -280,7 +280,7 @@ class _NavItemFahrten extends StatelessWidget {
           children: [
             Consumer2<AnfrageService, SeenAnfragenService>(
               builder: (context, anfrageService, seenService, _) {
-                final uid = FirebaseAuth.instance.currentUser?.uid;
+                final uid = context.read<IAuthRepository>().currentUser?.userId;
                 bool hasUnseen = false;
 
                 if (uid != null) {
