@@ -1,6 +1,6 @@
 // widget_tree.dart
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/data/notifiers.dart';
 import 'package:my_app/views/pages/events_page.dart';
 import 'package:my_app/views/pages/fahrten_page.dart';
@@ -79,7 +79,7 @@ class WidgetTree extends StatelessWidget {
               ),
 
               // Floating Action Button – nur für Admin sichtbar
-              if (FirebaseAuth.instance.currentUser?.uid == 'vA8UdBXsdCPD3ePJ88j4C3MQtjJ2')
+              if (context.read<IAuthRepository>().isAdmin)
                 Positioned(
                   bottom: 110,
                   right: 24,

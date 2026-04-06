@@ -1,5 +1,4 @@
 // detail_page.dart
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'dart:ui'; // Für ImageFilter.blur
@@ -227,9 +226,9 @@ class DetailPage extends StatelessWidget {
                                       ),
                                     ],
                                     SizedBox(height: height * 0.043),
-                                    if (FirebaseAuth.instance.currentUser
-                                            ?.uid ==
-                                        'vA8UdBXsdCPD3ePJ88j4C3MQtjJ2')
+                                    if (context
+                                        .read<IAuthRepository>()
+                                        .isAdmin)
                                       Center(
                                         child: OutlinedButton(
                                           onPressed: () {
@@ -685,10 +684,14 @@ class _IchWillHinPillState extends State<_IchWillHinPill>
     final bezirk = await context.read<IAuthRepository>().getHomeTown();
     if (!context.mounted) return;
 
+    final photoUrl =
+        context.read<IAuthRepository>().currentUser?.photoUrl;
+
     final eingetragen = await service.toggle(
       eventId: widget.event.id,
       userId: userId,
       userName: userName,
+      userPhotoUrl: photoUrl,
       bezirk: bezirk,
     );
 

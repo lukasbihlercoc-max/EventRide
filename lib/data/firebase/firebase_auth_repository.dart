@@ -2,43 +2,49 @@
 // Produktions-Implementierung von IAuthRepository via Firebase Auth + Firestore.
 // Ersetzt LocalAuthRepository sobald in main.dart eingebunden.
 
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:my_app/data/app_user.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 
 class FirebaseAuthRepository implements IAuthRepository {
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
+  final FirebaseStorage _storage;
 
   FirebaseAuthRepository({
     FirebaseAuth? auth,
     FirebaseFirestore? firestore,
+    FirebaseStorage? storage,
   })  : _auth = auth ?? FirebaseAuth.instance,
-        _firestore = firestore ?? FirebaseFirestore.instance;
+        _firestore = firestore ?? FirebaseFirestore.instance,
+        _storage = storage ?? FirebaseStorage.instance;
 
   // Mappt einen Firebase-User auf AppUser.
-  // Name kommt aus displayName (wird bei register() gesetzt).
+  // Name kommt aus displayName, photoUrl aus photoURL.
+  AppUser _mapUser(User fbUser) => AppUser(
+        userId: fbUser.uid,
+        name: fbUser.displayName ?? '',
+        email: fbUser.email ?? '',
+        photoUrl: fbUser.photoURL,
+      );
+
   @override
   AppUser? get currentUser {
     final fbUser = _auth.currentUser;
     if (fbUser == null) return null;
-    return AppUser(
-      userId: fbUser.uid,
-      name: fbUser.displayName ?? '',
-      email: fbUser.email ?? '',
-    );
+    return _mapUser(fbUser);
   }
 
+  // userChanges() feuert auch bei Profil-Updates (photoURL, displayName),
+  // nicht nur bei Sign-in/Sign-out wie authStateChanges().
   @override
   Stream<AppUser?> get authStateChanges {
-    return _auth.authStateChanges().map((fbUser) {
+    return _auth.userChanges().map((fbUser) {
       if (fbUser == null) return null;
-      return AppUser(
-        userId: fbUser.uid,
-        name: fbUser.displayName ?? '',
-        email: fbUser.email ?? '',
-      );
+      return _mapUser(fbUser);
     });
   }
 
@@ -62,11 +68,7 @@ class FirebaseAuthRepository implements IAuthRepository {
       }
     }
 
-    return AppUser(
-      userId: fbUser.uid,
-      name: name,
-      email: fbUser.email ?? '',
-    );
+    return _mapUser(fbUser);
   }
 
   @override
@@ -94,13 +96,10 @@ class FirebaseAuthRepository implements IAuthRepository {
       'email': email,
       'phone': phone,
       'homeTown': '',
+      'createdAt': FieldValue.serverTimestamp(),
     });
 
-    return AppUser(
-      userId: fbUser.uid,
-      name: fullName,
-      email: email,
-    );
+    return _mapUser(fbUser);
   }
 
   @override
@@ -117,6 +116,11 @@ class FirebaseAuthRepository implements IAuthRepository {
   @override
   Future<bool> isSignedIn() async => _auth.currentUser != null;
 
+  static const _adminUid = 'vA8UdBXsdCPD3ePJ88j4C3MQtjJ2';
+
+  @override
+  bool get isAdmin => _auth.currentUser?.uid == _adminUid;
+
   @override
   Future<void> setHomeTown(String town) async {
     final uid = _auth.currentUser?.uid;
@@ -130,5 +134,29 @@ class FirebaseAuthRepository implements IAuthRepository {
     if (uid == null) return null;
     final doc = await _firestore.collection('users').doc(uid).get();
     return doc.data()?['homeTown'] as String?;
+  }
+
+  @override
+  Future<String> uploadProfilePhoto(File image) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) throw Exception('Nicht eingeloggt');
+
+    // Upload nach: users/{uid}/profile.jpg
+    final ref = _storage.ref('users/$uid/profile.jpg');
+    await ref.putFile(
+      image,
+      SettableMetadata(contentType: 'image/jpeg'),
+    );
+
+    final url = await ref.getDownloadURL();
+
+    // URL in Firebase Auth und Firestore speichern
+    await _auth.currentUser!.updatePhotoURL(url);
+    await _firestore
+        .collection('users')
+        .doc(uid)
+        .update({'photoUrl': url});
+
+    return url;
   }
 }

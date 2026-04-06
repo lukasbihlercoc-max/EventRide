@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:my_app/data/app_user.dart';
 
 abstract class IAuthRepository {
@@ -21,7 +22,14 @@ abstract class IAuthRepository {
 
   Future<bool> isSignedIn();
 
+  /// Gibt true zurück, wenn der eingeloggte User Admin-Rechte hat.
+  bool get isAdmin;
+
   Future<void> setHomeTown(String town);
 
   Future<String?> getHomeTown();
+
+  /// Lädt ein Profilbild zu Firebase Storage hoch, speichert die URL in
+  /// Firestore und Firebase Auth und gibt die Download-URL zurück.
+  Future<String> uploadProfilePhoto(File image);
 }
