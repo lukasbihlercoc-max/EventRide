@@ -1,6 +1,9 @@
 // profile_page.dart
+import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:image_cropper/image_cropper.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:my_app/data/app_user.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/views/pages/login_page.dart';
@@ -192,19 +195,122 @@ class _TrustRow extends StatelessWidget {
 // LOGGED IN VIEW
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _LoggedInView extends StatelessWidget {
+class _LoggedInView extends StatefulWidget {
   final AppUser user;
   const _LoggedInView({required this.user});
 
   @override
+  State<_LoggedInView> createState() => _LoggedInViewState();
+}
+
+class _LoggedInViewState extends State<_LoggedInView> {
+  bool _uploading = false;
+
+  void _showSourceSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1A1F2E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded,
+                  color: Colors.white70),
+              title: const Text('Galerie',
+                  style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                _pickAndUpload(ImageSource.gallery);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt_rounded,
+                  color: Colors.white70),
+              title: const Text('Kamera',
+                  style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                _pickAndUpload(ImageSource.camera);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickAndUpload(ImageSource source) async {
+    final picked = await ImagePicker().pickImage(
+      source: source,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+
+    final cropped = await ImageCropper().cropImage(
+      sourcePath: picked.path,
+      aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+      uiSettings: [
+        AndroidUiSettings(
+          toolbarTitle: 'Zuschneiden',
+          toolbarColor: const Color(0xFF1A1F2E),
+          toolbarWidgetColor: Colors.white,
+          lockAspectRatio: true,
+          hideBottomControls: true,
+        ),
+        IOSUiSettings(
+          title: 'Zuschneiden',
+          aspectRatioLockEnabled: true,
+          resetAspectRatioEnabled: false,
+        ),
+      ],
+    );
+    if (cropped == null || !mounted) return;
+
+    setState(() => _uploading = true);
+    try {
+      await context
+          .read<IAuthRepository>()
+          .uploadProfilePhoto(File(cropped.path));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Upload fehlgeschlagen: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final user = widget.user;
     return SafeArea(
       bottom: false,
       child: SingleChildScrollView(
         child: Column(
           children: [
             // ── Hero ───────────────────────────────────────────────────
-            _HeroSection(user: user),
+            _HeroSection(
+              user: user,
+              uploading: _uploading,
+              onPickPhoto: _showSourceSheet,
+            ),
 
             const SizedBox(height: 24),
 
@@ -257,7 +363,9 @@ class _LoggedInView extends StatelessWidget {
                           icon: Icons.photo_camera_outlined,
                           label: "Profilbild",
                           cta: "Hochladen",
-                          done: false,
+                          done: user.photoUrl != null &&
+                              user.photoUrl!.isNotEmpty,
+                          onTap: _uploading ? null : _showSourceSheet,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -349,88 +457,131 @@ class _LoggedInView extends StatelessWidget {
 
 class _HeroSection extends StatelessWidget {
   final AppUser user;
-  const _HeroSection({required this.user});
+  final bool uploading;
+  final VoidCallback onPickPhoto;
+
+  const _HeroSection({
+    required this.user,
+    required this.uploading,
+    required this.onPickPhoto,
+  });
 
   @override
   Widget build(BuildContext context) {
     final initials = _initials(user.name);
+    final hasPhoto = user.photoUrl != null && user.photoUrl!.isNotEmpty;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 32, 24, 0),
       child: Column(
         children: [
-          // Avatar mit Progress-Arc
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              // Arc-Ring
-              SizedBox(
-                width: 122,
-                height: 122,
-                child: CustomPaint(
-                  painter: _ProgressArcPainter(progress: 0.25),
-                ),
-              ),
-              // Avatar
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF3B6FE0), Color(0xFF6B4FA0)],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF4A80F0).withValues(alpha: 0.3),
-                      blurRadius: 20,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: Text(
-                    initials,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 34,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.5,
+          // Avatar mit Progress-Arc + Tap
+          GestureDetector(
+            onTap: uploading ? null : onPickPhoto,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Arc-Ring
+                SizedBox(
+                  width: 122,
+                  height: 122,
+                  child: CustomPaint(
+                    painter: _ProgressArcPainter(
+                      progress: hasPhoto ? 0.5 : 0.25,
                     ),
                   ),
                 ),
-              ),
-              // Prozent-Badge unten rechts
-              Positioned(
-                bottom: 4,
-                right: 4,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 7, vertical: 3),
+                // Avatar
+                Container(
+                  width: 100,
+                  height: 100,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF4A80F0),
-                    borderRadius: BorderRadius.circular(10),
+                    shape: BoxShape.circle,
+                    gradient: hasPhoto
+                        ? null
+                        : const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Color(0xFF3B6FE0), Color(0xFF6B4FA0)],
+                          ),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF4A80F0).withValues(alpha: 0.5),
-                        blurRadius: 8,
-                        spreadRadius: 1,
+                        color:
+                            const Color(0xFF4A80F0).withValues(alpha: 0.3),
+                        blurRadius: 20,
+                        spreadRadius: 2,
                       ),
                     ],
                   ),
-                  child: const Text(
-                    "25%",
-                    style: TextStyle(
+                  child: ClipOval(
+                    child: uploading
+                        ? const Center(
+                            child: SizedBox(
+                              width: 32,
+                              height: 32,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: Colors.white,
+                              ),
+                            ),
+                          )
+                        : hasPhoto
+                            ? Image.network(
+                                user.photoUrl!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Center(
+                                  child: Text(
+                                    initials,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 34,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : Center(
+                                child: Text(
+                                  initials,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 34,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: -0.5,
+                                  ),
+                                ),
+                              ),
+                  ),
+                ),
+                // Kamera-Icon über dem Avatar
+                Positioned(
+                  bottom: 8,
+                  right: 8,
+                  child: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4A80F0),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                          color: const Color(0xFF1A1F2E), width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color:
+                              const Color(0xFF4A80F0).withValues(alpha: 0.5),
+                          blurRadius: 6,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.camera_alt_rounded,
+                      size: 14,
                       color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
 
           const SizedBox(height: 16),
