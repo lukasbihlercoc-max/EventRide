@@ -1,5 +1,6 @@
 // firestore_chat_repository.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:my_app/data/chat_conversation.dart';
 import 'package:my_app/data/chat_message.dart';
 import 'package:my_app/data/interfaces/i_chat_repository.dart';
@@ -20,10 +21,11 @@ class FirestoreChatRepository implements IChatRepository {
         .collection(_col)
         .doc(conversationId)
         .collection('messages')
-        .orderBy('createdAt')
         .snapshots()
-        .map((snap) =>
-            snap.docs.map((d) => ChatMessage.fromMap(d.id, d.data())).toList());
+        .map((snap) => snap.docs
+            .map((d) => ChatMessage.fromMap(d.id, d.data()))
+            .toList()
+          ..sort((a, b) => a.createdAt.compareTo(b.createdAt)));
   }
 
   /// Echtzeit-Conversations des Users, absteigend nach lastMessageAt.
@@ -33,11 +35,11 @@ class FirestoreChatRepository implements IChatRepository {
     return _db
         .collection(_col)
         .where('participants', arrayContains: userId)
-        .orderBy('lastMessageAt', descending: true)
         .snapshots()
         .map((snap) => snap.docs
             .map((d) => ChatConversation.fromMap(d.id, d.data()))
-            .toList());
+            .toList()
+          ..sort((a, b) => b.lastUpdated.compareTo(a.lastUpdated)));
   }
 
   // ── Writes ───────────────────────────────────────────────────────────────
@@ -47,35 +49,42 @@ class FirestoreChatRepository implements IChatRepository {
   /// Bei Systemnachrichten (feste ID) wird nur die Nachricht selbst überschrieben.
   @override
   Future<void> sendMessage(ChatMessage message) async {
-    final convoRef = _db.collection(_col).doc(message.conversationId);
+    try {
+      final convoRef = _db.collection(_col).doc(message.conversationId);
 
-    final msgData = message.toMap()
-      ..['createdAt'] = FieldValue.serverTimestamp();
+      final msgData = message.toMap()
+        ..['createdAt'] = FieldValue.serverTimestamp();
 
-    await convoRef.collection('messages').doc(message.id).set(msgData);
+      await convoRef.collection('messages').doc(message.id).set(msgData);
 
-    if (!message.isSystem) {
-      await convoRef.update({
-        'lastMessage': message.text,
-        'lastMessageAt': FieldValue.serverTimestamp(),
-      });
+      if (!message.isSystem) {
+        await convoRef.update({
+          'lastMessage': message.text,
+          'lastMessageAt': FieldValue.serverTimestamp(),
+        });
+      }
+    } on FirebaseException catch (e) {
+      debugPrint('Fehler beim Senden der Nachricht: ${e.message}');
+      rethrow;
     }
   }
 
-  /// Legt eine Conversation an – nur wenn sie noch nicht existiert (Transaction).
-  /// Verhindert Race-Conditions bei gleichzeitigem Öffnen des Chats.
+  /// Legt eine Conversation an oder aktualisiert sie (merge).
+  /// Kein Transaction-Roundtrip → schreibt sofort in den lokalen Cache,
+  /// await löst sofort auf. Das ermöglicht das direkte Chaining mit
+  /// updateSystemMessage ohne Netzwerk-Blockierung.
   @override
   Future<void> ensureConversation(ChatConversation convo) async {
-    final ref = _db.collection(_col).doc(convo.id);
-    await _db.runTransaction((tx) async {
-      final doc = await tx.get(ref);
-      if (!doc.exists) {
-        final data = convo.toMap()
-          ..['createdAt'] = FieldValue.serverTimestamp()
-          ..['lastMessageAt'] = FieldValue.serverTimestamp()
-          ..['lastMessage'] = '';
-        tx.set(ref, data);
-      }
-    });
+    try {
+      final ref = _db.collection(_col).doc(convo.id);
+      final data = convo.toMap()
+        ..['createdAt'] = FieldValue.serverTimestamp()
+        ..['lastMessageAt'] = FieldValue.serverTimestamp()
+        ..['lastMessage'] = '';
+      await ref.set(data, SetOptions(merge: true));
+    } on FirebaseException catch (e) {
+      debugPrint('Fehler beim Anlegen der Conversation: ${e.message}');
+      rethrow;
+    }
   }
 }

@@ -183,11 +183,9 @@ class FahrtDaten {
       uhrzeitHour: parseInt(map['uhrzeitHour']),
       uhrzeitMinute: parseInt(map['uhrzeitMinute']),
       rueckuhrzeitHour:
-          map.containsKey('rueckuhrzeitHour') ? parseInt(map['rueckuhrzeitHour'], null as int? ?? 0) : null,
-      // if absent, keep null
-      rueckuhrzeitMinute: map.containsKey('rueckuhrzeitMinute')
-          ? parseInt(map['rueckuhrzeitMinute'], null as int? ?? 0)
-          : null,
+          map.containsKey('rueckuhrzeitHour') ? parseInt(map['rueckuhrzeitHour']) : null,
+      rueckuhrzeitMinute:
+          map.containsKey('rueckuhrzeitMinute') ? parseInt(map['rueckuhrzeitMinute']) : null,
       freiePlaetze: parseInt(map['freiePlaetze'], 0),
       richtung: richtung,
       ownerId: map['ownerId'] as String? ?? '',

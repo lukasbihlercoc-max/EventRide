@@ -57,21 +57,27 @@ class FirestoreAnfrageRepository implements IAnfrageRepository {
         .collection(_collection)
         .where('requesterId', isEqualTo: uid)
         .snapshots()
-        .listen((snap) {
-      fromRequester =
-          snap.docs.map((d) => AnfrageDaten.fromMap(d.data())).toList();
-      emit();
-    });
+        .listen(
+      (snap) {
+        fromRequester =
+            snap.docs.map((d) => AnfrageDaten.fromMap(d.data())).toList();
+        emit();
+      },
+      onError: (_) {},
+    );
 
     final subB = _firestore
         .collection(_collection)
         .where('fahrtOwnerId', isEqualTo: uid)
         .snapshots()
-        .listen((snap) {
-      fromOwner =
-          snap.docs.map((d) => AnfrageDaten.fromMap(d.data())).toList();
-      emit();
-    });
+        .listen(
+      (snap) {
+        fromOwner =
+            snap.docs.map((d) => AnfrageDaten.fromMap(d.data())).toList();
+        emit();
+      },
+      onError: (_) {},
+    );
 
     controller.onCancel = () {
       subA.cancel();
@@ -83,20 +89,30 @@ class FirestoreAnfrageRepository implements IAnfrageRepository {
 
   @override
   Future<void> add(AnfrageDaten anfrage) async {
-    await _firestore
-        .collection(_collection)
-        .doc(anfrage.id)
-        .set(anfrage.toMap());
-    _cache.add(anfrage);
+    try {
+      await _firestore
+          .collection(_collection)
+          .doc(anfrage.id)
+          .set(anfrage.toMap());
+      _cache.add(anfrage);
+    } on FirebaseException catch (e) {
+      debugPrint('Fehler beim Speichern der Anfrage: ${e.message}');
+      rethrow;
+    }
   }
 
   @override
   Future<void> update(AnfrageDaten anfrage) async {
-    await _firestore
-        .collection(_collection)
-        .doc(anfrage.id)
-        .update(anfrage.toMap());
-    final index = _cache.indexWhere((a) => a.id == anfrage.id);
-    if (index != -1) _cache[index] = anfrage;
+    try {
+      await _firestore
+          .collection(_collection)
+          .doc(anfrage.id)
+          .update(anfrage.toMap());
+      final index = _cache.indexWhere((a) => a.id == anfrage.id);
+      if (index != -1) _cache[index] = anfrage;
+    } on FirebaseException catch (e) {
+      debugPrint('Fehler beim Aktualisieren der Anfrage: ${e.message}');
+      rethrow;
+    }
   }
 }

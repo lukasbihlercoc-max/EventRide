@@ -38,9 +38,9 @@ class ChatMessage {
     }
     return ChatMessage(
       id: id,
-      conversationId: map['conversationId'] as String,
-      senderId: map['senderId'] as String,
-      text: map['text'] as String,
+      conversationId: (map['conversationId'] as String?) ?? '',
+      senderId: (map['senderId'] as String?) ?? '',
+      text: (map['text'] as String?) ?? '',
       createdAt: createdAt,
       isSystem: map['isSystem'] as bool? ?? false,
     );

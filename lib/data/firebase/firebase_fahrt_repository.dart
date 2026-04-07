@@ -44,25 +44,40 @@ class FirestoreFahrtRepository implements IFahrtRepository {
   /// Schreibt nach Firestore und fügt dem Cache hinzu.
   @override
   Future<void> add(FahrtDaten fahrt) async {
-    await _firestore.collection(_collection).doc(fahrt.id).set(fahrt.toMap());
-    _cache.add(fahrt);
+    try {
+      await _firestore.collection(_collection).doc(fahrt.id).set(fahrt.toMap());
+      _cache.add(fahrt);
+    } on FirebaseException catch (e) {
+      debugPrint('Fehler beim Speichern der Fahrt: ${e.message}');
+      rethrow;
+    }
   }
 
   /// Aktualisiert Firestore und den Cache.
   @override
   Future<void> update(FahrtDaten fahrt) async {
-    await _firestore
-        .collection(_collection)
-        .doc(fahrt.id)
-        .update(fahrt.toMap());
-    final index = _cache.indexWhere((f) => f.id == fahrt.id);
-    if (index != -1) _cache[index] = fahrt;
+    try {
+      await _firestore
+          .collection(_collection)
+          .doc(fahrt.id)
+          .update(fahrt.toMap());
+      final index = _cache.indexWhere((f) => f.id == fahrt.id);
+      if (index != -1) _cache[index] = fahrt;
+    } on FirebaseException catch (e) {
+      debugPrint('Fehler beim Aktualisieren der Fahrt: ${e.message}');
+      rethrow;
+    }
   }
 
   /// Löscht aus Firestore und aus dem Cache.
   @override
   Future<void> delete(String id) async {
-    await _firestore.collection(_collection).doc(id).delete();
-    _cache.removeWhere((f) => f.id == id);
+    try {
+      await _firestore.collection(_collection).doc(id).delete();
+      _cache.removeWhere((f) => f.id == id);
+    } on FirebaseException catch (e) {
+      debugPrint('Fehler beim Löschen der Fahrt: ${e.message}');
+      rethrow;
+    }
   }
 }

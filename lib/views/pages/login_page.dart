@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'dart:ui'; // Für ImageFilter.blur
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:my_app/data/fahrt_service.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/pages/register_page.dart';
@@ -20,7 +19,7 @@ class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
-  bool _rememberMe = false;
+  bool _obscurePassword = true;
 
   @override
   Widget build(BuildContext context) {
@@ -106,6 +105,14 @@ class _LoginPageState extends State<LoginPage> {
                       labelText: "Passwort",
                       labelStyle: const TextStyle(color: Colors.white70),
                       prefixIcon: const Icon(Icons.lock, color: Colors.white70),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                          color: Colors.white70,
+                        ),
+                        onPressed: () =>
+                            setState(() => _obscurePassword = !_obscurePassword),
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: const BorderSide(color: Colors.white70),
@@ -119,7 +126,7 @@ class _LoginPageState extends State<LoginPage> {
                         borderSide: const BorderSide(color: Colors.blueAccent, width: 2),
                       ),
                     ),
-                    obscureText: true,
+                    obscureText: _obscurePassword,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Bitte Passwort eingeben';
@@ -132,50 +139,16 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Passwort vergessen ÜBER Remember Me
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Passwort vergessen zuerst
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton(
-                          onPressed: () {
-                            // Passwort zurücksetzen Funktion
-                          },
-                          child: Text("Passwort vergessen?",
-                              style: TextStyle(
-                                color: Colors.blueAccent,
-                                fontSize: 16,
-                              )),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      
-                      // Remember Me darunter
-                      Row(
-                        children: [
-                          Checkbox(
-                            value: _rememberMe,
-                            onChanged: (value) {
-                              setState(() {
-                                _rememberMe = value ?? false;
-                              });
-                            },
-                            fillColor: WidgetStateProperty.resolveWith<Color>(
-                              (Set<WidgetState> states) {
-                                if (states.contains(WidgetState.selected)) {
-                                  return Colors.blueAccent;
-                                }
-                                return Colors.white30;
-                              },
-                            ),
-                          ),
-                          Text("Eingeloggt bleiben", 
-                              style: TextStyle(color: Colors.white70)),
-                        ],
-                      ),
-                    ],
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed: _showResetPasswordDialog,
+                      child: const Text("Passwort vergessen?",
+                          style: TextStyle(
+                            color: Colors.blueAccent,
+                            fontSize: 16,
+                          )),
+                    ),
                   ),
                   const SizedBox(height: 30),
 
@@ -202,12 +175,10 @@ class _LoginPageState extends State<LoginPage> {
                   // Registrierungs-Link
                   Center(
                     child: GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const RegisterPage()),
-                        );
-                      },
+                      onTap: () => Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (_) => const RegisterPage()),
+                      ),
                       child: RichText(
                         text: TextSpan(
                           text: "Noch kein Konto? ",
@@ -243,8 +214,6 @@ class _LoginPageState extends State<LoginPage> {
         _emailController.text.trim(),
         _passwordController.text,
       );
-      if (!mounted) return;
-      await context.read<FahrtService>().load();
       if (mounted) Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
@@ -261,6 +230,114 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  void _showResetPasswordDialog() {
+    final emailController = TextEditingController(
+      text: _emailController.text.trim(),
+    );
+    bool loading = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF1A1F2E),
+          title: const Text(
+            'Passwort zurücksetzen',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Gib deine E-Mail-Adresse ein. Wir senden dir einen Link zum Zurücksetzen.',
+                style: TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: emailController,
+                style: const TextStyle(color: Colors.white),
+                keyboardType: TextInputType.emailAddress,
+                decoration: InputDecoration(
+                  labelText: 'E-Mail',
+                  labelStyle: const TextStyle(color: Colors.white70),
+                  prefixIcon: const Icon(Icons.email, color: Colors.white70),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.white70),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.blueAccent, width: 2),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: loading ? null : () => Navigator.pop(dialogContext),
+              child: const Text('Abbrechen',
+                  style: TextStyle(color: Colors.white54)),
+            ),
+            ElevatedButton(
+              onPressed: loading
+                  ? null
+                  : () async {
+                      final email = emailController.text.trim();
+                      if (email.isEmpty) return;
+                      setDialogState(() => loading = true);
+                      try {
+                        await context
+                            .read<IAuthRepository>()
+                            .resetPassword(email);
+                        if (dialogContext.mounted) Navigator.pop(dialogContext);
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('E-Mail zum Zurücksetzen wurde gesendet'),
+                          ),
+                        );
+                      } on FirebaseAuthException catch (e) {
+                        setDialogState(() => loading = false);
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(_resetError(e.code))),
+                        );
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blueAccent,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: loading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Senden'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _resetError(String code) {
+    switch (code) {
+      case 'user-not-found':
+        return 'Kein Konto mit dieser E-Mail gefunden';
+      case 'invalid-email':
+        return 'Ungültige E-Mail-Adresse';
+      default:
+        return 'Fehler beim Senden der E-Mail';
+    }
+  }
+
   String _authError(String code) {
     switch (code) {
       case 'user-not-found':
@@ -271,6 +348,10 @@ class _LoginPageState extends State<LoginPage> {
         return 'E-Mail oder Passwort falsch';
       case 'too-many-requests':
         return 'Zu viele Versuche – bitte später erneut versuchen';
+      case 'invalid-email':
+        return 'Ungültige E-Mail-Adresse';
+      case 'user-disabled':
+        return 'Dieses Konto wurde deaktiviert';
       default:
         return 'Anmeldung fehlgeschlagen';
     }

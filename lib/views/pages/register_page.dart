@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'dart:ui'; // Für ImageFilter.blur
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
+import 'package:my_app/views/pages/login_page.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:provider/provider.dart';
 
@@ -18,18 +19,40 @@ class _RegisterPageState extends State<RegisterPage> {
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
-  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _isLoading = false;
   bool _acceptTerms = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirm = true;
+
+  static OutlineInputBorder _border(Color color, {double width = 1}) =>
+      OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: color, width: width),
+      );
+
+  InputDecoration _fieldDecoration({
+    required String label,
+    Widget? prefix,
+    Widget? suffix,
+  }) =>
+      InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.white70),
+        prefixIcon: prefix,
+        suffixIcon: suffix,
+        border: _border(Colors.white70),
+        enabledBorder: _border(Colors.white70),
+        focusedBorder: _border(Colors.blueAccent, width: 2),
+      );
 
   @override
   Widget build(BuildContext context) {
     return Stack(
       children: [
         AppBackground(child: Container()),
-        Container(color: Colors.black.withOpacity(0.4)),
+        Container(color: Colors.black.withValues(alpha: 0.4)),
         BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
           child: Container(color: Colors.transparent),
@@ -40,18 +63,18 @@ class _RegisterPageState extends State<RegisterPage> {
             backgroundColor: Colors.transparent,
             elevation: 0,
             leading: IconButton(
-              icon: Icon(Icons.arrow_back),
+              icon: const Icon(Icons.arrow_back),
               onPressed: () => Navigator.pop(context),
             ),
           ),
           body: SingleChildScrollView(
-            padding: EdgeInsets.all(24),
+            padding: const EdgeInsets.all(24),
             child: Form(
               key: _formKey,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  const Text(
                     "Registrieren",
                     style: TextStyle(
                       fontSize: 32,
@@ -59,15 +82,12 @@ class _RegisterPageState extends State<RegisterPage> {
                       color: Colors.white,
                     ),
                   ),
-                  SizedBox(height: 8),
-                  Text(
+                  const SizedBox(height: 8),
+                  const Text(
                     "Erstelle dein sicheres Profil",
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.white70,
-                    ),
+                    style: TextStyle(fontSize: 18, color: Colors.white70),
                   ),
-                  SizedBox(height: 30),
+                  const SizedBox(height: 30),
 
                   // Name Felder
                   Row(
@@ -75,14 +95,8 @@ class _RegisterPageState extends State<RegisterPage> {
                       Expanded(
                         child: TextFormField(
                           controller: _firstNameController,
-                          style: TextStyle(color: Colors.white, fontSize: 18),
-                          decoration: InputDecoration(
-                            labelText: "Vorname",
-                            labelStyle: TextStyle(color: Colors.white70),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
+                          style: const TextStyle(color: Colors.white, fontSize: 18),
+                          decoration: _fieldDecoration(label: "Vorname"),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return 'Bitte Vorname eingeben';
@@ -91,18 +105,12 @@ class _RegisterPageState extends State<RegisterPage> {
                           },
                         ),
                       ),
-                      SizedBox(width: 16),
+                      const SizedBox(width: 16),
                       Expanded(
                         child: TextFormField(
                           controller: _lastNameController,
-                          style: TextStyle(color: Colors.white, fontSize: 18),
-                          decoration: InputDecoration(
-                            labelText: "Nachname",
-                            labelStyle: TextStyle(color: Colors.white70),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
+                          style: const TextStyle(color: Colors.white, fontSize: 18),
+                          decoration: _fieldDecoration(label: "Nachname"),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return 'Bitte Nachname eingeben';
@@ -113,19 +121,15 @@ class _RegisterPageState extends State<RegisterPage> {
                       ),
                     ],
                   ),
-                  SizedBox(height: 20),
+                  const SizedBox(height: 20),
 
                   // E-Mail Feld
                   TextFormField(
                     controller: _emailController,
-                    style: TextStyle(color: Colors.white, fontSize: 18),
-                    decoration: InputDecoration(
-                      labelText: "E-Mail",
-                      labelStyle: TextStyle(color: Colors.white70),
-                      prefixIcon: Icon(Icons.email, color: Colors.white70),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                    style: const TextStyle(color: Colors.white, fontSize: 18),
+                    decoration: _fieldDecoration(
+                      label: "E-Mail",
+                      prefix: const Icon(Icons.email, color: Colors.white70),
                     ),
                     keyboardType: TextInputType.emailAddress,
                     validator: (value) {
@@ -138,43 +142,25 @@ class _RegisterPageState extends State<RegisterPage> {
                       return null;
                     },
                   ),
-                  SizedBox(height: 20),
-
-                  // Telefonnummer Feld
-                  TextFormField(
-                    controller: _phoneController,
-                    style: TextStyle(color: Colors.white, fontSize: 18),
-                    decoration: InputDecoration(
-                      labelText: "Telefonnummer",
-                      labelStyle: TextStyle(color: Colors.white70),
-                      prefixIcon: Icon(Icons.phone, color: Colors.white70),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    keyboardType: TextInputType.phone,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Bitte Telefonnummer eingeben';
-                      }
-                      return null;
-                    },
-                  ),
-                  SizedBox(height: 20),
+                  const SizedBox(height: 20),
 
                   // Passwort Feld
                   TextFormField(
                     controller: _passwordController,
-                    style: TextStyle(color: Colors.white, fontSize: 18),
-                    decoration: InputDecoration(
-                      labelText: "Passwort",
-                      labelStyle: TextStyle(color: Colors.white70),
-                      prefixIcon: Icon(Icons.lock, color: Colors.white70),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                    style: const TextStyle(color: Colors.white, fontSize: 18),
+                    decoration: _fieldDecoration(
+                      label: "Passwort",
+                      prefix: const Icon(Icons.lock, color: Colors.white70),
+                      suffix: IconButton(
+                        icon: Icon(
+                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                          color: Colors.white70,
+                        ),
+                        onPressed: () =>
+                            setState(() => _obscurePassword = !_obscurePassword),
                       ),
                     ),
-                    obscureText: true,
+                    obscureText: _obscurePassword,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Bitte Passwort eingeben';
@@ -185,21 +171,25 @@ class _RegisterPageState extends State<RegisterPage> {
                       return null;
                     },
                   ),
-                  SizedBox(height: 20),
+                  const SizedBox(height: 20),
 
                   // Passwort bestätigen Feld
                   TextFormField(
                     controller: _confirmPasswordController,
-                    style: TextStyle(color: Colors.white, fontSize: 18),
-                    decoration: InputDecoration(
-                      labelText: "Passwort bestätigen",
-                      labelStyle: TextStyle(color: Colors.white70),
-                      prefixIcon: Icon(Icons.lock_outline, color: Colors.white70),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                    style: const TextStyle(color: Colors.white, fontSize: 18),
+                    decoration: _fieldDecoration(
+                      label: "Passwort bestätigen",
+                      prefix: const Icon(Icons.lock_outline, color: Colors.white70),
+                      suffix: IconButton(
+                        icon: Icon(
+                          _obscureConfirm ? Icons.visibility_off : Icons.visibility,
+                          color: Colors.white70,
+                        ),
+                        onPressed: () =>
+                            setState(() => _obscureConfirm = !_obscureConfirm),
                       ),
                     ),
-                    obscureText: true,
+                    obscureText: _obscureConfirm,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Bitte Passwort bestätigen';
@@ -210,7 +200,7 @@ class _RegisterPageState extends State<RegisterPage> {
                       return null;
                     },
                   ),
-                  SizedBox(height: 20),
+                  const SizedBox(height: 20),
 
                   // AGB Checkbox
                   Row(
@@ -236,7 +226,7 @@ class _RegisterPageState extends State<RegisterPage> {
                           onTap: () {
                             // AGB anzeigen
                           },
-                          child: Text(
+                          child: const Text(
                             "Ich akzeptiere die AGB und Datenschutzbestimmungen",
                             style: TextStyle(color: Colors.white70),
                           ),
@@ -244,7 +234,7 @@ class _RegisterPageState extends State<RegisterPage> {
                       ),
                     ],
                   ),
-                  SizedBox(height: 30),
+                  const SizedBox(height: 30),
 
                   // Registrieren Button
                   SizedBox(
@@ -254,24 +244,27 @@ class _RegisterPageState extends State<RegisterPage> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _acceptTerms ? Colors.blueAccent : Colors.grey,
                         foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(vertical: 16),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                       child: _isLoading
-                          ? CircularProgressIndicator(color: Colors.white)
-                          : Text("Konto erstellen", style: TextStyle(fontSize: 18)),
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text("Konto erstellen", style: TextStyle(fontSize: 18)),
                     ),
                   ),
-                  SizedBox(height: 24),
+                  const SizedBox(height: 24),
 
                   // Login-Link
                   Center(
                     child: GestureDetector(
-                      onTap: () => Navigator.pop(context),
+                      onTap: () => Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (_) => const LoginPage()),
+                      ),
                       child: RichText(
-                        text: TextSpan(
+                        text: const TextSpan(
                           text: "Bereits registriert? ",
                           style: TextStyle(color: Colors.white70),
                           children: [
@@ -305,7 +298,6 @@ class _RegisterPageState extends State<RegisterPage> {
         firstName: _firstNameController.text.trim(),
         lastName: _lastNameController.text.trim(),
         email: _emailController.text.trim(),
-        phone: _phoneController.text.trim(),
         password: _passwordController.text,
       );
       // Zurück zur Root-Route; AuthGate's StreamBuilder zeigt WidgetTree
@@ -333,6 +325,10 @@ class _RegisterPageState extends State<RegisterPage> {
         return 'Passwort zu schwach (mind. 6 Zeichen)';
       case 'invalid-email':
         return 'Ungültige E-Mail-Adresse';
+      case 'too-many-requests':
+        return 'Zu viele Versuche – bitte später erneut versuchen';
+      case 'user-disabled':
+        return 'Dieses Konto wurde deaktiviert';
       default:
         return 'Registrierung fehlgeschlagen';
     }
@@ -343,7 +339,6 @@ class _RegisterPageState extends State<RegisterPage> {
     _firstNameController.dispose();
     _lastNameController.dispose();
     _emailController.dispose();
-    _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();

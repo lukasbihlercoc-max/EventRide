@@ -18,15 +18,17 @@ final selectedRadiusNotifier = ValueNotifier<int?>(null);
 final favouriteEventsNotifier = ValueNotifier<Set<String>>(<String>{});
 
 const _favouritesKey = 'event_favourites';
+bool _favouritesListenerRegistered = false;
 
 Future<void> initFavouriteEvents() async {
   final prefs = await SharedPreferences.getInstance();
   final storedList = prefs.getStringList(_favouritesKey) ?? [];
 
-  // gespeicherte IDs in Set laden
   favouriteEventsNotifier.value = storedList.toSet();
 
-  // Listener nur EINMAL registrieren
+  if (_favouritesListenerRegistered) return;
+  _favouritesListenerRegistered = true;
+
   favouriteEventsNotifier.addListener(() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(
