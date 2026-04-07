@@ -8,10 +8,13 @@ import 'package:provider/provider.dart';
 import 'package:my_app/data/fahrt_daten.dart';
 import 'package:my_app/data/event_daten.dart';
 import 'package:my_app/data/anfrage_daten.dart';
+import 'package:my_app/views/widgets/trust_shields_widget.dart';
 import 'package:my_app/data/anfrage_service.dart';
 import 'package:my_app/views/pages/fahrt_anbieten_page.dart';
 import 'package:my_app/views/pages/fahrt_anfragen_page.dart';
+import 'package:my_app/views/pages/public_profile_page.dart';
 import 'package:my_app/views/widgets/sizehelper_widget.dart';
+import 'package:my_app/views/widgets/user_avatar_widget.dart';
 import 'package:my_app/views/auth/auth_guard.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 
@@ -262,63 +265,14 @@ class _FahrtenCardState extends State<FahrtenCard> {
 
                     // ── Avatar + Name oben links ──
                     Positioned(
-  top: 20,
-  left: 16,
-  right: 16,
-  child: Row(
-    children: [
-      Container(
-        width: 42,
-        height: 42,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: const Color(0xFF2F5ED6),
-          border: Border.all(color: Colors.white, width: 2),
-        ),
-        child: Center(
-          child: Text(
-            _initials(fahrt.ownerName),
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ),
-
-      const SizedBox(width: 10),
-
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              fahrt.ownerName,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: 16,
-                shadows: [
-                  Shadow(color: Colors.black54, blurRadius: 4),
-                ],
-              ),
-            ),
-            const SizedBox(height: 2),
-            const Row(
-              children: [
-                Icon(Icons.star, color: Colors.amber, size: 14),
-                Icon(Icons.star, color: Colors.amber, size: 14),
-                Icon(Icons.star, color: Colors.amber, size: 14),
-                SizedBox(width: 4),
-                Text("3.0", style: TextStyle(color: Colors.white70)),
-              ],
-            )
-          ],
-        ),
-      ),
-    ],
-  ),
-),
+                      top: 20,
+                      left: 16,
+                      right: 16,
+                      child: _FahrerProfilBlock(
+                        userId: fahrt.ownerId,
+                        name: fahrt.ownerName,
+                      ),
+                    ),
 
                     // ── Icons oben rechts (nur editierbar) ──
                     if (isEditable)
@@ -616,12 +570,6 @@ class _FahrtenCardState extends State<FahrtenCard> {
     );
   }
 
-  String _initials(String name) {
-    final parts = name.trim().split(RegExp(r'\s+'));
-    if (parts.isEmpty || parts.first.isEmpty) return '?';
-    if (parts.length == 1) return parts.first[0].toUpperCase();
-    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
-  }
 
   void _handleEdit(BuildContext context) {
     final event = Event(
@@ -1020,5 +968,82 @@ class _FahrtenCardState extends State<FahrtenCard> {
 
     if (!context.mounted) return;
     AppSnackbar.show(context, message: "Fahrt wurde gelöscht");
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// _FahrerProfilBlock
+// Avatar + Name + Rating — ganzer Block führt zur PublicProfilePage.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _FahrerProfilBlock extends StatefulWidget {
+  final String userId;
+  final String name;
+
+  const _FahrerProfilBlock({required this.userId, required this.name});
+
+  @override
+  State<_FahrerProfilBlock> createState() => _FahrerProfilBlockState();
+}
+
+class _FahrerProfilBlockState extends State<_FahrerProfilBlock> {
+  String? _photoUrl;
+
+  void _navigate() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PublicProfilePage(
+          userId: widget.userId,
+          name: widget.name,
+          photoUrl: _photoUrl,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: _navigate,
+      behavior: HitTestBehavior.opaque,
+      child: Row(
+        children: [
+          UserAvatarById(
+            userId: widget.userId,
+            name: widget.name,
+            radius: 21,
+            backgroundColor: const Color(0xFF2F5ED6),
+            onPhotoLoaded: (url) => setState(() => _photoUrl = url),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        widget.name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                          shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const TrustShields(filled: 1, size: 14),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

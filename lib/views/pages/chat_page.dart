@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
+import 'package:my_app/data/interfaces/i_user_repository.dart';
 
 import 'package:my_app/data/chat_service.dart';
 import 'package:my_app/data/chat_message.dart';
@@ -10,11 +13,13 @@ import 'package:my_app/views/widgets/background_widget.dart';
 class ChatPage extends StatefulWidget {
   final String conversationId;
   final String otherUserName;
+  final String otherUserId;
 
   const ChatPage({
     super.key,
     required this.conversationId,
     required this.otherUserName,
+    required this.otherUserId,
   });
 
   @override
@@ -26,6 +31,9 @@ class _ChatPageState extends State<ChatPage> {
   final _scrollController = ScrollController();
   late final String _myUserId;
 
+  DateTime? _otherUserLastSeen;
+  StreamSubscription<DateTime?>? _lastSeenSub;
+  Timer? _statusRefreshTimer;
   final _scrolledPast = ValueNotifier<bool>(false);
   final _systemInfoKey = GlobalKey();
   double _systemInfoHeight = 130;
@@ -37,6 +45,17 @@ class _ChatPageState extends State<ChatPage> {
   void initState() {
     super.initState();
     _myUserId = context.read<IAuthRepository>().currentUser?.userId ?? '';
+
+    _lastSeenSub = context
+        .read<IUserRepository>()
+        .lastSeenStream(widget.otherUserId)
+        .listen((dt) {
+      if (mounted) setState(() => _otherUserLastSeen = dt);
+    });
+
+    _statusRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted && _otherUserLastSeen != null) setState(() {});
+    });
 
     _scrollController.addListener(() {
       final past = _scrollController.offset > _triggerOffset;
@@ -69,10 +88,27 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   void dispose() {
+    _lastSeenSub?.cancel();
+    _statusRefreshTimer?.cancel();
     _scrolledPast.dispose();
     _scrollController.dispose();
     _controller.dispose();
     super.dispose();
+  }
+
+  Widget _appBarTitle() {
+    final subtitle = _lastSeenText(_otherUserLastSeen);
+    if (subtitle == null) return Text(widget.otherUserName);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(widget.otherUserName,
+            style: const TextStyle(fontSize: 16, height: 1.2)),
+        Text(subtitle,
+            style: const TextStyle(fontSize: 11, color: Colors.white60)),
+      ],
+    );
   }
 
   @override
@@ -91,7 +127,7 @@ class _ChatPageState extends State<ChatPage> {
                 backgroundColor: Colors.black.withValues(alpha: 0.18),
                 elevation: 0,
                 surfaceTintColor: Colors.transparent,
-                title: Text(widget.otherUserName),
+                title: _appBarTitle(),
               ),
               body: const Center(
                 child: CircularProgressIndicator(color: Colors.white54),
@@ -111,6 +147,8 @@ class _ChatPageState extends State<ChatPage> {
           _scrollToBottom();
         }
 
+        final chatItems = _buildChatItems(userMessages);
+
         return AppBackground(
           child: Stack(
             children: [
@@ -120,7 +158,7 @@ class _ChatPageState extends State<ChatPage> {
                   backgroundColor: Colors.black.withOpacity(0.18),
                   elevation: 0,
                   surfaceTintColor: Colors.transparent,
-                  title: Text(widget.otherUserName),
+                  title: _appBarTitle(),
                 ),
                 body: GestureDetector(
                   onTap: () => FocusScope.of(context).unfocus(),
@@ -139,11 +177,22 @@ class _ChatPageState extends State<ChatPage> {
                           16,
                           16,
                         ),
-                        itemCount: userMessages.length,
+                        itemCount: chatItems.length,
                         itemBuilder: (context, index) {
+                          final item = chatItems[index];
+                          if (item is DateTime) {
+                            return _buildDateSeparator(item);
+                          }
+                          final msg = item as ChatMessage;
+                          final next = index + 1 < chatItems.length
+                              ? chatItems[index + 1]
+                              : null;
+                          final isLastInGroup = next is! ChatMessage ||
+                              next.senderId != msg.senderId;
                           return _buildMessageBubble(
-                            userMessages[index],
+                            msg,
                             _myUserId,
+                            isLastInGroup: isLastInGroup,
                           );
                         },
                       ),
@@ -763,7 +812,31 @@ class _SystemMessageData {
   }
 }
 
-Widget _buildMessageBubble(ChatMessage msg, String myUserId) {
+Widget _buildMessageBubble(ChatMessage msg, String myUserId, {bool isLastInGroup = true}) {
+  if (msg.senderId == 'system') {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 24),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Text(
+            msg.text,
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.white54,
+              fontStyle: FontStyle.italic,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ),
+    );
+  }
+
   final isMe = msg.senderId == myUserId;
   final time =
       '${msg.createdAt.hour.toString().padLeft(2, '0')}:${msg.createdAt.minute.toString().padLeft(2, '0')}';
@@ -772,38 +845,49 @@ Widget _buildMessageBubble(ChatMessage msg, String myUserId) {
     alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
     child: IntrinsicWidth(
       child: Container(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+      margin: EdgeInsets.only(top: 2, bottom: isLastInGroup ? 8 : 2),
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 6),
       constraints: const BoxConstraints(maxWidth: 280),
       decoration: BoxDecoration(
         color: isMe ? const Color(0xFF2F5ED6) : const Color(0xFF1E3547),
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Align(
-            alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-            child: Text(
-              msg.text,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                height: 1.35,
-              ),
-            ),
-          ),
-          const SizedBox(height: 1),
-          Padding(
-            padding: const EdgeInsets.only(left: 12),
-            child: Text(
-              time,
-              style: const TextStyle(fontSize: 10, color: Colors.white38),
-            ),
-          ),
-        ],
+      child: Stack(
+  children: [
+    // ─────────────
+    // TEXT
+    // ─────────────
+    Padding(
+      padding: const EdgeInsets.only(
+        right: 38, // 🔥 Platz für Uhrzeit!
+        bottom: 2,
       ),
+      child: Text(
+        msg.text,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 15,
+          height: 1.3,
+        ),
+      ),
+    ),
+
+    // ─────────────
+    // UHRZEIT (unten rechts)
+    // ─────────────
+    Positioned(
+      right: 0,
+      bottom: 0,
+      child: Text(
+        time,
+        style: const TextStyle(
+          fontSize: 10,
+          color: Colors.white30,
+        ),
+      ),
+    ),
+  ],
+),
     ),
     ),
   );
@@ -890,4 +974,99 @@ class _InfoRow extends StatelessWidget {
       ),
     );
   }
+}
+
+// ─────────────────────────────────────────
+// DATUMSTRENNER-HELPERS
+// ─────────────────────────────────────────
+
+/// Baut eine flache Liste aus ChatMessages und DateTime-Trennern.
+List<Object> _buildChatItems(List<ChatMessage> messages) {
+  final items = <Object>[];
+  DateTime? lastDate;
+  for (final msg in messages) {
+    final d = DateTime(msg.createdAt.year, msg.createdAt.month, msg.createdAt.day);
+    if (lastDate == null || d != lastDate) {
+      items.add(d);
+      lastDate = d;
+    }
+    items.add(msg);
+  }
+  return items;
+}
+
+/// Zentrierter Datumstrenner wie bei WhatsApp.
+Widget _buildDateSeparator(DateTime date) {
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 12),
+    child: Row(
+      children: [
+        const Expanded(child: Divider(color: Colors.white12, thickness: 0.5)),
+        const SizedBox(width: 12),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            _datumLabel(date),
+            style: const TextStyle(
+              fontSize: 11,
+              color: Colors.white60,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        const Expanded(child: Divider(color: Colors.white24, thickness: 0.5)),
+      ],
+    ),
+  );
+}
+
+/// Gibt "Heute", "Gestern", Wochentag (bis 6 Tage zurück) oder
+/// "12. März 2026" zurück.
+String _datumLabel(DateTime date) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final d = DateTime(date.year, date.month, date.day);
+  final diff = today.difference(d).inDays;
+
+  if (diff == 0) return 'Heute';
+  if (diff == 1) return 'Gestern';
+  if (diff <= 6) {
+    const wochentage = [
+      'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag',
+      'Freitag', 'Samstag', 'Sonntag',
+    ];
+    return wochentage[date.weekday - 1];
+  }
+  const monate = [
+    'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
+    'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
+  ];
+  return '${date.day}. ${monate[date.month - 1]} ${date.year}';
+}
+
+/// Formatiert lastSeen für die AppBar-Zeile.
+String? _lastSeenText(DateTime? lastSeen) {
+  if (lastSeen == null) return null;
+  final now = DateTime.now();
+  if (now.difference(lastSeen).inSeconds < 25) return 'Online';
+
+  final time =
+      '${lastSeen.hour.toString().padLeft(2, '0')}:${lastSeen.minute.toString().padLeft(2, '0')}';
+  final today = DateTime(now.year, now.month, now.day);
+  final seenDate = DateTime(lastSeen.year, lastSeen.month, lastSeen.day);
+  final dayDiff = today.difference(seenDate).inDays;
+
+  if (dayDiff == 0) return 'Zuletzt online um $time Uhr';
+  if (dayDiff == 1) return 'Zuletzt online gestern um $time Uhr';
+
+  const monate = [
+    'Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez',
+  ];
+  return 'Zuletzt online ${lastSeen.day}. ${monate[lastSeen.month - 1]}';
 }

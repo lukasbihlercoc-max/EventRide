@@ -26,11 +26,13 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _isSaving = false;
   bool _isEditingTown = false;
   String _originalTown = '';
+  late final Stream<AppUser?> _authStream;
 
   @override
   void initState() {
     super.initState();
     _isDarkMode = isDarkModeNotifier.value;
+    _authStream = context.read<IAuthRepository>().authStateChanges;
     _loadTown();
   }
 
@@ -92,7 +94,7 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           body: StreamBuilder<AppUser?>(
-            stream: context.read<IAuthRepository>().authStateChanges,
+            stream: _authStream,
             builder: (context, snapshot) {
               final user = snapshot.data;
               return Padding(

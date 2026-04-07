@@ -27,8 +27,13 @@ class AnfrageService with ChangeNotifier {
     _authSub?.cancel();
     _authSub = auth.authStateChanges.listen((user) {
       if (user != null) {
-        // Stream neu starten wenn User einloggt (UID ändert sich)
         _startListening();
+      } else {
+        // Logout: Stream stoppen, damit keine Permission-Denied-Fehler entstehen
+        _streamSub?.cancel();
+        _streamSub = null;
+        _alleAnfragen.clear();
+        notifyListeners();
       }
     });
   }

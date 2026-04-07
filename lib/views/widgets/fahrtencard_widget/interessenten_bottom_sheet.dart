@@ -8,6 +8,9 @@ import 'package:my_app/data/interessenten_daten.dart';
 import 'package:my_app/data/interessenten_service.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
+import 'package:my_app/views/widgets/trust_shields_widget.dart';
+import 'package:my_app/views/widgets/user_avatar_widget.dart';
+import 'package:my_app/views/pages/public_profile_page.dart';
 
 
 void showInteressentenSheet(BuildContext context, FahrtDaten fahrt) {
@@ -215,20 +218,17 @@ class _InteressentTile extends StatelessWidget {
       child: Row(
         children: [
           // Avatar
-          Container(
-            width: 40,
-            height: 40,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: Color(0xFF2F5ED6),
-            ),
-            child: Center(
-              child: Text(
-                _initials(interessent.userName),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
+          UserAvatarWidget(
+            name: interessent.userName,
+            photoUrl: interessent.userPhotoUrl,
+            radius: 20,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => PublicProfilePage(
+                  userId: interessent.userId,
+                  name: interessent.userName,
+                  photoUrl: interessent.userPhotoUrl,
                 ),
               ),
             ),
@@ -240,13 +240,22 @@ class _InteressentTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  interessent.userName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 15,
-                  ),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        interessent.userName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const TrustShields(filled: 1, size: 13),
+                  ],
                 ),
                 if (interessent.bezirk != null &&
                     interessent.bezirk!.isNotEmpty)
@@ -305,10 +314,4 @@ class _InteressentTile extends StatelessWidget {
     );
   }
 
-  String _initials(String name) {
-    final parts = name.trim().split(RegExp(r'\s+'));
-    if (parts.isEmpty || parts.first.isEmpty) return '?';
-    if (parts.length == 1) return parts.first[0].toUpperCase();
-    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
-  }
 }

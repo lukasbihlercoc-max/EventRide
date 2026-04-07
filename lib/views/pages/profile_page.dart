@@ -10,14 +10,28 @@ import 'package:my_app/views/pages/login_page.dart';
 import 'package:my_app/views/pages/register_page.dart';
 import 'package:my_app/views/widgets/app_card.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
+import 'package:my_app/views/widgets/trust_shields_widget.dart';
 import 'package:provider/provider.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ROOT
 // ─────────────────────────────────────────────────────────────────────────────
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
+
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  late final Stream<AppUser?> _authStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _authStream = context.read<IAuthRepository>().authStateChanges;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +39,7 @@ class ProfilePage extends StatelessWidget {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: StreamBuilder<AppUser?>(
-          stream: context.read<IAuthRepository>().authStateChanges,
+          stream: _authStream,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(
@@ -144,11 +158,11 @@ class _GuestView extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  _TrustRow(filled: 1, label: "E-Mail & Telefon verifiziert"),
+                  _TrustRow(filled: 1, label: "E-Mail bestätigt"),
                   const SizedBox(height: 10),
-                  _TrustRow(filled: 2, label: "Profilfoto hinzugefügt"),
+                  _TrustRow(filled: 2, label: "Telefon verifiziert"),
                   const SizedBox(height: 10),
-                  _TrustRow(filled: 3, label: "Führerschein verifiziert"),
+                  _TrustRow(filled: 3, label: "Führerschein hochgeladen"),
                 ],
               ),
             ),
@@ -169,16 +183,7 @@ class _TrustRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Row(
-          children: List.generate(
-            3,
-            (i) => Icon(
-              i < filled ? Icons.star_rounded : Icons.star_outline_rounded,
-              color: i < filled ? Colors.amber : Colors.white24,
-              size: 15,
-            ),
-          ),
-        ),
+        TrustShields(filled: filled, size: 15),
         const SizedBox(width: 10),
         Expanded(
           child: Text(
@@ -205,6 +210,62 @@ class _LoggedInView extends StatefulWidget {
 
 class _LoggedInViewState extends State<_LoggedInView> {
   bool _uploading = false;
+
+  void _showVerifInfo() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1A1F2E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                "Das Vertrauenssystem",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                "Verifizierte Nutzer geben anderen Mitfahrern mehr Sicherheit. Je mehr Schritte du abschließt, desto mehr Sterne erhältst du.",
+                style: TextStyle(
+                  color: Colors.white54,
+                  fontSize: 13,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 20),
+              const _TrustRow(filled: 1, label: "E-Mail bestätigt"),
+              const SizedBox(height: 10),
+              const _TrustRow(filled: 2, label: "Telefon verifiziert"),
+              const SizedBox(height: 10),
+              const _TrustRow(filled: 3, label: "Führerschein hochgeladen"),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   void _showSourceSheet() {
     showModalBottomSheet(
@@ -315,16 +376,74 @@ class _LoggedInViewState extends State<_LoggedInView> {
             const SizedBox(height: 24),
 
             // ── Separator ──────────────────────────────────────────────
-            const _Separator(),
+            //const _Separator(),
 
-            const SizedBox(height: 24),
+            //const SizedBox(height: 24),
 
-            // ── Verifikation 2×2 ───────────────────────────────────────
+            // ── Verifikation ────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Header: Verifikation + Info-Icon
+                  Row(
+                    children: [
+                      const Text(
+                        "Verifikation",
+                        style: TextStyle(
+                          color: Colors.white70,
+                          letterSpacing: 0.3,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      GestureDetector(
+                        onTap: _showVerifInfo,
+                        child: const Icon(
+                          Icons.info_outline_rounded,
+                          size: 15,
+                          color: Colors.white38,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _VerifCard(
+                          icon: Icons.email_outlined,
+                          label: "E-Mail",
+                          done: true,
+                          doneLabel: "Verifiziert",
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _VerifCard(
+                          icon: Icons.phone_outlined,
+                          label: "Telefon",
+                          cta: "Verifizieren",
+                          done: false,
+                          doneLabel: "Verifiziert",
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _VerifCard(
+                    icon: Icons.credit_card_outlined,
+                    label: "Führerschein",
+                    cta: "Hochladen",
+                    done: false,
+                    doneLabel: "Verifiziert",
+                  ),
+
+                  const SizedBox(height: 28),
+
+                  // Header: Profil vervollständigen
                   const Text(
                     "Profil vervollständigen",
                     style: TextStyle(
@@ -339,45 +458,34 @@ class _LoggedInViewState extends State<_LoggedInView> {
                     children: [
                       Expanded(
                         child: _VerifCard(
-                          icon: Icons.email_outlined,
-                          label: "E-Mail",
-                          done: true,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _VerifCard(
-                          icon: Icons.phone_outlined,
-                          label: "Telefon",
-                          cta: "Verifizieren",
-                          done: false,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _VerifCard(
                           icon: Icons.photo_camera_outlined,
                           label: "Profilbild",
                           cta: "Hochladen",
                           done: user.photoUrl != null &&
                               user.photoUrl!.isNotEmpty,
+                          doneLabel: "Erledigt",
                           onTap: _uploading ? null : _showSourceSheet,
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: _VerifCard(
-                          icon: Icons.credit_card_outlined,
-                          label: "Führerschein",
-                          cta: "Hochladen",
+                          icon: Icons.location_on_outlined,
+                          label: "Gemeinde",
+                          cta: "Hinzufügen",
                           done: false,
+                          doneLabel: "Erledigt",
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 12),
+                  _VerifCard(
+                    icon: Icons.directions_car_outlined,
+                    label: "Auto-Infos",
+                    cta: "Hinzufügen",
+                    done: false,
+                    doneLabel: "Erledigt",
                   ),
 
                   const SizedBox(height: 24),
@@ -586,14 +694,22 @@ class _HeroSection extends StatelessWidget {
 
           const SizedBox(height: 16),
 
-          // Name
-          Text(
-            user.name,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-            ),
+          // Name + Vertrauenssterne
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                user.name,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const TrustShields(filled: 1, size: 18),
+            ],
           ),
 
           const SizedBox(height: 10),
@@ -613,37 +729,6 @@ class _HeroSection extends StatelessWidget {
                 iconColor: Colors.amber,
               ),
             ],
-          ),
-
-          const SizedBox(height: 12),
-
-          // Schritt-Pillen
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(4, (i) {
-              final active = i == 0;
-              return Container(
-                width: active ? 28 : 10,
-                height: 5,
-                margin: const EdgeInsets.symmetric(horizontal: 3),
-                decoration: BoxDecoration(
-                  gradient: active
-                      ? const LinearGradient(
-                          colors: [Color(0xFF4A80F0), Color(0xFF7B5EA7)],
-                        )
-                      : null,
-                  color: active
-                      ? null
-                      : Colors.white.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(3),
-                ),
-              );
-            }),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            "1 von 4 Schritten abgeschlossen",
-            style: TextStyle(color: Colors.white38, fontSize: 11),
           ),
         ],
       ),
@@ -693,13 +778,16 @@ class _StatChip extends StatelessWidget {
 // SEPARATOR
 // ─────────────────────────────────────────────────────────────────────────────
 
+
+
+/*
 class _Separator extends StatelessWidget {
   const _Separator();
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Row(
         children: [
           Expanded(
@@ -709,42 +797,34 @@ class _Separator extends StatelessWidget {
                 gradient: LinearGradient(
                   colors: [
                     Colors.transparent,
-                    Colors.white.withValues(alpha: 0.2),
+                    Colors.white.withValues(alpha: 0.15),
                   ],
                 ),
               ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.15),
-                ),
-              ),
-              child: const Text(
-                "EventRide",
-                style: TextStyle(
-                  color: Colors.white30,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.2,
-                ),
-              ),
+
+          const SizedBox(width: 12),
+
+          Text(
+            "EVENTRIDE",
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.25),
+              fontSize: 10,
+              letterSpacing: 1.6,
+              fontWeight: FontWeight.w600,
             ),
           ),
+
+          const SizedBox(width: 12),
+
           Expanded(
             child: Container(
               height: 1,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    Colors.white.withValues(alpha: 0.2),
+                    Colors.white.withValues(alpha: 0.15),
                     Colors.transparent,
                   ],
                 ),
@@ -756,7 +836,7 @@ class _Separator extends StatelessWidget {
     );
   }
 }
-
+*/
 // ─────────────────────────────────────────────────────────────────────────────
 // VERIFIKATION CARD
 // ─────────────────────────────────────────────────────────────────────────────
@@ -766,6 +846,7 @@ class _VerifCard extends StatelessWidget {
   final String label;
   final bool done;
   final String? cta;
+  final String doneLabel;
   final VoidCallback? onTap;
 
   const _VerifCard({
@@ -773,6 +854,7 @@ class _VerifCard extends StatelessWidget {
     required this.label,
     required this.done,
     this.cta,
+    this.doneLabel = "OK",
     this.onTap,
   });
 
@@ -825,7 +907,7 @@ class _VerifCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
-                    done ? "OK" : "Offen",
+                    done ? doneLabel : "Offen",
                     style: const TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
@@ -851,7 +933,7 @@ class _VerifCard extends StatelessWidget {
             const SizedBox(height: 2),
 
             Text(
-              done ? "Bestätigt" : (cta ?? "Erforderlich"),
+              done ? doneLabel : (cta ?? "Erforderlich"),
               style: TextStyle(
                 color: done
                     ? const Color(0xFF74C69D)

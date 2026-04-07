@@ -7,10 +7,13 @@ import 'package:my_app/data/fahrt_daten.dart';
 import 'package:my_app/data/anfrage_daten.dart';
 import 'package:my_app/data/anfrage_service.dart';
 import 'package:my_app/data/fahrt_service.dart';
+import 'package:my_app/views/widgets/trust_shields_widget.dart';
 import 'package:my_app/data/chat_service.dart';
 import 'package:my_app/data/interessenten_daten.dart';
 import 'package:my_app/data/interessenten_service.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
+import 'package:my_app/views/widgets/user_avatar_widget.dart';
+import 'package:my_app/views/pages/public_profile_page.dart';
 
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/pages/chat_page.dart';
@@ -198,14 +201,19 @@ class _InteressentCard extends StatelessWidget {
         child: Row(
           children: [
             // Avatar
-            CircleAvatar(
+            UserAvatarWidget(
+              name: interessent.userName,
+              photoUrl: interessent.userPhotoUrl,
               radius: 22,
               backgroundColor: Colors.amber.shade700,
-              child: Text(
-                _initials(interessent.userName),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => PublicProfilePage(
+                    userId: interessent.userId,
+                    name: interessent.userName,
+                    photoUrl: interessent.userPhotoUrl,
+                  ),
                 ),
               ),
             ),
@@ -216,13 +224,22 @@ class _InteressentCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    interessent.userName,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          interessent.userName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const TrustShields(filled: 1, size: 14),
+                    ],
                   ),
                   if (interessent.bezirk != null &&
                       interessent.bezirk!.isNotEmpty)
@@ -249,12 +266,6 @@ class _InteressentCard extends StatelessWidget {
     );
   }
 
-  String _initials(String name) {
-    final parts = name.trim().split(RegExp(r'\s+'));
-    if (parts.isEmpty || parts.first.isEmpty) return '?';
-    if (parts.length == 1) return parts.first[0].toUpperCase();
-    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
-  }
 }
 
 class _AnfragenButton extends StatefulWidget {
@@ -408,6 +419,7 @@ class _AnfrageCardState extends State<_AnfrageCard> {
         builder: (_) => ChatPage(
           conversationId: conversationId,
           otherUserName: widget.anfrage.requesterName,
+          otherUserId: widget.anfrage.requesterId,
         ),
       ),
     );
@@ -420,7 +432,22 @@ class _AnfrageCardState extends State<_AnfrageCard> {
       startOrt: widget.fahrt.abfahrtsort,
       zielOrt: widget.fahrt.standort,
       seatsRequested: widget.anfrage.seatsRequested,
-    );
+    ).then((_) => chatService.updateSystemMessage(
+      conversationId: conversationId,
+      eventName: widget.fahrt.eventName,
+      startOrt: widget.fahrt.abfahrtsort,
+      zielOrt: widget.fahrt.standort,
+      seatsRequested: widget.anfrage.seatsRequested,
+      seatsAccepted: widget.anfrage.seatsAccepted ?? 0,
+      uhrzeit:
+          '${widget.fahrt.uhrzeitHour.toString().padLeft(2, '0')}:${widget.fahrt.uhrzeitMinute.toString().padLeft(2, '0')}',
+      richtung: switch (widget.fahrt.richtung) {
+        Fahrtrichtung.hinfahrt => 'Hinfahrt',
+        Fahrtrichtung.rueckfahrt => 'Rückfahrt',
+        Fahrtrichtung.hinUndZurueck => 'Hin und Zurück',
+      },
+      ownerName: widget.fahrt.ownerName,
+    ));
   }
 
   @override
@@ -441,13 +468,22 @@ class _AnfrageCardState extends State<_AnfrageCard> {
             Row(
               children: [
                 Expanded(
-                  child: Text(
-                    a.requesterName,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          a.requesterName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const TrustShields(filled: 1, size: 15),
+                    ],
                   ),
                 ),
                 buildStatusChip(a.status),
@@ -555,7 +591,20 @@ class _AnfrageCardState extends State<_AnfrageCard> {
                 children: [
                   TextButton.icon(
                     onPressed: () async {
+                      final chatService = context.read<ChatService>();
                       await context.read<AnfrageService>().ablehnenAnfrage(a);
+                      if (!mounted) return;
+                      // Benachrichtigung im Chat senden (fire-and-forget)
+                      chatService.sendStatusNotification(
+                        fahrtId: widget.fahrt.id,
+                        ownerId: widget.fahrt.ownerId,
+                        requesterId: a.requesterId,
+                        eventName: widget.fahrt.eventName,
+                        startOrt: widget.fahrt.abfahrtsort,
+                        zielOrt: widget.fahrt.standort,
+                        seatsRequested: a.seatsRequested,
+                        text: 'Anfrage wurde abgelehnt.',
+                      );
                     },
                     icon: const Icon(Icons.close, color: Colors.redAccent),
                     label: const Text("Ablehnen",

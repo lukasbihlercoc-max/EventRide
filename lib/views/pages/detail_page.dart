@@ -661,9 +661,15 @@ class _IchWillHinPillState extends State<_IchWillHinPill>
         pageBuilder: (_, __, ___) => ChatPage(
           conversationId: conversationId,
           otherUserName: einladung.fahrerName,
+          otherUserId: einladung.fahrtOwnerId,
         ),
       ),
     );
+
+    final fahrt = context.read<FahrtService>().alleFahrten
+        .where((f) => f.id == einladung.fahrtId)
+        .firstOrNull;
+
     chatService.ensureConversation(
       fahrtId: einladung.fahrtId,
       ownerId: einladung.fahrtOwnerId,
@@ -672,7 +678,26 @@ class _IchWillHinPillState extends State<_IchWillHinPill>
       startOrt: einladung.startOrt,
       zielOrt: einladung.zielOrt,
       seatsRequested: einladung.seatsRequested,
-    );
+    ).then((_) {
+      if (fahrt != null) {
+        chatService.updateSystemMessage(
+          conversationId: conversationId,
+          eventName: fahrt.eventName,
+          startOrt: fahrt.abfahrtsort,
+          zielOrt: fahrt.standort,
+          seatsRequested: einladung.seatsRequested,
+          seatsAccepted: einladung.seatsAccepted ?? 0,
+          uhrzeit:
+              '${fahrt.uhrzeitHour.toString().padLeft(2, '0')}:${fahrt.uhrzeitMinute.toString().padLeft(2, '0')}',
+          richtung: switch (fahrt.richtung) {
+            Fahrtrichtung.hinfahrt => 'Hinfahrt',
+            Fahrtrichtung.rueckfahrt => 'Rückfahrt',
+            Fahrtrichtung.hinUndZurueck => 'Hin und Zurück',
+          },
+          ownerName: fahrt.ownerName,
+        );
+      }
+    });
   }
 
   Future<void> _toggle(
@@ -773,8 +798,20 @@ class _EinladungsBottomSheetState extends State<_EinladungsBottomSheet> {
 
   Future<void> _ablehnen() async {
     setState(() => _loading = true);
+    final chatService = context.read<ChatService>();
     await context.read<AnfrageService>().ablehnenAnfrage(widget.einladung);
-    if (mounted) Navigator.pop(context);
+    if (!mounted) return;
+    chatService.sendStatusNotification(
+      fahrtId: widget.einladung.fahrtId,
+      ownerId: widget.einladung.fahrtOwnerId,
+      requesterId: widget.einladung.requesterId,
+      eventName: widget.einladung.eventName,
+      startOrt: widget.einladung.startOrt,
+      zielOrt: widget.einladung.zielOrt,
+      seatsRequested: widget.einladung.seatsRequested,
+      text: 'Einladung wurde abgelehnt.',
+    );
+    Navigator.pop(context);
   }
 
   @override

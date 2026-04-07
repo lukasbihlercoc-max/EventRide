@@ -35,6 +35,7 @@ class InteressentenService extends ChangeNotifier {
     required String eventId,
     required String userId,
     required String userName,
+    String? userPhotoUrl,
     String? bezirk,
   }) async {
     final id = InteressentenDaten.buildId(eventId, userId);
@@ -49,6 +50,7 @@ class InteressentenService extends ChangeNotifier {
         eventId: eventId,
         userId: userId,
         userName: userName,
+        userPhotoUrl: userPhotoUrl,
         timestamp: DateTime.now(),
         bezirk: bezirk,
       ));

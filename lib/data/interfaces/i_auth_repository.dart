@@ -12,9 +12,10 @@ abstract class IAuthRepository {
     required String firstName,
     required String lastName,
     required String email,
-    required String phone,
     required String password,
   });
+
+  Future<void> resetPassword(String email);
 
   Future<void> signOut();
 

@@ -1,4 +1,6 @@
 // lib/main.dart
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
@@ -18,6 +20,7 @@ import 'package:my_app/data/firebase/firestore_chat_repository.dart';
 import 'package:my_app/data/firebase/firestore_user_repository.dart';
 
 // Interfaces + lokale Implementierungen
+import 'package:my_app/data/app_user.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/data/interfaces/i_fahrt_repository.dart';
 import 'package:my_app/data/interfaces/i_user_repository.dart';
@@ -77,6 +80,8 @@ void main() async {
   final fahrtService = FahrtService(fahrtRepository);
   await fahrtService.load();
 
+  final userRepository = FirestoreUserRepository();
+
   final chatService = ChatService(FirestoreChatRepository());
 
   final seenAnfragenService = SeenAnfragenService();
@@ -98,6 +103,7 @@ void main() async {
     chatService: chatService,
     authRepository: authRepository,
     fahrtRepository: fahrtRepository,
+    userRepository: userRepository,
     seenAnfragenService: seenAnfragenService,
     interessentenService: interessentenService,
   ));
@@ -110,6 +116,7 @@ class MyApp extends StatefulWidget {
   final ChatService chatService;
   final IAuthRepository authRepository;
   final IFahrtRepository fahrtRepository;
+  final IUserRepository userRepository;
   final SeenAnfragenService seenAnfragenService;
   final InteressentenService interessentenService;
 
@@ -121,6 +128,7 @@ class MyApp extends StatefulWidget {
     required this.chatService,
     required this.authRepository,
     required this.fahrtRepository,
+    required this.userRepository,
     required this.seenAnfragenService,
     required this.interessentenService,
   });
@@ -129,7 +137,59 @@ class MyApp extends StatefulWidget {
   State<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends State<MyApp> {
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
+  Timer? _heartbeatTimer;
+  StreamSubscription<AppUser?>? _authSub;
+  String _currentUserId = '';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _authSub = widget.authRepository.authStateChanges.listen((user) {
+      _currentUserId = user?.userId ?? '';
+      if (_currentUserId.isNotEmpty) {
+        _startHeartbeat();
+      } else {
+        _stopHeartbeat();
+      }
+    });
+  }
+
+  void _startHeartbeat() {
+    _heartbeatTimer?.cancel();
+    widget.userRepository.updateLastSeen(_currentUserId);
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (_currentUserId.isNotEmpty) {
+        widget.userRepository.updateLastSeen(_currentUserId);
+      }
+    });
+  }
+
+  void _stopHeartbeat() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      if (_currentUserId.isNotEmpty) _startHeartbeat();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      _stopHeartbeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _authSub?.cancel();
+    _stopHeartbeat();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
@@ -169,9 +229,7 @@ class _MyAppState extends State<MyApp> {
         // Repository-Interfaces (austauschbar gegen Firebase-Implementierungen)
         Provider<IAuthRepository>.value(value: widget.authRepository),
         Provider<IFahrtRepository>.value(value: widget.fahrtRepository),
-        Provider<IUserRepository>(
-          create: (_) => FirestoreUserRepository(),
-        ),
+        Provider<IUserRepository>.value(value: widget.userRepository),
       ],
 
       

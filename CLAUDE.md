@@ -1,4 +1,4 @@
-# MitfahrApp Kärnten
+# EventRide
 
 ## Was die App macht
 Flutter App für lokale Events (Kirchtage, Bälle, Feste) in Kärnten.

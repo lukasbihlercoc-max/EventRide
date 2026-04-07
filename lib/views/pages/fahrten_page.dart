@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:my_app/views/widgets/app_card.dart';
+import 'package:my_app/views/widgets/trust_shields_widget.dart';
 
 import 'package:my_app/data/app_user.dart';
 import 'package:my_app/data/fahrt_service.dart';
@@ -20,6 +21,8 @@ import 'package:my_app/views/pages/login_page.dart';
 import 'package:my_app/views/pages/fahrt_anfragen_page.dart';
 import 'package:my_app/views/pages/fahrt_anbieten_page.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
+import 'package:my_app/views/widgets/user_avatar_widget.dart';
+import 'package:my_app/views/pages/public_profile_page.dart';
 
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/pages/chat_page.dart';
@@ -277,18 +280,18 @@ class _LoggedInFahrtenViewState extends State<_LoggedInFahrtenView>
 
     if (_tabController.index == 0) {
       final ids = anfrageService
-          .getAnfragenForFahrer(userId)
-          .where((a) => a.status == AnfrageStatus.offen)
-          .map((a) => a.id)
-          .toList();
-      seenService.markOwnerAsSeen(userId, ids);
-    } else {
-      final ids = anfrageService
           .getAnfragenByRequester(userId)
           .where((a) => a.status != AnfrageStatus.offen || a.vonFahrer)
           .map((a) => a.id)
           .toList();
       seenService.markRequesterAsSeen(userId, ids);
+    } else {
+      final ids = anfrageService
+          .getAnfragenForFahrer(userId)
+          .where((a) => a.status == AnfrageStatus.offen)
+          .map((a) => a.id)
+          .toList();
+      seenService.markOwnerAsSeen(userId, ids);
     }
   }
 
@@ -306,8 +309,8 @@ class _LoggedInFahrtenViewState extends State<_LoggedInFahrtenView>
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  _AngeboteneFahrtenTab(userId: userId),
                   _AngefragteFahrtenTab(userId: userId),
+                  _AngeboteneFahrtenTab(userId: userId),
                 ],
               ),
             ),
@@ -373,8 +376,8 @@ class _FahrtenTabBar extends StatelessWidget {
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
           tabs: [
-            _tabLabel('Angeboten', seenService.hasUnseenOwner(userId, ownerIds)),
             _tabLabel('Angefragt', seenService.hasUnseenRequester(userId, requesterIds)),
+            _tabLabel('Angeboten', seenService.hasUnseenOwner(userId, ownerIds)),
           ],
         );
       },
@@ -1129,12 +1132,15 @@ class _RequestedRideCard extends StatelessWidget {
         opaque: true,
         pageBuilder: (_, __, ___) => ChatPage(
           conversationId: conversationId,
-          otherUserName: anfrage.requesterName,
+          otherUserName: fahrt.ownerName,
+          otherUserId: fahrt.ownerId,
         ),
       ),
     );
 
-    // Conversation + Systemnachricht im Hintergrund sicherstellen
+    // ensureConversation schreibt sofort in den lokalen Cache (kein Transaction-
+    // Roundtrip mehr). Erst danach updateSystemMessage – so sind die Security
+    // Rules erfüllt (participants bereits vorhanden).
     chatService.ensureConversation(
       fahrtId: fahrt.id,
       ownerId: fahrt.ownerId,
@@ -1322,57 +1328,10 @@ class _RequestedRideCard extends StatelessWidget {
             height: 20,
           ),
 
-          // Fahrer-Block (anklickbar, Avatar + Name/Rating + Chevron)
-          GestureDetector(
-            onTap: () {}, // Platzhalter für spätere Profilnavigation
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 17,
-                  backgroundColor: Colors.white.withValues(alpha: 0.15),
-                  child: Text(
-                    fahrt.ownerName[0].toUpperCase(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        fahrt.ownerName,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Row(
-                        children: const [
-                          Icon(Icons.star, color: Colors.amber, size: 12),
-                          SizedBox(width: 3),
-                          Text(
-                            '5,0',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.chevron_right, color: Colors.white38, size: 18),
-              ],
-            ),
+          // Fahrer-Block (Avatar + Name/Rating + Chevron — ganzer Block tappbar)
+          _FahrerProfilRow(
+            userId: fahrt.ownerId,
+            name: fahrt.ownerName,
           ),
 
           const SizedBox(height: 8),
@@ -1835,6 +1794,84 @@ class _TimeBadge extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// _FahrerProfilRow
+// Avatar + Name + Rating — ganzer Block führt zur PublicProfilePage.
+// Speichert die geladene photoUrl im State, damit kein zweiter Fetch nötig ist.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _FahrerProfilRow extends StatefulWidget {
+  final String userId;
+  final String name;
+
+  const _FahrerProfilRow({required this.userId, required this.name});
+
+  @override
+  State<_FahrerProfilRow> createState() => _FahrerProfilRowState();
+}
+
+class _FahrerProfilRowState extends State<_FahrerProfilRow> {
+  String? _photoUrl;
+
+  void _navigate() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PublicProfilePage(
+          userId: widget.userId,
+          name: widget.name,
+          photoUrl: _photoUrl,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: _navigate,
+      behavior: HitTestBehavior.opaque,
+      child: Row(
+        children: [
+          UserAvatarById(
+            userId: widget.userId,
+            name: widget.name,
+            radius: 17,
+            backgroundColor: Colors.white.withValues(alpha: 0.15),
+            onPhotoLoaded: (url) => setState(() => _photoUrl = url),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        widget.name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const TrustShields(filled: 1, size: 12),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right, color: Colors.white38, size: 18),
         ],
       ),
     );
