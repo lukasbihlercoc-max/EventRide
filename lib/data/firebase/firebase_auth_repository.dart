@@ -14,13 +14,24 @@ class FirebaseAuthRepository implements IAuthRepository {
   final FirebaseFirestore _firestore;
   final FirebaseStorage _storage;
 
+  bool _isAdmin = false;
+
   FirebaseAuthRepository({
     FirebaseAuth? auth,
     FirebaseFirestore? firestore,
     FirebaseStorage? storage,
   })  : _auth = auth ?? FirebaseAuth.instance,
         _firestore = firestore ?? FirebaseFirestore.instance,
-        _storage = storage ?? FirebaseStorage.instance;
+        _storage = storage ?? FirebaseStorage.instance {
+    // Admin-Status laden falls Nutzer beim App-Start bereits eingeloggt ist.
+    final currentUser = _auth.currentUser;
+    if (currentUser != null) _loadAdminStatus(currentUser.uid);
+  }
+
+  Future<void> _loadAdminStatus(String uid) async {
+    final doc = await _firestore.collection('users').doc(uid).get();
+    _isAdmin = doc.data()?['isAdmin'] == true;
+  }
 
   // Mappt einen Firebase-User auf AppUser.
   // Name kommt aus displayName, photoUrl aus photoURL.
@@ -68,6 +79,7 @@ class FirebaseAuthRepository implements IAuthRepository {
       }
     }
 
+    await _loadAdminStatus(fbUser.uid);
     return _mapUser(fbUser);
   }
 
@@ -76,7 +88,6 @@ class FirebaseAuthRepository implements IAuthRepository {
     required String firstName,
     required String lastName,
     required String email,
-    required String phone,
     required String password,
   }) async {
     final credential = await _auth.createUserWithEmailAndPassword(
@@ -94,7 +105,7 @@ class FirebaseAuthRepository implements IAuthRepository {
       'firstName': firstName,
       'lastName': lastName,
       'email': email,
-      'phone': phone,
+      'phone': '',
       'homeTown': '',
       'createdAt': FieldValue.serverTimestamp(),
     });
@@ -103,7 +114,14 @@ class FirebaseAuthRepository implements IAuthRepository {
   }
 
   @override
-  Future<void> signOut() => _auth.signOut();
+  Future<void> resetPassword(String email) =>
+      _auth.sendPasswordResetEmail(email: email);
+
+  @override
+  Future<void> signOut() async {
+    _isAdmin = false;
+    await _auth.signOut();
+  }
 
   @override
   Future<void> deleteAccount() async {
@@ -122,10 +140,8 @@ class FirebaseAuthRepository implements IAuthRepository {
   @override
   Future<bool> isSignedIn() async => _auth.currentUser != null;
 
-  static const _adminUid = 'vA8UdBXsdCPD3ePJ88j4C3MQtjJ2';
-
   @override
-  bool get isAdmin => _auth.currentUser?.uid == _adminUid;
+  bool get isAdmin => _isAdmin;
 
   @override
   Future<void> setHomeTown(String town) async {
