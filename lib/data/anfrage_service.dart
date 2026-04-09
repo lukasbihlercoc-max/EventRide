@@ -63,12 +63,7 @@ class AnfrageService with ChangeNotifier {
     try {
       await _repository.add(anfrage);
       // Stream-Update kommt automatisch via _startListening().
-      if (kDebugMode) {
-        debugPrint("📨 Neue Anfrage gespeichert: ${anfrage.id}");
-        debugPrint("  -> Gesamtanzahl: ${_alleAnfragen.length}");
-      }
-    } catch (e, st) {
-      if (kDebugMode) debugPrint('addAnfrage Fehler: $e\n$st');
+    } catch (_) {
       rethrow;
     }
   }
@@ -77,19 +72,14 @@ class AnfrageService with ChangeNotifier {
   Future<bool> updateAnfrage(String id, AnfrageDaten updated) async {
     try {
       final index = _alleAnfragen.indexWhere((a) => a.id == id);
-      if (index == -1) {
-        if (kDebugMode) debugPrint('updateAnfrage: id=$id nicht gefunden');
-        return false;
-      }
+      if (index == -1) return false;
 
       await _repository.update(updated);
       _alleAnfragen[index] = updated;
       notifyListeners();
 
-      if (kDebugMode) debugPrint('🔄 Anfrage mit ID $id aktualisiert');
       return true;
-    } catch (e, st) {
-      if (kDebugMode) debugPrint('updateAnfrage Fehler: $e\n$st');
+    } catch (_) {
       return false;
     }
   }
@@ -155,12 +145,7 @@ class AnfrageService with ChangeNotifier {
   }) async {
     final erlaubtePlaetze = seatsAccepted.clamp(1, fahrt.freiePlaetze);
 
-    if (erlaubtePlaetze <= 0) {
-      if (kDebugMode) {
-        debugPrint("❌ Keine freien Plätze mehr für Fahrt ${fahrt.id}");
-      }
-      return false;
-    }
+    if (erlaubtePlaetze <= 0) return false;
 
     final updated = anfrage.copyWith(
       status: AnfrageStatus.akzeptiert,
@@ -177,27 +162,13 @@ class AnfrageService with ChangeNotifier {
 
   Future<bool> ablehnenAnfrage(AnfrageDaten anfrage) async {
     final updated = anfrage.copyWith(status: AnfrageStatus.abgelehnt);
-    final ok = await updateAnfrage(anfrage.id, updated);
-    if (kDebugMode) {
-      if (ok) {
-        debugPrint("🚫 Anfrage ${anfrage.id} abgelehnt");
-      } else {
-        debugPrint("❌ ablehnenAnfrage: Update fehlgeschlagen für ${anfrage.id}");
-      }
-    }
-    return ok;
+    return await updateAnfrage(anfrage.id, updated);
   }
 
   /// Mitfahrer zieht eigene Anfrage zurück (Status → storniert).
   Future<bool> storniereAnfrage(AnfrageDaten anfrage) async {
     final updated = anfrage.copyWith(status: AnfrageStatus.storniert);
-    final ok = await updateAnfrage(anfrage.id, updated);
-    if (kDebugMode) {
-      debugPrint(ok
-          ? '↩️ Anfrage ${anfrage.id} storniert'
-          : '❌ storniereAnfrage fehlgeschlagen für ${anfrage.id}');
-    }
-    return ok;
+    return await updateAnfrage(anfrage.id, updated);
   }
 
   // -------------------------------------------------------------
@@ -215,14 +186,8 @@ class AnfrageService with ChangeNotifier {
         if (index != -1) _alleAnfragen[index] = updated;
       }
       notifyListeners();
-
-      if (kDebugMode) {
-        debugPrint("🚫 Alle Anfragen für Fahrt $fahrtId wurden auf 'abgelehnt' gesetzt");
-      }
-
       return true;
-    } catch (e, st) {
-      if (kDebugMode) debugPrint('cancelAnfragenForFahrt Fehler: $e\n$st');
+    } catch (_) {
       return false;
     }
   }

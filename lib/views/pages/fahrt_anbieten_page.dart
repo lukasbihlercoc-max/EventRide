@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_places_flutter/google_places_flutter.dart';
 import 'package:google_places_flutter/model/place_type.dart';
@@ -307,16 +308,12 @@ if (fahrtrichtung == Fahrtrichtung.hinUndZurueck && rueckuhrzeit == null) {
 
 
 
-                          debugPrint('🚗 [Speichern] Starte...');
-
                           final user = context.read<IAuthRepository>().currentUser;
                           if (user == null) {
-                            debugPrint('❌ [Speichern] currentUser ist null!');
                             if (!context.mounted) return;
                             AppSnackbar.show(context, message: "Nicht eingeloggt", accentColor: Colors.redAccent);
                             return;
                           }
-                          debugPrint('✅ [Speichern] User: ${user.userId}');
 
                           final fahrt = widget.existingFahrt == null
                               ? FahrtDaten.fromTimeOfDay(
@@ -353,7 +350,6 @@ if (fahrtrichtung == Fahrtrichtung.hinUndZurueck && rueckuhrzeit == null) {
                                 );
 
 
-                          debugPrint('🚗 [Speichern] Rufe fahrtService.add() auf...');
                           try {
                             if (widget.existingFahrt == null) {
                               await fahrtService.add(fahrt);
@@ -363,9 +359,8 @@ if (fahrtrichtung == Fahrtrichtung.hinUndZurueck && rueckuhrzeit == null) {
                             } else {
                               await fahrtService.update(fahrt);
                             }
-                            debugPrint('✅ [Speichern] fahrtService.add() abgeschlossen');
                           } catch (e, st) {
-                            debugPrint('❌ [Speichern] Fehler in fahrtService: $e\n$st');
+                            if (kDebugMode) debugPrint('❌ [Speichern] Fehler in fahrtService: $e\n$st');
                             if (!context.mounted) return;
                             AppSnackbar.show(
                               context,
@@ -375,11 +370,9 @@ if (fahrtrichtung == Fahrtrichtung.hinUndZurueck && rueckuhrzeit == null) {
                             return;
                           }
 
-                          debugPrint('🚗 [Speichern] Prüfe context.mounted: ${context.mounted}');
                           if (!context.mounted) return;
 
                           // ✅ Snackbar anzeigen
-                          debugPrint('🎉 [Speichern] Zeige Snackbar...');
                           AppSnackbar.show(
                             context,
                             message: "Fahrt gespeichert",
@@ -392,7 +385,6 @@ if (fahrtrichtung == Fahrtrichtung.hinUndZurueck && rueckuhrzeit == null) {
                           );
 
                           if (!context.mounted) return;
-                          debugPrint('🔙 [Speichern] Navigator.pop()');
                           Navigator.pop(context);
 
                         },

@@ -1,6 +1,5 @@
 // firebase_fahrt_repository.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
 import 'package:my_app/data/fahrt_daten.dart';
 import 'package:my_app/data/interfaces/i_fahrt_repository.dart';
 
@@ -31,9 +30,6 @@ class FirestoreFahrtRepository implements IFahrtRepository {
     return _firestore.collection(_collection).snapshots().map((snap) {
       final fahrten =
           snap.docs.map((doc) => FahrtDaten.fromMap(doc.data())).toList();
-      if (kDebugMode) {
-        debugPrint('🚗 FirestoreFahrtRepository: ${fahrten.length} Fahrten (stream)');
-      }
       _cache
         ..clear()
         ..addAll(fahrten);
@@ -47,8 +43,7 @@ class FirestoreFahrtRepository implements IFahrtRepository {
     try {
       await _firestore.collection(_collection).doc(fahrt.id).set(fahrt.toMap());
       _cache.add(fahrt);
-    } on FirebaseException catch (e) {
-      debugPrint('Fehler beim Speichern der Fahrt: ${e.message}');
+    } on FirebaseException catch (_) {
       rethrow;
     }
   }
@@ -63,8 +58,7 @@ class FirestoreFahrtRepository implements IFahrtRepository {
           .update(fahrt.toMap());
       final index = _cache.indexWhere((f) => f.id == fahrt.id);
       if (index != -1) _cache[index] = fahrt;
-    } on FirebaseException catch (e) {
-      debugPrint('Fehler beim Aktualisieren der Fahrt: ${e.message}');
+    } on FirebaseException catch (_) {
       rethrow;
     }
   }
@@ -75,8 +69,7 @@ class FirestoreFahrtRepository implements IFahrtRepository {
     try {
       await _firestore.collection(_collection).doc(id).delete();
       _cache.removeWhere((f) => f.id == id);
-    } on FirebaseException catch (e) {
-      debugPrint('Fehler beim Löschen der Fahrt: ${e.message}');
+    } on FirebaseException catch (_) {
       rethrow;
     }
   }

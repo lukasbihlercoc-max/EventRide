@@ -2,7 +2,6 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:my_app/data/chat_service.dart';
@@ -89,11 +88,6 @@ void main() async {
 
   final interessentenService =
       InteressentenService(FirestoreInteressentenRepository());
-
-  // 🔹 Performance Optimierungen
-  if (kReleaseMode) {
-    debugPrint = (String? message, {int? wrapWidth}) {};
-  }
 
   // App starten
   runApp(MyApp(

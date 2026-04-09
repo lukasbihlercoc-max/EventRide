@@ -41,16 +41,13 @@ class FahrtService with ChangeNotifier {
   }
 
   Future<void> add(FahrtDaten fahrt) async {
-    debugPrint('🚗 [FahrtService.add] Starte, id=${fahrt.id}');
     await _repo.add(fahrt);
-    debugPrint('✅ [FahrtService.add] _repo.add() fertig');
     // Stream-Update kommt automatisch; optimistisch lokal einfügen:
     if (!_fahrten.any((f) => f.id == fahrt.id)) {
       _fahrten.add(fahrt);
       _sort();
       notifyListeners();
     }
-    debugPrint('✅ [FahrtService.add] fertig');
   }
 
   Future<void> update(FahrtDaten fahrt) async {

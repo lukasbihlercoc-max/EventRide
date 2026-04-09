@@ -2,7 +2,6 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:my_app/data/anfrage_daten.dart';
 import 'package:my_app/data/interfaces/i_anfrage_repository.dart';
 
@@ -47,9 +46,6 @@ class FirestoreAnfrageRepository implements IAnfrageRepository {
       _cache
         ..clear()
         ..addAll(combined);
-      if (kDebugMode) {
-        debugPrint('📨 FirestoreAnfrageRepository: ${_cache.length} Anfragen (stream)');
-      }
       controller.add(List.unmodifiable(_cache));
     }
 
@@ -96,8 +92,7 @@ class FirestoreAnfrageRepository implements IAnfrageRepository {
           .doc(anfrage.id)
           .set(anfrage.toMap());
       _cache.add(anfrage);
-    } on FirebaseException catch (e) {
-      debugPrint('Fehler beim Speichern der Anfrage: ${e.message}');
+    } on FirebaseException catch (_) {
       rethrow;
     }
   }
@@ -111,8 +106,7 @@ class FirestoreAnfrageRepository implements IAnfrageRepository {
           .update(anfrage.toMap());
       final index = _cache.indexWhere((a) => a.id == anfrage.id);
       if (index != -1) _cache[index] = anfrage;
-    } on FirebaseException catch (e) {
-      debugPrint('Fehler beim Aktualisieren der Anfrage: ${e.message}');
+    } on FirebaseException catch (_) {
       rethrow;
     }
   }

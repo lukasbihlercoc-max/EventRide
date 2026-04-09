@@ -1,6 +1,5 @@
 // firestore_chat_repository.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
 import 'package:my_app/data/chat_conversation.dart';
 import 'package:my_app/data/chat_message.dart';
 import 'package:my_app/data/interfaces/i_chat_repository.dart';
@@ -63,8 +62,7 @@ class FirestoreChatRepository implements IChatRepository {
           'lastMessageAt': FieldValue.serverTimestamp(),
         });
       }
-    } on FirebaseException catch (e) {
-      debugPrint('Fehler beim Senden der Nachricht: ${e.message}');
+    } on FirebaseException catch (_) {
       rethrow;
     }
   }
@@ -82,8 +80,7 @@ class FirestoreChatRepository implements IChatRepository {
         ..['lastMessageAt'] = FieldValue.serverTimestamp()
         ..['lastMessage'] = '';
       await ref.set(data, SetOptions(merge: true));
-    } on FirebaseException catch (e) {
-      debugPrint('Fehler beim Anlegen der Conversation: ${e.message}');
+    } on FirebaseException catch (_) {
       rethrow;
     }
   }

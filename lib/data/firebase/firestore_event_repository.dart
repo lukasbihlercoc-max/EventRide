@@ -1,6 +1,5 @@
 // firestore_event_repository.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
 import 'package:my_app/data/event_daten.dart';
 import 'package:my_app/data/interfaces/i_event_repository.dart';
 
@@ -30,9 +29,6 @@ class FirestoreEventRepository implements IEventRepository {
     return _firestore.collection(_collection).snapshots().map((snap) {
       final events =
           snap.docs.map((doc) => Event.fromMap(doc.data())).toList();
-      if (kDebugMode) {
-        debugPrint('🎉 FirestoreEventRepository: ${events.length} Events (stream)');
-      }
       _cache
         ..clear()
         ..addAll(events);
