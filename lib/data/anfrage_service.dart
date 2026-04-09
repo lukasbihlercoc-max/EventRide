@@ -62,12 +62,7 @@ class AnfrageService with ChangeNotifier {
   Future<void> addAnfrage(AnfrageDaten anfrage) async {
     try {
       await _repository.add(anfrage);
-      // Stream-Update kommt automatisch; optimistisch lokal einfügen:
-      if (!_alleAnfragen.any((a) => a.id == anfrage.id)) {
-        _alleAnfragen.add(anfrage);
-        notifyListeners();
-      }
-
+      // Stream-Update kommt automatisch via _startListening().
       if (kDebugMode) {
         debugPrint("📨 Neue Anfrage gespeichert: ${anfrage.id}");
         debugPrint("  -> Gesamtanzahl: ${_alleAnfragen.length}");
@@ -189,6 +184,18 @@ class AnfrageService with ChangeNotifier {
       } else {
         debugPrint("❌ ablehnenAnfrage: Update fehlgeschlagen für ${anfrage.id}");
       }
+    }
+    return ok;
+  }
+
+  /// Mitfahrer zieht eigene Anfrage zurück (Status → storniert).
+  Future<bool> storniereAnfrage(AnfrageDaten anfrage) async {
+    final updated = anfrage.copyWith(status: AnfrageStatus.storniert);
+    final ok = await updateAnfrage(anfrage.id, updated);
+    if (kDebugMode) {
+      debugPrint(ok
+          ? '↩️ Anfrage ${anfrage.id} storniert'
+          : '❌ storniereAnfrage fehlgeschlagen für ${anfrage.id}');
     }
     return ok;
   }

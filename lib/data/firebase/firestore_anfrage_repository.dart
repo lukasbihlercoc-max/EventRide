@@ -63,7 +63,7 @@ class FirestoreAnfrageRepository implements IAnfrageRepository {
             snap.docs.map((d) => AnfrageDaten.fromMap(d.data())).toList();
         emit();
       },
-      onError: (_) {},
+      onError: (e) => controller.addError(e),
     );
 
     final subB = _firestore
@@ -76,12 +76,13 @@ class FirestoreAnfrageRepository implements IAnfrageRepository {
             snap.docs.map((d) => AnfrageDaten.fromMap(d.data())).toList();
         emit();
       },
-      onError: (_) {},
+      onError: (e) => controller.addError(e),
     );
 
     controller.onCancel = () {
       subA.cancel();
       subB.cancel();
+      controller.close();
     };
 
     return controller.stream;
