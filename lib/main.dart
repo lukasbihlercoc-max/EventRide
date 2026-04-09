@@ -153,7 +153,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   void _startHeartbeat() {
     _heartbeatTimer?.cancel();
     widget.userRepository.updateLastSeen(_currentUserId);
-    _heartbeatTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 60), (_) {
       if (_currentUserId.isNotEmpty) {
         widget.userRepository.updateLastSeen(_currentUserId);
       }
