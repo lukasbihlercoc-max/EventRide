@@ -221,10 +221,7 @@ class _FahrtenCardState extends State<FahrtenCard> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Container(
             decoration: BoxDecoration(
-              borderRadius: const BorderRadius.only(
-  topLeft: Radius.circular(22),
-  topRight: Radius.circular(22),
-),
+              borderRadius: BorderRadius.circular(22),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.2),
@@ -359,6 +356,7 @@ class _FahrtenCardState extends State<FahrtenCard> {
                         ],
                       ),
                     ),
+
                   ],
                 ),
               ),
@@ -394,29 +392,60 @@ class _FahrtenCardState extends State<FahrtenCard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Badge
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: accentColor.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: accentColor),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.directions, color: accentColor, size: 13),
-              const SizedBox(width: 4),
-              Text(
-                richtungLabel,
-                style: TextStyle(
-                  color: accentColor,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+        // Badges (Richtung + optional Voll)
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: accentColor.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: accentColor),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.directions, color: accentColor, size: 13),
+                  const SizedBox(width: 4),
+                  Text(
+                    richtungLabel,
+                    style: TextStyle(
+                      color: accentColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (fahrt.freiePlaetze == 0) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.blueGrey.withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.blueGrey),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.event_seat, color: Colors.blueGrey, size: 13),
+                    SizedBox(width: 4),
+                    Text(
+                      'Ausgebucht',
+                      style: TextStyle(
+                        color: Colors.blueGrey,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
-          ),
+          ],
         ),
 
         const SizedBox(height: 8),
@@ -475,14 +504,33 @@ class _FahrtenCardState extends State<FahrtenCard> {
               ),
             ],
             const Spacer(),
-            const Icon(Icons.event_seat,
-                color: Color(0xFF94A3B8), size: 15),
-            const SizedBox(width: 4),
-            Text(
-              '${fahrt.freiePlaetze} Plätze',
-              style: const TextStyle(
-                  color: Color(0xFF94A3B8), fontSize: 14),
-            ),
+            if (fahrt.freiePlaetze > 0)
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.greenAccent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: Colors.greenAccent.withValues(alpha: 0.5)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.event_seat,
+                        color: Colors.greenAccent, size: 13),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${fahrt.freiePlaetze} frei',
+                      style: const TextStyle(
+                        color: Colors.greenAccent,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
 

@@ -7,10 +7,11 @@ class AppCard extends StatelessWidget {
   final Color? borderColor;
   final double borderRadius;
 
-  static const List<Color> _defaultGradient = [
-    Color(0xFF243A5E),
-    Color(0xFF365E91),
-  ];
+static const List<Color> _defaultGradient = [
+  Color.fromARGB(255, 20, 42, 71),
+  Color.fromARGB(255, 38, 73, 113),
+  Color.fromARGB(255, 57, 100, 156),
+];
 
   const AppCard({
     super.key,
@@ -32,40 +33,53 @@ class AppCard extends StatelessWidget {
         borderRadius: radius,
         gradient: LinearGradient(
           begin: Alignment.topLeft,
-          end: const Alignment(0.9, 1),
+          end: const Alignment(0.7, 1),
           colors: colors,
+          stops: colors.length == 3 ? const [0.0, 0.7, 1.0] : null,
         ),
         border: Border.all(color: border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.25),
-            blurRadius: 30,
+            color: Colors.black.withValues(alpha: 0.38),
+            blurRadius: 36,
+            spreadRadius: -6,
+            offset: const Offset(0, 16),
+          ),
+          BoxShadow(
+            color: colors.last.withValues(alpha: 0.24),
+            blurRadius: 16,
             spreadRadius: -4,
-            offset: const Offset(0, 12),
+            offset: const Offset(0, 6),
           ),
         ],
       ),
-
-      // Top-left light + bottom depth
-      foregroundDecoration: BoxDecoration(
-        borderRadius: radius,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.white.withValues(alpha: 0.12),
-            Colors.transparent,
-            Colors.black.withValues(alpha: 0.06),
-          ],
-          stops: const [0.0, 0.4, 1.0],
-        ),
-      ),
-
       child: ClipRRect(
         borderRadius: radius,
-        child: Padding(
-          padding: padding ?? const EdgeInsets.all(16),
-          child: child,
+        child: Stack(
+          children: [
+            // Top-left Highlight hinter dem Content (nicht darüber)
+            Positioned.fill(
+  child: IgnorePointer(
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.bottomRight,
+          end: Alignment.center,
+          colors: [
+            Colors.black.withValues(alpha: 0.18),
+            Colors.transparent,
+          ],
+          stops: const [0.0, 0.4],
+        ),
+      ),
+    ),
+  ),
+),
+            Padding(
+              padding: padding ?? const EdgeInsets.all(16),
+              child: child,
+            ),
+          ],
         ),
       ),
     );

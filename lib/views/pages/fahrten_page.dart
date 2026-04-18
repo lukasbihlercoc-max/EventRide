@@ -23,6 +23,7 @@ import 'package:my_app/views/pages/fahrt_anbieten_page.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
 import 'package:my_app/views/widgets/user_avatar_widget.dart';
 import 'package:my_app/views/pages/public_profile_page.dart';
+import 'package:my_app/views/pages/fahrt_finden_page.dart';
 
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/pages/chat_page.dart';
@@ -281,7 +282,10 @@ class _LoggedInFahrtenViewState extends State<_LoggedInFahrtenView>
     if (_tabController.index == 0) {
       final ids = anfrageService
           .getAnfragenByRequester(userId)
-          .where((a) => a.status != AnfrageStatus.offen || a.vonFahrer)
+          .where((a) =>
+              (a.status != AnfrageStatus.offen &&
+                  a.status != AnfrageStatus.storniert) ||
+              a.vonFahrer)
           .map((a) => a.id)
           .toList();
       seenService.markRequesterAsSeen(userId, ids);
@@ -367,7 +371,10 @@ class _FahrtenTabBar extends StatelessWidget {
 
         final requesterIds = anfrageService
             .getAnfragenByRequester(userId)
-            .where((a) => a.status != AnfrageStatus.offen || a.vonFahrer)
+            .where((a) =>
+              (a.status != AnfrageStatus.offen &&
+                  a.status != AnfrageStatus.storniert) ||
+              a.vonFahrer)
             .map((a) => a.id);
 
         return TabBar(
@@ -376,8 +383,8 @@ class _FahrtenTabBar extends StatelessWidget {
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
           tabs: [
-            _tabLabel('Angefragt', seenService.hasUnseenRequester(userId, requesterIds)),
-            _tabLabel('Angeboten', seenService.hasUnseenOwner(userId, ownerIds)),
+            _tabLabel('Mitfahrten', seenService.hasUnseenRequester(userId, requesterIds)),
+            _tabLabel('Meine Fahrten', seenService.hasUnseenOwner(userId, ownerIds)),
           ],
         );
       },
@@ -753,16 +760,34 @@ class _AngefragteFahrtenTabState extends State<_AngefragteFahrtenTab>
 
         _syncUnseenIds(items, seenService);
 
-        items.sort((a, b) {
-            // gelöschte Fahrten ans Ende
-            if (a.fahrt == null && b.fahrt == null) return 0;
-            if (a.fahrt == null) return 1;
-            if (b.fahrt == null) return -1;
-            // neueste Aktivität zuerst (WhatsApp-Stil)
+        // Einladungen: vonFahrer && offen (mit vorhandener Fahrt)
+        final einladungen = items
+            .where((i) =>
+                i.fahrt != null &&
+                i.anfrage.vonFahrer &&
+                i.anfrage.status == AnfrageStatus.offen)
+            .toList()
+          ..sort((a, b) {
+            final aUnseen = _unseenCardIds.contains(a.anfrage.id) ? 0 : 1;
+            final bUnseen = _unseenCardIds.contains(b.anfrage.id) ? 0 : 1;
+            if (aUnseen != bUnseen) return aUnseen - bUnseen;
             return b.anfrage.updatedAt.compareTo(a.anfrage.updatedAt);
           });
 
-        if (items.isEmpty) {
+        // Normale Anfragen: alles andere
+        final normalAnfragen = items
+            .where((i) =>
+                !(i.anfrage.vonFahrer &&
+                    i.anfrage.status == AnfrageStatus.offen))
+            .toList()
+          ..sort((a, b) {
+            if (a.fahrt == null && b.fahrt == null) return 0;
+            if (a.fahrt == null) return 1;
+            if (b.fahrt == null) return -1;
+            return b.anfrage.updatedAt.compareTo(a.anfrage.updatedAt);
+          });
+
+        if (einladungen.isEmpty && normalAnfragen.isEmpty) {
           return const _EmptyState(
             icon: Icons.chat_bubble_outline,
             title: 'Noch keine Mitfahranfragen',
@@ -770,26 +795,80 @@ class _AngefragteFahrtenTabState extends State<_AngefragteFahrtenTab>
           );
         }
 
-        return ListView.builder(
-          padding: const EdgeInsets.only(bottom: 130),
-          itemCount: items.length,
-          itemBuilder: (context, index) {
-            final item = items[index];
-            if (item.fahrt == null) {
-              return RepaintBoundary(
-                child: _RequestedRideDeletedCard(anfrage: item.anfrage),
-              );
-            }
-            final anfrageId = item.anfrage.id;
-            return RepaintBoundary(
-              child: _RequestedRideCard(
-                fahrt: item.fahrt!,
-                anfrage: item.anfrage,
-                isUnseen: _unseenCardIds.contains(anfrageId),
-                onInteracted: () => _markCardSeen(anfrageId),
+        return CustomScrollView(
+          slivers: [
+            if (einladungen.isNotEmpty)
+              SliverToBoxAdapter(
+                child: _EinladungsSection(
+                  items: einladungen,
+                  unseenCardIds: _unseenCardIds,
+                  onMarkSeen: _markCardSeen,
+                ),
               ),
-            );
-          },
+            if (normalAnfragen.isNotEmpty) ...[
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Divider(
+                            color: Colors.white.withValues(alpha: 0.25),
+                            thickness: 1),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: Row(
+                          children: const [
+                            Icon(Icons.list_alt_outlined,
+                                size: 13, color: Colors.white),
+                            SizedBox(width: 5),
+                            Text(
+                              'DEINE ANFRAGEN',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: Divider(
+                            color: Colors.white.withValues(alpha: 0.25),
+                            thickness: 1),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final item = normalAnfragen[index];
+                    if (item.fahrt == null) {
+                      return RepaintBoundary(
+                        child: _RequestedRideDeletedCard(anfrage: item.anfrage),
+                      );
+                    }
+                    final anfrageId = item.anfrage.id;
+                    return RepaintBoundary(
+                      child: _RequestedRideCard(
+                        fahrt: item.fahrt!,
+                        anfrage: item.anfrage,
+                        isUnseen: _unseenCardIds.contains(anfrageId),
+                        onInteracted: () => _markCardSeen(anfrageId),
+                      ),
+                    );
+                  },
+                  childCount: normalAnfragen.length,
+                ),
+              ),
+            ],
+            const SliverToBoxAdapter(child: SizedBox(height: 130)),
+          ],
         );
       },
     );
@@ -806,6 +885,358 @@ class _RequestedRideItem {
   _RequestedRideItem(this.anfrage, this.fahrt);
 }
 
+/// ------------------------------------------------------------
+/// Einladungs-Sektion (collapsible, oben im Mitfahrten-Tab)
+/// ------------------------------------------------------------
+class _EinladungsSection extends StatefulWidget {
+  final List<_RequestedRideItem> items;
+  final Set<String> unseenCardIds;
+  final void Function(String) onMarkSeen;
+
+  const _EinladungsSection({
+    required this.items,
+    required this.unseenCardIds,
+    required this.onMarkSeen,
+  });
+
+  @override
+  State<_EinladungsSection> createState() => _EinladungsSectionState();
+}
+
+class _EinladungsSectionState extends State<_EinladungsSection> {
+  bool _expanded = false;
+
+  static const _orange = Color(0xFFFFB74D);
+
+  @override
+  Widget build(BuildContext context) {
+    final items = widget.items;
+    final extraCount = items.length - 1;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Section-Header — zentriert mit Trennlinien
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: Divider(
+                    color: _orange.withValues(alpha: 0.5), thickness: 1),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Row(
+                  children: const [
+                    Icon(Icons.mail_outline, size: 13, color: Colors.white),
+                    SizedBox(width: 5),
+                    Text(
+                      'EINLADUNGEN',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Divider(
+                    color: _orange.withValues(alpha: 0.5), thickness: 1),
+              ),
+            ],
+          ),
+        ),
+        // Erste Einladung — immer sichtbar
+        RepaintBoundary(
+          child: _EinladungsCard(
+            fahrt: items[0].fahrt!,
+            anfrage: items[0].anfrage,
+            isUnseen: widget.unseenCardIds.contains(items[0].anfrage.id),
+            onInteracted: () => widget.onMarkSeen(items[0].anfrage.id),
+          ),
+        ),
+        // Weitere Einladungen — collapsible
+        if (extraCount > 0) ...[
+          AnimatedSize(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeInOut,
+            child: _expanded
+                ? Column(
+                    children: items
+                        .skip(1)
+                        .map((item) => RepaintBoundary(
+                              child: _EinladungsCard(
+                                fahrt: item.fahrt!,
+                                anfrage: item.anfrage,
+                                isUnseen: widget.unseenCardIds
+                                    .contains(item.anfrage.id),
+                                onInteracted: () =>
+                                    widget.onMarkSeen(item.anfrage.id),
+                              ),
+                            ))
+                        .toList(),
+                  )
+                : const SizedBox.shrink(),
+          ),
+          // Button — immer sichtbar wenn >1 Einladung, toggle expand/collapse
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            child: GestureDetector(
+              onTap: () => setState(() => _expanded = !_expanded),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: _orange.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border:
+                      Border.all(color: _orange.withValues(alpha: 0.35)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      _expanded
+                          ? Icons.expand_less
+                          : Icons.expand_more,
+                      size: 16,
+                      color: _orange,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _expanded
+                          ? 'Weniger anzeigen'
+                          : '+ $extraCount weitere anzeigen',
+                      style: const TextStyle(
+                        color: _orange,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// ------------------------------------------------------------
+/// Einladungs-Card (ausklappbar, kein Richtungsstreifen)
+/// ------------------------------------------------------------
+class _EinladungsCard extends StatefulWidget {
+  final FahrtDaten fahrt;
+  final AnfrageDaten anfrage;
+  final bool isUnseen;
+  final VoidCallback? onInteracted;
+
+  const _EinladungsCard({
+    required this.fahrt,
+    required this.anfrage,
+    this.isUnseen = false,
+    this.onInteracted,
+  });
+
+  @override
+  State<_EinladungsCard> createState() => _EinladungsCardState();
+}
+
+class _EinladungsCardState extends State<_EinladungsCard> {
+  bool _expanded = false;
+
+  static const _orange = Color(0xFFFFB74D);
+
+  FahrtDaten get fahrt => widget.fahrt;
+  AnfrageDaten get anfrage => widget.anfrage;
+
+  @override
+  Widget build(BuildContext context) {
+    final event = context.read<EventService>().events.firstWhere(
+          (e) => e.id == fahrt.eventId,
+          orElse: () => Event(
+            name: fahrt.eventName,
+            datum: DateTime(2000),
+            standort: fahrt.standort,
+            beschreibung: '',
+            typ: '',
+            adresse: '',
+          ),
+        );
+
+    final rueckuhrzeit = fahrt.rueckuhrzeit?.format(context);
+    final istHinUndZurueck =
+        fahrt.richtung == Fahrtrichtung.hinUndZurueck && rueckuhrzeit != null;
+
+    final cardChild = GestureDetector(
+      onTap: () => setState(() => _expanded = !_expanded),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Kopfzeile: Eventname | Badge rechts | Pfeil
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => _showEventInfoDialog(context, event),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                fahrt.eventName,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.info_outline,
+                                color: Colors.white38, size: 12),
+                          ],
+                        ),
+                        if (event.datum.year != 2000) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            DateFormat('dd. MMMM yyyy', 'de')
+                                .format(event.datum),
+                            style: const TextStyle(
+                                color: Colors.white38, fontSize: 11),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Badge "Einladung" — rechts, leuchtender Stil
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: _orange.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: _orange.withValues(alpha: 0.55), width: 1),
+                  ),
+                  child: const Text(
+                    'Einladung',
+                    style: TextStyle(
+                      color: _orange,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  _expanded
+                      ? Icons.keyboard_arrow_up
+                      : Icons.keyboard_arrow_down,
+                  color: Colors.white38,
+                  size: 18,
+                ),
+              ],
+            ),
+            const Divider(color: Colors.white12, thickness: 1, height: 16),
+            _FahrerProfilRow(userId: fahrt.ownerId, name: fahrt.ownerName),
+            // Ausgeklappter Bereich
+            AnimatedCrossFade(
+              firstChild: const SizedBox.shrink(),
+              secondChild: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 8),
+                  Container(
+                      height: 1,
+                      color: Colors.white.withValues(alpha: 0.08)),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${fahrt.abfahrtsortAnzeige}  →  ${fahrt.standort}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      _TimeBadge(
+                          icon: Icons.schedule,
+                          text: fahrt.uhrzeit.format(context)),
+                      if (istHinUndZurueck)
+                        _TimeBadge(icon: Icons.sync, text: rueckuhrzeit),
+                      _TimeBadge(
+                        icon: Icons.event_seat,
+                        text:
+                            '${anfrage.seatsRequested} Platz${anfrage.seatsRequested > 1 ? 'e' : ''}',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _EinladungButtons(
+                    anfrage: anfrage,
+                    fahrt: fahrt,
+                    onInteracted: widget.onInteracted,
+                  ),
+                ],
+              ),
+              crossFadeState: _expanded
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
+              duration: const Duration(milliseconds: 220),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          AppCard(
+            padding: EdgeInsets.zero,
+            borderRadius: 22,
+            child: cardChild,
+          ),
+          if (widget.isUnseen)
+            Positioned(
+              right: 6,
+              top: 6,
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
 
 /// ------------------------------------------------------------
 /// Card: angebotene Fahrt (FAHRER)
@@ -1065,21 +1496,25 @@ class _FahrerGlassCard extends StatelessWidget {
                                         Container(
                                           padding: const EdgeInsets.symmetric(
                                               horizontal: 7, vertical: 2),
-                                          decoration: BoxDecoration(
-  borderRadius: BorderRadius.circular(12),
-  color: Colors.white.withValues(alpha: 0.08),
-  border: Border.all(
-    color: Colors.white.withValues(alpha: 0.18),
-  ),
-),
-                                          child: Text(
-                                            '${counts.offen}',
-                                            style: const TextStyle(
-  color: Colors.white,
-  fontWeight: FontWeight.w600,
-  fontSize: 14,
-  letterSpacing: 0.2,
-),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(12),
+                                        color: Colors.white.withValues(
+                                          alpha: 0.08,
+                                        ),
+                                        border: Border.all(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.18,
+                                          ),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        '${counts.offen}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14,
+                                          letterSpacing: 0.2,
+                                        ),
                                           ),
                                         ),
                                       ],
@@ -1104,7 +1539,7 @@ class _FahrerGlassCard extends StatelessWidget {
 /// ------------------------------------------------------------
 /// Card: angefragte Fahrt (MITFAHRER)
 /// ------------------------------------------------------------
-class _RequestedRideCard extends StatelessWidget {
+class _RequestedRideCard extends StatefulWidget {
   final FahrtDaten fahrt;
   final AnfrageDaten anfrage;
   final bool isUnseen;
@@ -1117,8 +1552,18 @@ class _RequestedRideCard extends StatelessWidget {
     this.onInteracted,
   });
 
+  @override
+  State<_RequestedRideCard> createState() => _RequestedRideCardState();
+}
+
+class _RequestedRideCardState extends State<_RequestedRideCard> {
+  bool _expanded = false;
+
+  FahrtDaten get fahrt => widget.fahrt;
+  AnfrageDaten get anfrage => widget.anfrage;
+
   void _openChat(BuildContext context) {
-    onInteracted?.call();
+    widget.onInteracted?.call();
     final chatService = context.read<ChatService>();
 
     final conversationId = chatService.buildConversationId(
@@ -1138,9 +1583,6 @@ class _RequestedRideCard extends StatelessWidget {
       ),
     );
 
-    // ensureConversation schreibt sofort in den lokalen Cache (kein Transaction-
-    // Roundtrip mehr). Erst danach updateSystemMessage – so sind die Security
-    // Rules erfüllt (participants bereits vorhanden).
     chatService.ensureConversation(
       fahrtId: fahrt.id,
       ownerId: fahrt.ownerId,
@@ -1181,230 +1623,410 @@ class _RequestedRideCard extends StatelessWidget {
           ),
         );
 
+    final isOffen = anfrage.status == AnfrageStatus.offen;
+    final isAkzeptiert = anfrage.status == AnfrageStatus.akzeptiert;
+
     final accentColor = switch (fahrt.richtung) {
       Fahrtrichtung.hinfahrt => Colors.greenAccent,
       Fahrtrichtung.rueckfahrt => Colors.orangeAccent,
       Fahrtrichtung.hinUndZurueck => Colors.blueAccent,
     };
-
     final richtungLabel = switch (fahrt.richtung) {
       Fahrtrichtung.hinfahrt => 'Hinfahrt',
       Fahrtrichtung.rueckfahrt => 'Rückfahrt',
       Fahrtrichtung.hinUndZurueck => 'Hin & Zurück',
     };
-
     final rueckuhrzeit = fahrt.rueckuhrzeit?.format(context);
     final istHinUndZurueck =
         fahrt.richtung == Fahrtrichtung.hinUndZurueck && rueckuhrzeit != null;
+
+    final bool isEinladung = anfrage.vonFahrer &&
+        anfrage.status == AnfrageStatus.offen &&
+        context.read<IAuthRepository>().currentUser?.userId ==
+            anfrage.requesterId;
+
+    final aktionenWidget = isEinladung
+        ? _EinladungButtons(
+            anfrage: anfrage,
+            fahrt: fahrt,
+            onInteracted: widget.onInteracted,
+          )
+        : _MitfahrerAktionen(
+            anfrage: anfrage,
+            event: event,
+            openChat: () => _openChat(context),
+            onInteracted: widget.onInteracted,
+          );
+
+    // ── Einladungs-Label ──
+    Widget? einladungsLabel;
+    if (anfrage.vonFahrer) {
+      einladungsLabel = Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: Colors.amber.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.mail_outline, color: Colors.amber.shade400, size: 12),
+            const SizedBox(width: 4),
+            Text(
+              'Einladung',
+              style: TextStyle(
+                color: Colors.amber.shade400,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // ── Card-Inhalt je Status ──
+    Widget cardChild;
+
+    if (isAkzeptiert) {
+      // Volle Card mit linkem Richtungsstreifen
+      cardChild = IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(width: 4, color: accentColor),
+            SizedBox(
+              width: 26,
+              child: Center(
+                child: RotatedBox(
+                  quarterTurns: 3,
+                  child: Text(
+                    richtungLabel,
+                    style: TextStyle(
+                      color: accentColor,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Container(width: 1, color: Colors.white.withValues(alpha: 0.12)),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (einladungsLabel != null) einladungsLabel,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => _showEventInfoDialog(context, event),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        fahrt.eventName,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Icon(Icons.info_outline,
+                                        color: Colors.white38, size: 12),
+                                  ],
+                                ),
+                                if (event.datum.year != 2000) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    DateFormat('dd. MMMM yyyy', 'de')
+                                        .format(event.datum),
+                                    style: const TextStyle(
+                                        color: Colors.white38, fontSize: 11),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _StatusBadge(status: anfrage.status),
+                      ],
+                    ),
+                    const Divider(color: Colors.white12, thickness: 1, height: 20),
+                    _FahrerProfilRow(userId: fahrt.ownerId, name: fahrt.ownerName),
+                    const SizedBox(height: 8),
+                    Container(height: 1, color: Colors.white.withValues(alpha: 0.08)),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${fahrt.abfahrtsortAnzeige}  →  ${fahrt.standort}',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        _TimeBadge(
+                            icon: Icons.schedule,
+                            text: fahrt.uhrzeit.format(context)),
+                        if (istHinUndZurueck)
+                          _TimeBadge(icon: Icons.sync, text: rueckuhrzeit),
+                        _TimeBadge(
+                          icon: Icons.event_seat,
+                          text: anfrage.seatsAccepted != null
+                              ? '${anfrage.seatsAccepted} / ${anfrage.seatsRequested} Plätze'
+                              : '${anfrage.seatsRequested} Plätze',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    aktionenWidget,
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    } else if (isOffen) {
+      // Minimale, expandierbare Card – kein Richtungsstreifen
+      cardChild = GestureDetector(
+        onTap: () => setState(() => _expanded = !_expanded),
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => _showEventInfoDialog(context, event),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  fahrt.eventName,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const Icon(Icons.info_outline,
+                                  color: Colors.white38, size: 12),
+                            ],
+                          ),
+                          if (event.datum.year != 2000) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              DateFormat('dd. MMMM yyyy', 'de').format(event.datum),
+                              style: const TextStyle(
+                                  color: Colors.white38, fontSize: 11),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _StatusBadge(status: anfrage.status),
+                  const SizedBox(width: 4),
+                  Icon(
+                    _expanded
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
+                    color: Colors.white38,
+                    size: 18,
+                  ),
+                ],
+              ),
+              const Divider(color: Colors.white12, thickness: 1, height: 16),
+              _FahrerProfilRow(userId: fahrt.ownerId, name: fahrt.ownerName),
+              AnimatedCrossFade(
+                firstChild: const SizedBox.shrink(),
+                secondChild: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 8),
+                    Container(height: 1, color: Colors.white.withValues(alpha: 0.08)),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${fahrt.abfahrtsortAnzeige}  →  ${fahrt.standort}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        _TimeBadge(
+                            icon: Icons.schedule,
+                            text: fahrt.uhrzeit.format(context)),
+                        if (istHinUndZurueck)
+                          _TimeBadge(icon: Icons.sync, text: rueckuhrzeit),
+                        _TimeBadge(
+                          icon: Icons.event_seat,
+                          text:
+                              '${anfrage.seatsRequested} Platz${anfrage.seatsRequested > 1 ? 'e' : ''}',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    aktionenWidget,
+                  ],
+                ),
+                crossFadeState: _expanded
+                    ? CrossFadeState.showSecond
+                    : CrossFadeState.showFirst,
+                duration: const Duration(milliseconds: 220),
+              ),
+            ],
+          ),
+        ),
+      );
+    } else {
+      // Inaktiv (abgelehnt / storniert) – Farben via _InaktivStyles
+      cardChild = Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (einladungsLabel != null) einladungsLabel,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => _showEventInfoDialog(context, event),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                fahrt.eventName,
+                                style: const TextStyle(
+                                  color: _InaktivStyles.titelFarbe,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.info_outline,
+                                color: _InaktivStyles.infoIconFarbe, size: 12),
+                          ],
+                        ),
+                        if (event.datum.year != 2000) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            DateFormat('dd. MMMM yyyy', 'de').format(event.datum),
+                            style: const TextStyle(
+                                color: _InaktivStyles.datumFarbe, fontSize: 11),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _StatusBadge(status: anfrage.status),
+              ],
+            ),
+            const Divider(
+                color: _InaktivStyles.dividerFarbe, thickness: 1, height: 20),
+            _FahrerProfilRow(
+              userId: fahrt.ownerId,
+              name: fahrt.ownerName,
+              nameFarbe: _InaktivStyles.fahrerNameFarbe,
+              chevronFarbe: _InaktivStyles.fahrerChevronFarbe,
+              avatarBg: _InaktivStyles.fahrerAvatarBg,
+              avatarRadius: _InaktivStyles.fahrerAvatarRadius,
+            ),
+            const SizedBox(height: 8),
+            aktionenWidget,
+          ],
+        ),
+      );
+    }
+
+    final bool isInaktiv = !isOffen && !isAkzeptiert;
+
+    final Widget card = isInaktiv
+        ? Opacity(
+            opacity: _InaktivStyles.cardOpacity,
+            child: Container(
+              decoration: _InaktivStyles.cardDecoration(),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(22),
+                child: cardChild,
+              ),
+            ),
+          )
+        : AppCard(
+            padding: EdgeInsets.zero,
+            borderRadius: 22,
+            child: cardChild,
+          );
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          AppCard(
-            padding: EdgeInsets.zero,
-            borderRadius: 22,
-            gradientColors: isUnseen
-                ? const [Color(0xFF1D3A6E), Color(0xFF2B5BA8)]
-                : null,
-            child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // ── Dünner Farbstreifen ganz links ──
-              Container(width: 4, color: accentColor),
+          card,
 
-              // ── Fahrtrichtungstext ──
-              SizedBox(
-                width: 26,
-                child: Center(
-                  child: RotatedBox(
-                    quarterTurns: 3,
-                    child: Text(
-                      richtungLabel,
-                      style: TextStyle(
-                        color: accentColor,
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.1,
-                      ),
+          // ── Rahmen aktive Card ────────────────────────────────────────────
+          // Liegt als letztes Layer über der Card → unabhängig vom Gradient
+          // alpha: 0.0–1.0 · width in Pixeln ← hier anpassen
+          if (!isInaktiv)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.8),
+                      width: 0.7,
                     ),
                   ),
                 ),
               ),
-
-              // ── Trennstrich ──
-              Container(
-                width: 1,
-                color: Colors.white.withValues(alpha: 0.12),
-              ),
-
-              // ── Hauptinhalt ──
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-          // Einladungs-Label (nur bei vonFahrer)
-          if (anfrage.vonFahrer) ...[
-            Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: Colors.amber.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.mail_outline, color: Colors.amber.shade400, size: 12),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Einladung',
-                    style: TextStyle(
-                      color: Colors.amber.shade400,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
             ),
-          ],
 
-          // Event-Name (anklickbar) + Status-Badge
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => _showEventInfoDialog(context, event),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              fahrt.eventName,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.info_outline,
-                              color: Colors.white38, size: 12),
-                        ],
-                      ),
-                      if (event.datum.year != 2000) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          DateFormat('dd. MMMM yyyy', 'de').format(event.datum),
-                          style: const TextStyle(
-                            color: Colors.white38,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              _StatusBadge(status: anfrage.status),
-            ],
-          ),
-
-          const Divider(
-            color: Colors.white12,
-            thickness: 1,
-            height: 20,
-          ),
-
-          // Fahrer-Block (Avatar + Name/Rating + Chevron — ganzer Block tappbar)
-          _FahrerProfilRow(
-            userId: fahrt.ownerId,
-            name: fahrt.ownerName,
-          ),
-
-          const SizedBox(height: 8),
-          Container(height: 1, color: Colors.white.withValues(alpha: 0.08)),
-          const SizedBox(height: 8),
-
-          // Route
-          Text(
-            '${fahrt.abfahrtsortAnzeige}  →  ${fahrt.standort}',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-
-          const SizedBox(height: 12),
-
-          // Zeit & Plätze
-          Wrap(
-            spacing: 8,
-            runSpacing: 6,
-            children: [
-              _TimeBadge(
-                icon: Icons.schedule,
-                text: fahrt.uhrzeit.format(context),
-              ),
-              if (istHinUndZurueck)
-                _TimeBadge(icon: Icons.sync, text: rueckuhrzeit),
-              _TimeBadge(
-                icon: Icons.event_seat,
-                text: anfrage.seatsAccepted != null
-                    ? '${anfrage.seatsAccepted} / ${anfrage.seatsRequested} Plätze'
-                    : '${anfrage.seatsRequested} Plätze',
-              ),
-            ],
-          ),
-
-                  const SizedBox(height: 12),
-
-                  // Buttons: Annehmen/Ablehnen (offene Einladung) oder Chat
-                  if (anfrage.vonFahrer &&
-                      anfrage.status == AnfrageStatus.offen &&
-                      context.read<IAuthRepository>().currentUser?.userId == anfrage.requesterId)
-                    _EinladungButtons(anfrage: anfrage, fahrt: fahrt, onInteracted: onInteracted)
-                  else
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              Colors.blueAccent.withValues(alpha: 0.75),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        onPressed: () => _openChat(context),
-                        child: const Text('Chat öffnen',
-                            style: TextStyle(fontSize: 13)),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    ),
-          ),
-          if (isUnseen)
+          if (widget.isUnseen)
             Positioned(
               right: 6,
               top: 6,
@@ -1549,6 +2171,170 @@ class _EinladungButtonsState extends State<_EinladungButtons> {
 }
 
 /// ------------------------------------------------------------
+/// Status-abhängige Aktionen (Mitfahrer-Sicht)
+/// ------------------------------------------------------------
+class _MitfahrerAktionen extends StatefulWidget {
+  final AnfrageDaten anfrage;
+  final Event event;
+  final VoidCallback openChat;
+  final VoidCallback? onInteracted;
+
+  const _MitfahrerAktionen({
+    required this.anfrage,
+    required this.event,
+    required this.openChat,
+    this.onInteracted,
+  });
+
+  @override
+  State<_MitfahrerAktionen> createState() => _MitfahrerAktionenState();
+}
+
+class _MitfahrerAktionenState extends State<_MitfahrerAktionen> {
+  bool _loading = false;
+
+  Future<void> _stornieren() async {
+    setState(() => _loading = true);
+    await context.read<AnfrageService>().storniereAnfrage(widget.anfrage);
+    widget.onInteracted?.call();
+    if (mounted) setState(() => _loading = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(
+        child: SizedBox(
+          height: 36,
+          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.amber),
+        ),
+      );
+    }
+
+    switch (widget.anfrage.status) {
+      // ── OFFEN: warten + zurückziehen ──────────────────────────
+      case AnfrageStatus.offen:
+        return Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: () async {
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  backgroundColor: const Color(0xFF1A1F2E),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                  title: const Text('Anfrage zurückziehen?',
+                      style: TextStyle(color: Colors.white, fontSize: 16)),
+                  content: const Text(
+                    'Möchtest du deine Anfrage wirklich zurückziehen?',
+                    style: TextStyle(color: Colors.white70, fontSize: 14),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Abbrechen',
+                          style: TextStyle(color: Colors.white54)),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text('Zurückziehen',
+                          style: TextStyle(
+                              color: Colors.redAccent,
+                              fontWeight: FontWeight.w600)),
+                    ),
+                  ],
+                ),
+              );
+              if (confirmed == true) _stornieren();
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.white38,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              minimumSize: Size.zero,
+            ),
+            child: const Text(
+              'Anfrage zurückziehen',
+              style: TextStyle(
+                fontSize: 12,
+                decoration: TextDecoration.underline,
+                decorationColor: Colors.white24,
+              ),
+            ),
+          ),
+        );
+
+      // ── AKZEPTIERT: mit Fahrer chatten ────────────────────────
+      case AnfrageStatus.akzeptiert:
+        return SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blueAccent,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            icon: const Icon(Icons.chat_bubble_outline, size: 16),
+            label: const Text(
+              'Mit Fahrer chatten',
+              style: TextStyle(fontSize: 13),
+            ),
+            onPressed: widget.openChat,
+          ),
+        );
+
+      // ── ABGELEHNT: andere Fahrt finden ────────────────────────
+      case AnfrageStatus.abgelehnt:
+        return TextButton.icon(
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => FahrtFindenPage(event: widget.event),
+            ),
+          ),
+          style: TextButton.styleFrom(
+            foregroundColor: _InaktivStyles.andereFahrtFarbe,
+            padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            minimumSize: Size.zero,
+          ),
+          icon: const Icon(Icons.search, size: 15),
+          label: const Text(
+            'Andere Fahrt finden',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+          ),
+        );
+
+      // ── STORNIERT: andere Fahrt finden ───────────────────────
+      case AnfrageStatus.storniert:
+        return TextButton.icon(
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => FahrtFindenPage(event: widget.event),
+            ),
+          ),
+          style: TextButton.styleFrom(
+            foregroundColor: _InaktivStyles.andereFahrtFarbe,
+            padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            minimumSize: Size.zero,
+          ),
+          icon: const Icon(Icons.search, size: 15),
+          label: const Text(
+            'Andere Fahrt finden',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+          ),
+        );
+    }
+  }
+}
+
+/// ------------------------------------------------------------
 /// Card: Fahrt gelöscht
 /// ------------------------------------------------------------
 class _RequestedRideDeletedCard extends StatelessWidget {
@@ -1558,83 +2344,132 @@ class _RequestedRideDeletedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final event = context.read<EventService>().events.firstWhere(
+          (e) => e.id == anfrage.eventId,
+          orElse: () => Event(
+            name: anfrage.eventName,
+            datum: DateTime(2000),
+            standort: anfrage.zielOrt,
+            beschreibung: '',
+            typ: '',
+            adresse: '',
+          ),
+        );
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment(0.8, 1),
-            colors: [Color(0xFF1F2A3C), Color(0xFF243A5E)],
-          ),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.35),
-              blurRadius: 22,
-              spreadRadius: -2,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(22),
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Colors.white.withValues(alpha: 0.05),
-                        Colors.transparent,
-                      ],
+      child: Opacity(
+        opacity: _InaktivStyles.cardOpacity,
+        child: Container(
+          decoration: _InaktivStyles.cardDecoration(),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => _showEventInfoDialog(context, event),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    anfrage.eventName,
+                                    style: const TextStyle(
+                                      color: _InaktivStyles.titelFarbe,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.info_outline,
+                                    color: _InaktivStyles.infoIconFarbe,
+                                    size: 12),
+                              ],
+                            ),
+                            if (event.datum.year != 2000) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                DateFormat('dd. MMMM yyyy', 'de')
+                                    .format(event.datum),
+                                style: const TextStyle(
+                                    color: _InaktivStyles.datumFarbe,
+                                    fontSize: 11),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: _InaktivStyles.geloeschtColor
+                            .withValues(alpha: 0.85),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'Gelöscht',
+                        style: TextStyle(
+                          color: _InaktivStyles.geloeschtTextFarbe,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(
+                    color: _InaktivStyles.dividerFarbe,
+                    thickness: 1,
+                    height: 20),
+                _FahrerProfilRow(
+                  userId: anfrage.fahrtOwnerId,
+                  name: anfrage.fahrerName,
+                  nameFarbe: _InaktivStyles.fahrerNameFarbe,
+                  chevronFarbe: _InaktivStyles.fahrerChevronFarbe,
+                  avatarBg: _InaktivStyles.fahrerAvatarBg,
+                  avatarRadius: _InaktivStyles.fahrerAvatarRadius,
+                ),
+                const SizedBox(height: 12),
+                TextButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => FahrtFindenPage(event: event),
                     ),
                   ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              anfrage.eventName,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                const Icon(Icons.route, size: 16, color: Colors.white70),
-                const SizedBox(width: 6),
-                Text(
-                  '${anfrage.startOrt} → ${anfrage.zielOrt}',
-                  style: const TextStyle(color: Colors.white70),
+                  style: TextButton.styleFrom(
+                    foregroundColor: _InaktivStyles.andereFahrtFarbe,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 0, vertical: 4),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    minimumSize: Size.zero,
+                  ),
+                  icon: const Icon(Icons.search, size: 15),
+                  label: const Text(
+                    'Andere Fahrt finden',
+                    style:
+                        TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Fahrt wurde gelöscht',
-              style: TextStyle(
-                color: Colors.redAccent.withValues(alpha: 0.9),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-            ],
           ),
         ),
       ),
+    ),
     );
   }
 }
@@ -1653,14 +2488,7 @@ class _AuslastungBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color color;
-    if (freiePlaetze == 0) {
-      color = Colors.redAccent;
-    } else if (freiePlaetze == 1) {
-      color = Colors.orange;
-    } else {
-      color = Colors.green;
-    }
+    final Color color = freiePlaetze == 0 ? Colors.blueGrey : Colors.green;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -1685,6 +2513,68 @@ class _AuslastungBadge extends StatelessWidget {
 /// ------------------------------------------------------------
 /// Badge: Anfrage-Status
 /// ------------------------------------------------------------
+// ════════════════════════════════════════════════════════════════════════════
+// Einstellungen für inaktive Cards (abgelehnt / storniert / gelöscht)
+// Alle Farben hier zentral anpassen — kein anderer Ort nötig.
+// ════════════════════════════════════════════════════════════════════════════
+class _InaktivStyles {
+  // ── Badge-Farben ──────────────────────────────────────────────────────────
+  static const Color abgelehntColor      = Color(0xFFEF5B5B);
+  static const Color abgelehntTextFarbe  = Color.fromARGB(200, 255, 255, 255);
+  static const Color storniertColor      = Color(0xFF7A8FA3);
+  static const Color storniertTextFarbe  = Color.fromARGB(200, 255, 255, 255);
+  static const Color geloeschtColor      = Color(0xFFEF5B5B);
+  static const Color geloeschtTextFarbe  = Color.fromARGB(200, 255, 255, 255);
+
+  // ── Event-Titel ───────────────────────────────────────────────────────────
+  static const Color titelFarbe      = Colors.white70;
+
+  // ── Datum ─────────────────────────────────────────────────────────────────
+  static const Color datumFarbe      = Colors.white38;
+
+  // ── Info-Icon ─────────────────────────────────────────────────────────────
+  static const Color infoIconFarbe   = Colors.white38;
+
+  // ── Trennstrich ───────────────────────────────────────────────────────────
+  static const Color dividerFarbe    = Colors.white10;
+
+  // ── Fahrerprofil ──────────────────────────────────────────────────────────
+  static const Color fahrerNameFarbe    = Colors.white60;
+  static const Color fahrerChevronFarbe = Colors.white38;
+  static const Color fahrerAvatarBg     = Color(0x26FFFFFF); // white ~15 %
+  static const double fahrerAvatarRadius = 15.0; // ← Avatar-Größe anpassen
+
+  // ── Gesamt-Transparenz der Card ───────────────────────────────────────────
+  // 1.0 = voll sichtbar · 0.6 = deutlich abgedunkelt ← hier anpassen
+  static const double cardOpacity = 0.95;
+
+  // ── Link „Andere Fahrt finden" ────────────────────────────────────────────
+  static const Color andereFahrtFarbe = Color.fromARGB(180, 255, 170, 60);
+
+  // ── Kartenhintergrund ─────────────────────────────────────────────────────
+  static BoxDecoration cardDecoration() => BoxDecoration(
+    borderRadius: BorderRadius.circular(22),
+    color: Colors.black.withValues(alpha: 0.6),
+    gradient: const LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment(0.8, 1),
+      colors: [
+        Color(0xFF161E29), // etwas grauer
+        Color(0xFF1E2C3D),
+      ],
+    ),
+    border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
+    boxShadow: [
+      BoxShadow(
+        color: Colors.black.withValues(alpha: 0.14),
+        blurRadius: 10,
+        spreadRadius: -3,
+        offset: const Offset(0, 3),
+      ),
+    ],
+  );
+}
+
 class _StatusBadge extends StatelessWidget {
   final AnfrageStatus status;
 
@@ -1693,30 +2583,38 @@ class _StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Color color;
+    final Color textFarbe;
     final String text;
 
     switch (status) {
       case AnfrageStatus.offen:
         color = Colors.blueAccent;
+        textFarbe = Colors.white;
         text = 'Offen';
       case AnfrageStatus.akzeptiert:
         color = Colors.green;
+        textFarbe = Colors.white;
         text = 'Akzeptiert';
       case AnfrageStatus.abgelehnt:
-        color = Colors.redAccent;
+        color = _InaktivStyles.abgelehntColor;
+        textFarbe = _InaktivStyles.abgelehntTextFarbe;
         text = 'Abgelehnt';
+      case AnfrageStatus.storniert:
+        color = _InaktivStyles.storniertColor;
+        textFarbe = _InaktivStyles.storniertTextFarbe;
+        text = 'Zurückgezogen';
     }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.85),
+        color: color.withValues(alpha: 0.75),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
         text,
-        style: const TextStyle(
-          color: Colors.white,
+        style: TextStyle(
+          color: textFarbe,
           fontSize: 11,
           fontWeight: FontWeight.bold,
         ),
@@ -1809,8 +2707,19 @@ class _TimeBadge extends StatelessWidget {
 class _FahrerProfilRow extends StatefulWidget {
   final String userId;
   final String name;
+  final Color nameFarbe;
+  final Color chevronFarbe;
+  final Color avatarBg;
+  final double avatarRadius;
 
-  const _FahrerProfilRow({required this.userId, required this.name});
+  const _FahrerProfilRow({
+    required this.userId,
+    required this.name,
+    this.nameFarbe = Colors.white,
+    this.chevronFarbe = Colors.white38,
+    this.avatarBg = const Color(0x26FFFFFF),
+    this.avatarRadius = 19.0,
+  });
 
   @override
   State<_FahrerProfilRow> createState() => _FahrerProfilRowState();
@@ -1842,8 +2751,8 @@ class _FahrerProfilRowState extends State<_FahrerProfilRow> {
           UserAvatarById(
             userId: widget.userId,
             name: widget.name,
-            radius: 17,
-            backgroundColor: Colors.white.withValues(alpha: 0.15),
+            radius: widget.avatarRadius,
+            backgroundColor: widget.avatarBg,
             onPhotoLoaded: (url) => setState(() => _photoUrl = url),
           ),
           const SizedBox(width: 8),
@@ -1856,8 +2765,8 @@ class _FahrerProfilRowState extends State<_FahrerProfilRow> {
                     Flexible(
                       child: Text(
                         widget.name,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: widget.nameFarbe,
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
                         ),
@@ -1871,7 +2780,7 @@ class _FahrerProfilRowState extends State<_FahrerProfilRow> {
               ],
             ),
           ),
-          const Icon(Icons.chevron_right, color: Colors.white38, size: 18),
+          Icon(Icons.chevron_right, color: widget.chevronFarbe, size: 18),
         ],
       ),
     );

@@ -43,8 +43,11 @@ class FahrtAnfragenPage extends StatelessWidget {
             elevation: 0,
             title: const Text("Anfragen zu deiner Fahrt"),
           ),
-          body: Consumer2<AnfrageService, InteressentenService>(
-            builder: (context, anfrageService, interessentenService, _) {
+          body: Consumer3<AnfrageService, InteressentenService, FahrtService>(
+            builder: (context, anfrageService, interessentenService, fahrtService, _) {
+              final aktuelleFahrt = fahrtService.alleFahrten
+                  .firstWhere((f) => f.id == fahrt.id, orElse: () => fahrt);
+              final istVoll = aktuelleFahrt.freiePlaetze <= 0;
               final anfragen = anfrageService.getAnfragenForFahrt(fahrt.id);
 
               // Interessenten für dieses Event laden; Nutzer rausfiltern,
@@ -62,6 +65,18 @@ class FahrtAnfragenPage extends StatelessWidget {
                   .getForEvent(fahrt.eventId)
                   .where((i) => !akzeptierteRequesterIds.contains(i.userId))
                   .toList();
+
+              // Wenn Fahrt voll: akzeptierte separat anzeigen, Rest in normaler Liste
+              final akzeptierte = istVoll
+                  ? anfragen
+                      .where((a) => a.status == AnfrageStatus.akzeptiert)
+                      .toList()
+                  : <AnfrageDaten>[];
+              final restlicheAnfragen = istVoll
+                  ? anfragen
+                      .where((a) => a.status != AnfrageStatus.akzeptiert)
+                      .toList()
+                  : anfragen;
 
               final hatContent =
                   anfragen.isNotEmpty || interessenten.isNotEmpty;
@@ -92,8 +107,45 @@ class FahrtAnfragenPage extends StatelessWidget {
 
               return CustomScrollView(
                 slivers: [
-                  // ── Interessenten-Sektion ──
-                  if (interessenten.isNotEmpty) ...[
+                  // ── Voll-Banner ──
+                  if (istVoll)
+                    SliverToBoxAdapter(child: _VollBanner()),
+
+                  // ── Mitfahrer-Sektion (nur wenn Fahrt voll) ──
+                  if (istVoll && akzeptierte.isNotEmpty) ...[
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.check_circle_outline,
+                                color: Colors.greenAccent, size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              '${akzeptierte.length} Mitfahrer',
+                              style: const TextStyle(
+                                color: Colors.greenAccent,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) => _AnfrageCard(
+                          anfrage: akzeptierte[index],
+                          fahrt: aktuelleFahrt,
+                        ),
+                        childCount: akzeptierte.length,
+                      ),
+                    ),
+                  ],
+
+                  // ── Interessenten-Sektion (nur wenn noch Plätze frei) ──
+                  if (!istVoll && interessenten.isNotEmpty) ...[
                     SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -119,7 +171,7 @@ class FahrtAnfragenPage extends StatelessWidget {
                       delegate: SliverChildBuilderDelegate(
                         (context, index) => _InteressentCard(
                           interessent: interessenten[index],
-                          fahrt: fahrt,
+                          fahrt: aktuelleFahrt,
                           anfrageService: anfrageService,
                         ),
                         childCount: interessenten.length,
@@ -128,19 +180,18 @@ class FahrtAnfragenPage extends StatelessWidget {
                   ],
 
                   // ── Anfragen-Sektion ──
-                  if (anfragen.isNotEmpty) ...[
+                  if (restlicheAnfragen.isNotEmpty) ...[
                     SliverToBoxAdapter(
                       child: Padding(
-                        padding: EdgeInsets.fromLTRB(
-                            16, interessenten.isNotEmpty ? 16 : 16, 16, 8),
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                         child: Row(
                           children: [
                             const Icon(Icons.mail_outline,
                                 color: Colors.white70, size: 20),
                             const SizedBox(width: 8),
                             Text(
-                              '${anfragen.length} Anfrage'
-                              '${anfragen.length == 1 ? '' : 'n'}',
+                              '${restlicheAnfragen.length} Anfrage'
+                              '${restlicheAnfragen.length == 1 ? '' : 'n'}',
                               style: const TextStyle(
                                 color: Colors.white70,
                                 fontSize: 16,
@@ -154,10 +205,10 @@ class FahrtAnfragenPage extends StatelessWidget {
                     SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (context, index) => _AnfrageCard(
-                          anfrage: anfragen[index],
-                          fahrt: fahrt,
+                          anfrage: restlicheAnfragen[index],
+                          fahrt: aktuelleFahrt,
                         ),
-                        childCount: anfragen.length,
+                        childCount: restlicheAnfragen.length,
                       ),
                     ),
                   ],
@@ -395,6 +446,7 @@ class _AnfrageCard extends StatefulWidget {
 
 class _AnfrageCardState extends State<_AnfrageCard> {
   late int _acceptedSeats;
+  bool _loading = false;
 
   @override
   void initState() {
@@ -569,9 +621,18 @@ class _AnfrageCardState extends State<_AnfrageCard> {
                   const SizedBox(width: 12),
                   _seatButton(
                     icon: Icons.add,
-                    onTap: _acceptedSeats < a.seatsRequested
-                        ? () => setState(() => _acceptedSeats++)
-                        : null,
+                    onTap: _acceptedSeats >= a.seatsRequested
+                        ? null
+                        : () {
+                            final freie = widget.fahrt.freiePlaetze;
+                            if (_acceptedSeats >= freie) {
+                              AppSnackbar.show(context,
+                                  message:
+                                      'Nur noch $freie Platz${freie == 1 ? '' : 'e'} verfügbar');
+                              return;
+                            }
+                            setState(() => _acceptedSeats++);
+                          },
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -590,82 +651,141 @@ class _AnfrageCardState extends State<_AnfrageCard> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton.icon(
-                    onPressed: () async {
-                      final chatService = context.read<ChatService>();
-                      await context.read<AnfrageService>().ablehnenAnfrage(a);
-                      if (!mounted) return;
-                      // Benachrichtigung im Chat senden (fire-and-forget)
-                      chatService.sendStatusNotification(
-                        fahrtId: widget.fahrt.id,
-                        ownerId: widget.fahrt.ownerId,
-                        requesterId: a.requesterId,
-                        eventName: widget.fahrt.eventName,
-                        startOrt: widget.fahrt.abfahrtsort,
-                        zielOrt: widget.fahrt.standort,
-                        seatsRequested: a.seatsRequested,
-                        text: 'Anfrage wurde abgelehnt.',
-                      );
-                    },
+                    onPressed: _loading
+                        ? null
+                        : () async {
+                            setState(() => _loading = true);
+                            try {
+                              final chatService = context.read<ChatService>();
+                              await context
+                                  .read<AnfrageService>()
+                                  .ablehnenAnfrage(a);
+                              if (!mounted) return;
+                              // Benachrichtigung im Chat senden (fire-and-forget)
+                              chatService.sendStatusNotification(
+                                fahrtId: widget.fahrt.id,
+                                ownerId: widget.fahrt.ownerId,
+                                requesterId: a.requesterId,
+                                eventName: widget.fahrt.eventName,
+                                startOrt: widget.fahrt.abfahrtsort,
+                                zielOrt: widget.fahrt.standort,
+                                seatsRequested: a.seatsRequested,
+                                text: 'Deine Anfrage wurde leider abgelehnt.',
+                              );
+                            } finally {
+                              if (mounted) setState(() => _loading = false);
+                            }
+                          },
                     icon: const Icon(Icons.close, color: Colors.redAccent),
                     label: const Text("Ablehnen",
                         style: TextStyle(color: Colors.redAccent)),
                   ),
                   const SizedBox(width: 12),
                   TextButton.icon(
-                    onPressed: () async {
-                      final anfrageService = context.read<AnfrageService>();
-                      final fahrtService = context.read<FahrtService>();
-                      final chatService = context.read<ChatService>();
+                    onPressed: _loading
+                        ? null
+                        : () async {
+                            setState(() => _loading = true);
+                            try {
+                              final anfrageService =
+                                  context.read<AnfrageService>();
+                              final fahrtService =
+                                  context.read<FahrtService>();
+                              final chatService = context.read<ChatService>();
+                              final interessentenService =
+                                  context.read<InteressentenService>();
 
-                      final aktuelleFahrt =
-                          fahrtService.alleFahrten.firstWhere(
-                        (f) => f.id == widget.fahrt.id,
-                        orElse: () => widget.fahrt,
-                      );
+                              final aktuelleFahrt =
+                                  fahrtService.alleFahrten.firstWhere(
+                                (f) => f.id == widget.fahrt.id,
+                                orElse: () => widget.fahrt,
+                              );
 
-                      final freie = aktuelleFahrt.freiePlaetze;
-                      if (_acceptedSeats > freie) return;
+                              final freie = aktuelleFahrt.freiePlaetze;
+                              if (_acceptedSeats > freie) return;
 
-                      final ok = await anfrageService.akzeptiereAnfrage(
-                        anfrage: a,
-                        fahrt: aktuelleFahrt,
-                        seatsAccepted: _acceptedSeats,
-                      );
+                              final ok = await anfrageService.akzeptiereAnfrage(
+                                anfrage: a,
+                                fahrt: aktuelleFahrt,
+                                seatsAccepted: _acceptedSeats,
+                              );
 
-                      if (!ok) return;
+                              if (!ok) return;
 
-                      final convo = await chatService.ensureConversation(
-                        fahrtId: widget.fahrt.id,
-                        ownerId: widget.fahrt.ownerId,
-                        requesterId: a.requesterId,
-                        eventName: widget.fahrt.eventName,
-                        startOrt: widget.fahrt.abfahrtsort,
-                        zielOrt: widget.fahrt.standort,
-                        seatsRequested: a.seatsRequested,
-                      );
+                              // Interessent aus Warteliste entfernen
+                              await interessentenService.removeForUser(
+                                widget.fahrt.eventId,
+                                a.requesterId,
+                              );
 
-                      final updatedFahrt = aktuelleFahrt.copyWith(
-                        freiePlaetze: freie - _acceptedSeats,
-                      );
-                      await fahrtService.update(updatedFahrt);
+                              final convo =
+                                  await chatService.ensureConversation(
+                                fahrtId: widget.fahrt.id,
+                                ownerId: widget.fahrt.ownerId,
+                                requesterId: a.requesterId,
+                                eventName: widget.fahrt.eventName,
+                                startOrt: widget.fahrt.abfahrtsort,
+                                zielOrt: widget.fahrt.standort,
+                                seatsRequested: a.seatsRequested,
+                              );
 
-                      await chatService.updateSystemMessage(
-                        conversationId: convo.id,
-                        eventName: widget.fahrt.eventName,
-                        startOrt: widget.fahrt.abfahrtsort,
-                        zielOrt: widget.fahrt.standort,
-                        seatsRequested: a.seatsRequested,
-                        seatsAccepted: _acceptedSeats,
-                        uhrzeit:
-                            '${widget.fahrt.uhrzeitHour.toString().padLeft(2, '0')}:${widget.fahrt.uhrzeitMinute.toString().padLeft(2, '0')}',
-                        richtung: switch (widget.fahrt.richtung) {
-                          Fahrtrichtung.hinfahrt => 'Hinfahrt',
-                          Fahrtrichtung.rueckfahrt => 'Rückfahrt',
-                          Fahrtrichtung.hinUndZurueck => 'Hin und Zurück',
-                        },
-                        ownerName: widget.fahrt.ownerName,
-                      );
-                    },
+                              final updatedFahrt = aktuelleFahrt.copyWith(
+                                freiePlaetze: freie - _acceptedSeats,
+                              );
+                              await fahrtService.update(updatedFahrt);
+
+                              await chatService.updateSystemMessage(
+                                conversationId: convo.id,
+                                eventName: widget.fahrt.eventName,
+                                startOrt: widget.fahrt.abfahrtsort,
+                                zielOrt: widget.fahrt.standort,
+                                seatsRequested: a.seatsRequested,
+                                seatsAccepted: _acceptedSeats,
+                                uhrzeit:
+                                    '${widget.fahrt.uhrzeitHour.toString().padLeft(2, '0')}:${widget.fahrt.uhrzeitMinute.toString().padLeft(2, '0')}',
+                                richtung: switch (widget.fahrt.richtung) {
+                                  Fahrtrichtung.hinfahrt => 'Hinfahrt',
+                                  Fahrtrichtung.rueckfahrt => 'Rückfahrt',
+                                  Fahrtrichtung.hinUndZurueck =>
+                                    'Hin und Zurück',
+                                },
+                                ownerName: widget.fahrt.ownerName,
+                              );
+
+                              if (!context.mounted) return;
+                              AppSnackbar.show(context,
+                                  message: 'Anfrage angenommen');
+
+                              // Wenn Fahrt jetzt voll: alle offenen Anfragen auto-ablehnen
+                              final newFreie = freie - _acceptedSeats;
+                              if (newFreie <= 0) {
+                                final offene = anfrageService
+                                    .getAnfragenForFahrt(widget.fahrt.id)
+                                    .where((x) =>
+                                        x.id != a.id &&
+                                        x.status == AnfrageStatus.offen)
+                                    .toList();
+                                for (final offeneAnfrage in offene) {
+                                  await anfrageService
+                                      .ablehnenAnfrage(offeneAnfrage);
+                                  if (!mounted) break;
+                                  chatService.sendStatusNotification(
+                                    fahrtId: widget.fahrt.id,
+                                    ownerId: widget.fahrt.ownerId,
+                                    requesterId: offeneAnfrage.requesterId,
+                                    eventName: widget.fahrt.eventName,
+                                    startOrt: widget.fahrt.abfahrtsort,
+                                    zielOrt: widget.fahrt.standort,
+                                    seatsRequested:
+                                        offeneAnfrage.seatsRequested,
+                                    text: 'Fahrt ist leider voll.',
+                                  );
+                                }
+                              }
+                            } finally {
+                              if (mounted) setState(() => _loading = false);
+                            }
+                          },
                     icon: const Icon(Icons.check, color: Colors.greenAccent),
                     label: const Text("Annehmen",
                         style: TextStyle(color: Colors.greenAccent)),
@@ -693,6 +813,52 @@ class _AnfrageCardState extends State<_AnfrageCard> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Voll-Banner
+// ---------------------------------------------------------------------------
+class _VollBanner extends StatelessWidget {
+  const _VollBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.redAccent.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.block, color: Colors.redAccent, size: 18),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Fahrt ist voll',
+                  style: TextStyle(
+                    color: Colors.redAccent,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Alle Plätze sind vergeben.',
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 Widget buildStatusChip(AnfrageStatus status) {
   switch (status) {
     case AnfrageStatus.offen:
@@ -701,6 +867,8 @@ Widget buildStatusChip(AnfrageStatus status) {
       return _chip("Akzeptiert", Colors.green);
     case AnfrageStatus.abgelehnt:
       return _chip("Abgelehnt", Colors.red);
+    case AnfrageStatus.storniert:
+      return _chip("Storniert", Colors.blueGrey);
   }
 }
 

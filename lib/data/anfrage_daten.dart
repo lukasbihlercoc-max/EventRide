@@ -4,6 +4,7 @@ enum AnfrageStatus {
   offen,
   akzeptiert,
   abgelehnt,
+  storniert,
 }
 
 class AnfrageDaten {

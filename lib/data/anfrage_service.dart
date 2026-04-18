@@ -40,12 +40,19 @@ class AnfrageService with ChangeNotifier {
 
   void _startListening() {
     _streamSub?.cancel();
-    _streamSub = _repository.watch().listen((anfragen) {
-      _alleAnfragen
-        ..clear()
-        ..addAll(anfragen);
-      notifyListeners();
-    });
+    _streamSub = _repository.watch().listen(
+      (anfragen) {
+        _alleAnfragen
+          ..clear()
+          ..addAll(anfragen);
+        notifyListeners();
+      },
+      onError: (_) {
+        // z. B. Firestore PERMISSION_DENIED vor Auth-Init → ignorieren
+        _alleAnfragen.clear();
+        notifyListeners();
+      },
+    );
   }
 
   @override

@@ -18,13 +18,20 @@ class EventService with ChangeNotifier {
   /// Aktualisiert die Liste automatisch bei Änderungen anderer Geräte.
   Future<void> load() async {
     _subscription?.cancel();
-    _subscription = _repo.watch().listen((events) {
-      _events
-        ..clear()
-        ..addAll(events);
-      _sort();
-      notifyListeners();
-    });
+    _subscription = _repo.watch().listen(
+      (events) {
+        _events
+          ..clear()
+          ..addAll(events);
+        _sort();
+        notifyListeners();
+      },
+      onError: (_) {
+        // z. B. Firestore PERMISSION_DENIED im ausgeloggten Zustand → ignorieren
+        _events.clear();
+        notifyListeners();
+      },
+    );
   }
 
   @override

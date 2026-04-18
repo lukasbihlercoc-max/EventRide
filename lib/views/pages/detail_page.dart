@@ -12,6 +12,8 @@ import 'package:my_app/data/event_daten.dart';
 import 'package:my_app/data/fahrt_daten.dart';
 import 'package:my_app/data/fahrt_service.dart';
 import 'package:my_app/data/interessenten_service.dart';
+import 'package:my_app/data/interessenten_daten.dart';
+import 'package:my_app/data/app_user.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/views/pages/events_page.dart';
 import 'package:my_app/views/pages/fahrt_anbieten_page.dart';
@@ -145,6 +147,9 @@ class DetailPage extends StatelessWidget {
                               ),
                             ],
                           ),
+                          SizedBox(height: height * 0.013),
+                          _InteressentenInline(
+                              event: event, width: width, height: height),
                           Divider(
                             color: Colors.white24,
                             thickness: 1,
@@ -317,9 +322,6 @@ class DetailPage extends StatelessWidget {
                             EdgeInsets.symmetric(vertical: height * 0.013),
                       ),
                     ),
-                    // SOCIAL PILL: Ich will hin
-                    _IchWillHinPill(
-                        event: event, width: width, height: height),
                   ],
                 ),
               ),
@@ -332,10 +334,10 @@ class DetailPage extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// "Ich will hin" Pill — soziales Element, kein klassischer Button
+// Interessenten — inline social proof (below address, above divider)
 // ---------------------------------------------------------------------------
-class _IchWillHinPill extends StatefulWidget {
-  const _IchWillHinPill({
+class _InteressentenInline extends StatefulWidget {
+  const _InteressentenInline({
     required this.event,
     required this.width,
     required this.height,
@@ -346,11 +348,12 @@ class _IchWillHinPill extends StatefulWidget {
   final double height;
 
   @override
-  State<_IchWillHinPill> createState() => _IchWillHinPillState();
+  State<_InteressentenInline> createState() => _InteressentenInlineState();
 }
 
-class _IchWillHinPillState extends State<_IchWillHinPill>
+class _InteressentenInlineState extends State<_InteressentenInline>
     with SingleTickerProviderStateMixin {
+  bool _loading = false;
   bool _pressed = false;
   late final AnimationController _pulseCtrl;
   late final Animation<double> _pulseAnim;
@@ -373,22 +376,43 @@ class _IchWillHinPillState extends State<_IchWillHinPill>
 
   @override
   Widget build(BuildContext context) {
-    final currentUser = context.read<IAuthRepository>().currentUser;
     final interessentenService = context.watch<InteressentenService>();
-    final count = interessentenService.countForEvent(widget.event.id);
+    final currentUser = context.read<IAuthRepository>().currentUser;
+    final interessenten = interessentenService.getForEvent(widget.event.id);
+    final count = interessenten.length;
 
     // ── Nicht eingeloggt ──
     if (currentUser == null) {
-      return _pill(
-        onTap: () => requiresLogin(context),
-        bgColor: Colors.white.withValues(alpha: 0.07),
-        borderColor: Colors.amber.withValues(alpha: 0.35),
-        child: _pillRow(
-          icon: Icon(Icons.emoji_people,
-              color: Colors.amber.shade400, size: widget.width * 0.048),
-          label: 'Ich will hin',
-          labelColor: Colors.amber.shade300,
-          count: count,
+      return _shell(
+        bgColor: Colors.white.withValues(alpha: 0.06),
+        borderColor: Colors.white.withValues(alpha: 0.08),
+        child: _inlineRow(
+          interessenten: interessenten,
+          mainText: count == 0
+              ? 'Noch keiner eingetragen'
+              : count == 1
+                  ? '1 will hin'
+                  : '$count wollen hin',
+          subText: 'Tippe um dich einzutragen',
+          right: GestureDetector(
+            onTap: () => requiresLogin(context),
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                color: Colors.amber.withValues(alpha: 0.2),
+              ),
+              child: const Text(
+                'Ich will hin',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.amber,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
         ),
       );
     }
@@ -396,43 +420,33 @@ class _IchWillHinPillState extends State<_IchWillHinPill>
     final fahrtService = context.watch<FahrtService>();
     final anfrageService = context.watch<AnfrageService>();
 
-    // ── FALL 1: Fahrer-Sicht ──
-    final eigeneFahrt = fahrtService.alleFahrten
-        .where((f) =>
-            f.eventId == widget.event.id && f.ownerId == currentUser.userId)
-        .firstOrNull;
+    // ── PRIORITÄT 1: Akzeptierte Anfrage ──
+    final hatAkzeptierteAnfrage = anfrageService.alleAnfragen.any((a) =>
+        a.eventId == widget.event.id &&
+        a.requesterId == currentUser.userId &&
+        a.status == AnfrageStatus.akzeptiert);
 
-    if (eigeneFahrt != null) {
-      final active = count > 0;
-      return _pill(
-        onTap: active
-            ? () => showInteressentenSheet(context, eigeneFahrt)
-            : null,
-        bgColor: active
-            ? Colors.amber.withValues(alpha: 0.18)
-            : Colors.white.withValues(alpha: 0.05),
-        borderColor: active
-            ? Colors.amber.withValues(alpha: 0.50)
-            : Colors.white.withValues(alpha: 0.10),
-        child: _pillRow(
-          icon: Icon(Icons.people_outline,
-              color: active ? Colors.amber.shade300 : Colors.white30,
-              size: widget.width * 0.048),
-          label: count == 0
-              ? 'Noch niemand interessiert'
-              : count == 1
-                  ? '1 will hin'
-                  : '$count wollen hin',
-          labelColor: active ? Colors.amber.shade200 : Colors.white30,
-          trailing: active
-              ? Icon(Icons.chevron_right,
-                  color: Colors.amber.shade300, size: widget.width * 0.048)
+    if (hatAkzeptierteAnfrage) {
+      return _shell(
+        bgColor: Colors.white.withValues(alpha: 0.05),
+        borderColor: Colors.white.withValues(alpha: 0.10),
+        child: _inlineRow(
+          interessenten: interessenten,
+          mainText: 'Du hast eine Fahrt',
+          mainTextColor: Colors.white38,
+          subText: count > 0
+              ? (count == 1
+                  ? '1 weiterer will hin'
+                  : '$count weitere wollen hin')
               : null,
+          subTextColor: Colors.white38,
+          right: const Icon(Icons.check_circle_outline,
+              color: Colors.white24, size: 18),
         ),
       );
     }
 
-    // ── FALL 0: Offene Einladungen vom Fahrer (vor Gast-Zuständen) ──
+    // ── PRIORITÄT 2: Offene Einladungen vom Fahrer ──
     final einladungen = anfrageService.alleAnfragen
         .where((a) =>
             a.eventId == widget.event.id &&
@@ -443,179 +457,240 @@ class _IchWillHinPillState extends State<_IchWillHinPill>
 
     if (einladungen.isNotEmpty) {
       final n = einladungen.length;
-      return _pill(
+      return GestureDetector(
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTapCancel: () => setState(() => _pressed = false),
         onTap: () => _showEinladungsSheet(context, einladungen, fahrtService),
-        bgColor: Colors.amber.withValues(alpha: 0.07),
-        borderColor: Colors.amber.withValues(alpha: 0.30),
-        pulse: true,
-        child: _pillRow(
-          icon: Icon(Icons.mail_outline,
-              color: Colors.amber.shade200, size: widget.width * 0.048),
-          label: n == 1
-              ? 'Fahrer hat dich eingeladen'
-              : '$n Fahrer haben dich eingeladen',
-          labelColor: Colors.amber.shade100,
-          labelBold: true,
-          trailing: Icon(Icons.chevron_right,
-              color: Colors.amber.shade300, size: widget.width * 0.048),
+        child: AnimatedScale(
+          scale: _pressed ? 0.97 : 1.0,
+          duration: const Duration(milliseconds: 80),
+          child: AnimatedBuilder(
+            animation: _pulseAnim,
+            builder: (_, __) => Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: widget.width * 0.04,
+                vertical: widget.height * 0.012,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.amber
+                    .withValues(alpha: 0.08 + 0.08 * _pulseAnim.value),
+                borderRadius: BorderRadius.circular(widget.width * 0.03),
+                border: Border.all(
+                  color: Colors.amber
+                      .withValues(alpha: 0.35 + 0.25 * _pulseAnim.value),
+                ),
+              ),
+              child: _inlineRow(
+                interessenten: interessenten,
+                mainText: n == 1
+                    ? 'Fahrer hat dich eingeladen'
+                    : '$n Fahrer haben dich eingeladen',
+                mainTextColor: Colors.amber.shade100,
+                mainTextBold: true,
+                subText: count > 0
+                    ? (count == 1 ? '1 will hin' : '$count wollen hin')
+                    : null,
+                right: Icon(Icons.chevron_right,
+                    color: Colors.amber.shade300, size: 20),
+              ),
+            ),
+          ),
         ),
       );
     }
 
-    // ── FALL 2: Akzeptierte Anfrage → deaktiviert ──
-    final hatAkzeptierteAnfrage = anfrageService.alleAnfragen.any((a) =>
-        a.eventId == widget.event.id &&
-        a.requesterId == currentUser.userId &&
-        a.status == AnfrageStatus.akzeptiert);
+    // ── PRIORITÄT 3: Fahrer-Sicht ──
+    final eigeneFahrt = fahrtService.alleFahrten
+        .where((f) =>
+            f.eventId == widget.event.id &&
+            f.ownerId == currentUser.userId)
+        .firstOrNull;
 
-    if (hatAkzeptierteAnfrage) {
-      return _pill(
-        onTap: null,
-        bgColor: Colors.white.withValues(alpha: 0.05),
-        borderColor: Colors.white.withValues(alpha: 0.10),
-        child: _pillRow(
-          icon: Icon(Icons.check_circle_outline,
-              color: Colors.white38, size: widget.width * 0.048),
-          label: 'Du hast eine Fahrt',
-          labelColor: Colors.white38,
+    if (eigeneFahrt != null) {
+      return _shell(
+        onTap: count > 0
+            ? () => showInteressentenSheet(context, eigeneFahrt)
+            : null,
+        bgColor: Colors.white.withValues(alpha: 0.06),
+        borderColor: count > 0
+            ? Colors.amber.withValues(alpha: 0.35)
+            : Colors.white.withValues(alpha: 0.08),
+        child: _inlineRow(
+          interessenten: interessenten,
+          mainText: count == 0
+              ? 'Noch keiner eingetragen'
+              : count == 1
+                  ? '1 will hin'
+                  : '$count wollen hin',
+          subText: count > 0 ? 'Tippe um einzuladen' : null,
+          right: count > 0
+              ? Icon(Icons.chevron_right,
+                  color: Colors.amber.shade300, size: 20)
+              : null,
         ),
       );
     }
 
-    // ── FALL 3: Gast-Toggle ──
-    final ichBinInteressiert =
-        interessentenService.isInteressiert(widget.event.id, currentUser.userId);
+    // ── PRIORITÄT 4: Gast-Toggle ──
+    final ichBinInteressiert = interessentenService.isInteressiert(
+        widget.event.id, currentUser.userId);
 
-    return _pill(
-      onTap: () => _toggle(
-          context, currentUser.userId, currentUser.name, interessentenService),
-      bgColor: ichBinInteressiert
-          ? Colors.amber.withValues(alpha: 0.20)
-          : Colors.white.withValues(alpha: 0.07),
+    return _shell(
+      bgColor: Colors.white.withValues(alpha: 0.06),
       borderColor: ichBinInteressiert
-          ? Colors.amber.withValues(alpha: 0.60)
-          : Colors.amber.withValues(alpha: 0.30),
-      child: _pillRow(
-        icon: Icon(
-          ichBinInteressiert ? Icons.check : Icons.emoji_people,
-          color: ichBinInteressiert
-              ? Colors.amber.shade200
-              : Colors.amber.shade400,
-          size: widget.width * 0.048,
-        ),
-        label: ichBinInteressiert ? 'Du willst hin' : 'Ich will hin',
-        labelColor:
-            ichBinInteressiert ? Colors.amber.shade200 : Colors.amber.shade300,
-        labelBold: ichBinInteressiert,
-        count: count,
+          ? Colors.amber.withValues(alpha: 0.35)
+          : Colors.white.withValues(alpha: 0.08),
+      child: _inlineRow(
+        interessenten: interessenten,
+        mainText: count == 0
+            ? 'Noch keiner eingetragen'
+            : count == 1
+                ? '1 will hin'
+                : '$count wollen hin',
+        subText:
+            ichBinInteressiert ? 'Du willst hin' : 'Tippe um dich einzutragen',
+        right: ichBinInteressiert
+            ? GestureDetector(
+                onTap: _loading ? null : () => _toggle(currentUser),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    color: Colors.white.withValues(alpha: 0.08),
+                  ),
+                  child: const Text(
+                    'Abmelden',
+                    style: TextStyle(fontSize: 11, color: Colors.white70),
+                  ),
+                ),
+              )
+            : GestureDetector(
+                onTap: _loading ? null : () => _toggle(currentUser),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    color: Colors.amber.withValues(alpha: 0.2),
+                  ),
+                  child: const Text(
+                    'Ich will hin',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.amber,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
       ),
     );
   }
 
-  Widget _pill({
+  Widget _shell({
     required Widget child,
     required Color bgColor,
     required Color borderColor,
     VoidCallback? onTap,
-    bool pulse = false,
   }) {
-    final inner = pulse
-        ? AnimatedBuilder(
-            animation: _pulseAnim,
-            builder: (_, __) => Container(
-              margin: EdgeInsets.only(top: widget.height * 0.016),
-              padding: EdgeInsets.symmetric(
-                horizontal: widget.width * 0.05,
-                vertical: widget.height * 0.014,
-              ),
-              decoration: BoxDecoration(
-                color: Colors.amber
-                    .withValues(alpha: 0.12 + 0.12 * _pulseAnim.value),
-                borderRadius: BorderRadius.circular(widget.width * 0.032),
-                border: Border.all(
-                  color: Colors.amber
-                      .withValues(alpha: 0.40 + 0.35 * _pulseAnim.value),
-                ),
-              ),
-              child: child,
-            ),
-          )
-        : Container(
-            margin: EdgeInsets.only(top: widget.height * 0.016),
-            padding: EdgeInsets.symmetric(
-              horizontal: widget.width * 0.05,
-              vertical: widget.height * 0.014,
-            ),
-            decoration: BoxDecoration(
-              color: bgColor,
-              borderRadius: BorderRadius.circular(widget.width * 0.032),
-              border: Border.all(color: borderColor),
-            ),
-            child: child,
-          );
-
     return GestureDetector(
-      onTapDown: onTap != null ? (_) => setState(() => _pressed = true) : null,
-      onTapUp: onTap != null ? (_) => setState(() => _pressed = false) : null,
-      onTapCancel: onTap != null ? () => setState(() => _pressed = false) : null,
       onTap: onTap,
-      child: AnimatedScale(
-        scale: _pressed ? 0.97 : 1.0,
-        duration: const Duration(milliseconds: 80),
-        child: inner,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: EdgeInsets.symmetric(
+          horizontal: widget.width * 0.04,
+          vertical: widget.height * 0.012,
+        ),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(widget.width * 0.03),
+          border: Border.all(color: borderColor),
+        ),
+        child: child,
       ),
     );
   }
 
-  Widget _pillRow({
-    required Icon icon,
-    required String label,
-    required Color labelColor,
-    bool labelBold = false,
-    int count = 0,
-    Widget? trailing,
+  Widget _inlineRow({
+    required List<InteressentenDaten> interessenten,
+    required String mainText,
+    Color? mainTextColor,
+    bool mainTextBold = false,
+    String? subText,
+    Color? subTextColor,
+    Widget? right,
   }) {
+    final count = interessenten.length;
     return Row(
       children: [
-        icon,
-        SizedBox(width: widget.width * 0.025),
-        Expanded(
-          child: Text(
-            label,
-            style: TextStyle(
-              color: labelColor,
-              fontSize: widget.width * 0.038,
-              fontWeight: labelBold ? FontWeight.w600 : FontWeight.normal,
+        if (count > 0)
+          SizedBox(
+            height: 26,
+            width: 58,
+            child: Stack(
+              children:
+                  interessenten.take(3).toList().asMap().entries.map((e) {
+                final index = e.key;
+                final user = e.value;
+                return Positioned(
+                  left: index * 16.0,
+                  child: CircleAvatar(
+                    radius: 13,
+                    backgroundColor: Colors.white24,
+                    backgroundImage: user.userPhotoUrl != null
+                        ? NetworkImage(user.userPhotoUrl!)
+                        : null,
+                    child: user.userPhotoUrl == null
+                        ? Text(
+                            user.userName.isNotEmpty
+                                ? user.userName[0].toUpperCase()
+                                : '?',
+                            style: const TextStyle(fontSize: 10),
+                          )
+                        : null,
+                  ),
+                );
+              }).toList(),
             ),
+          )
+        else
+          const Icon(Icons.people_outline, size: 18, color: Colors.white38),
+        SizedBox(width: widget.width * 0.035),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                mainText,
+                style: TextStyle(
+                  color: mainTextColor ?? Colors.white,
+                  fontSize: 13.5,
+                  fontWeight: mainTextBold ? FontWeight.bold : FontWeight.w600,
+                ),
+              ),
+              if (subText != null)
+                Text(
+                  subText,
+                  style: TextStyle(
+                    color: subTextColor ?? Colors.white54,
+                    fontSize: 11,
+                  ),
+                ),
+            ],
           ),
         ),
-        if (trailing != null) trailing,
-        if (count > 0 && trailing == null) ...[
-          SizedBox(width: widget.width * 0.02),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(
-              color: Colors.amber.withValues(alpha: 0.25),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              '$count',
-              style: TextStyle(
-                color: Colors.amber.shade200,
-                fontSize: widget.width * 0.035,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
+        if (right != null) right,
       ],
     );
   }
 
   void _showEinladungsSheet(
-      BuildContext context,
-      List<AnfrageDaten> einladungen,
-      FahrtService fahrtService) {
+    BuildContext context,
+    List<AnfrageDaten> einladungen,
+    FahrtService fahrtService,
+  ) {
     FahrtDaten? fahrtFuer(AnfrageDaten e) => fahrtService.alleFahrten
         .where((f) => f.id == e.fahrtId)
         .firstOrNull;
@@ -629,26 +704,24 @@ class _IchWillHinPillState extends State<_IchWillHinPill>
         builder: (_) => _EinladungsBottomSheet(
           einladung: einladung,
           fahrt: fahrtFuer(einladung),
-          onChatPressed: () => _openChatFromPill(context, einladung),
+          onChatPressed: () => _openChatFromSheet(context, einladung),
         ),
       );
     } else {
-      final pairs = einladungen
-          .map((e) => (e, fahrtFuer(e)))
-          .toList();
+      final pairs = einladungen.map((e) => (e, fahrtFuer(e))).toList();
       showModalBottomSheet(
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
         builder: (_) => _EinladungenListSheet(
           einladungen: pairs,
-          onChatPressed: (e) => _openChatFromPill(context, e),
+          onChatPressed: (e) => _openChatFromSheet(context, e),
         ),
       );
     }
   }
 
-  void _openChatFromPill(BuildContext context, AnfrageDaten einladung) {
+  void _openChatFromSheet(BuildContext context, AnfrageDaten einladung) {
     final chatService = context.read<ChatService>();
     final conversationId = chatService.buildConversationId(
       fahrtId: einladung.fahrtId,
@@ -666,7 +739,9 @@ class _IchWillHinPillState extends State<_IchWillHinPill>
       ),
     );
 
-    final fahrt = context.read<FahrtService>().alleFahrten
+    final fahrt = context
+        .read<FahrtService>()
+        .alleFahrten
         .where((f) => f.id == einladung.fahrtId)
         .firstOrNull;
 
@@ -700,33 +775,32 @@ class _IchWillHinPillState extends State<_IchWillHinPill>
     });
   }
 
-  Future<void> _toggle(
-    BuildContext context,
-    String userId,
-    String userName,
-    InteressentenService service,
-  ) async {
+  Future<void> _toggle(AppUser currentUser) async {
     final bezirk = await context.read<IAuthRepository>().getHomeTown();
     if (!context.mounted) return;
-
-    final photoUrl =
-        context.read<IAuthRepository>().currentUser?.photoUrl;
-
-    final eingetragen = await service.toggle(
-      eventId: widget.event.id,
-      userId: userId,
-      userName: userName,
-      userPhotoUrl: photoUrl,
-      bezirk: bezirk,
-    );
-
-    if (!context.mounted) return;
-    AppSnackbar.show(
-      context,
-      message: eingetragen
-          ? 'Du wurdest als Interessent eingetragen!'
-          : 'Interesse zurückgezogen.',
-    );
+    setState(() => _loading = true);
+    try {
+      final eingetragen = await context.read<InteressentenService>().toggle(
+            eventId: widget.event.id,
+            userId: currentUser.userId,
+            userName: currentUser.name,
+            userPhotoUrl: currentUser.photoUrl,
+            bezirk: bezirk,
+          );
+      if (mounted) {
+        AppSnackbar.show(
+          context,
+          message: eingetragen
+              ? 'Du wurdest als Interessent eingetragen!'
+              : 'Interesse zurückgezogen.',
+        );
+      }
+    } catch (e) {
+      debugPrint('[Toggle] FEHLER: $e');
+      if (mounted) AppSnackbar.show(context, message: 'Fehler: $e');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 }
 

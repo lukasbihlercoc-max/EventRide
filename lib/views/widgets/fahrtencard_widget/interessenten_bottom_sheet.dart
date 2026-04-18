@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:my_app/data/anfrage_daten.dart';
 import 'package:my_app/data/anfrage_service.dart';
 import 'package:my_app/data/fahrt_daten.dart';
+import 'package:my_app/data/fahrt_service.dart';
 import 'package:my_app/data/interessenten_daten.dart';
 import 'package:my_app/data/interessenten_service.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
@@ -48,10 +49,16 @@ class _InteressentenSheetState extends State<_InteressentenSheet> {
 
     final alleAnfragen = context.watch<AnfrageService>().alleAnfragen;
 
-    // Nur Leute ausblenden, die bereits eine akzeptierte Anfrage haben
+    final liveFahrt = context
+        .watch<FahrtService>()
+        .alleFahrten
+        .firstWhere((f) => f.id == widget.fahrt.id, orElse: () => widget.fahrt);
+    final istVoll = liveFahrt.freiePlaetze <= 0;
+
+    // Leute ausblenden, die bereits bei irgendeinem Fahrer dieses Events akzeptiert wurden
     final filtered = interessenten.where((i) {
       return !alleAnfragen.any((a) =>
-          a.fahrtId == widget.fahrt.id &&
+          a.eventId == widget.fahrt.eventId &&
           a.requesterId == i.userId &&
           a.status == AnfrageStatus.akzeptiert);
     }).toList();
@@ -130,7 +137,7 @@ class _InteressentenSheetState extends State<_InteressentenSheet> {
                             interessent: person,
                             istEingeladen: bereitsEingeladen,
                             isLoading: _loading.contains(person.userId),
-                            onEinladen: () => _einladen(person),
+                            onEinladen: istVoll ? null : () => _einladen(person),
                             onBereitsEingeladen: () => AppSnackbar.show(
                               context,
                               message:
@@ -208,7 +215,7 @@ class _InteressentTile extends StatelessWidget {
   final InteressentenDaten interessent;
   final bool istEingeladen;
   final bool isLoading;
-  final VoidCallback onEinladen;
+  final VoidCallback? onEinladen;
   final VoidCallback onBereitsEingeladen;
 
   @override

@@ -31,6 +31,7 @@ class InteressentenService extends ChangeNotifier {
 
   /// Toggled den "Ich will hin"-Status für den aktuellen User.
   /// Gibt [true] zurück wenn neu eingetragen, [false] wenn ausgetragen.
+  /// Verwendet den In-Memory-Cache statt eines Firestore-Reads.
   Future<bool> toggle({
     required String eventId,
     required String userId,
@@ -39,21 +40,23 @@ class InteressentenService extends ChangeNotifier {
     String? bezirk,
   }) async {
     final id = InteressentenDaten.buildId(eventId, userId);
-    final existing = await _repository.get(id);
+    final existsInCache = (_cache[eventId] ?? []).any((i) => i.id == id);
 
-    if (existing != null) {
-      await _repository.remove(id);
+    if (existsInCache) {
+      await _repository.remove(id).timeout(const Duration(seconds: 8));
       return false;
     } else {
-      await _repository.add(InteressentenDaten(
-        id: id,
-        eventId: eventId,
-        userId: userId,
-        userName: userName,
-        userPhotoUrl: userPhotoUrl,
-        timestamp: DateTime.now(),
-        bezirk: bezirk,
-      ));
+      await _repository
+          .add(InteressentenDaten(
+            id: id,
+            eventId: eventId,
+            userId: userId,
+            userName: userName,
+            userPhotoUrl: userPhotoUrl,
+            timestamp: DateTime.now(),
+            bezirk: bezirk,
+          ))
+          .timeout(const Duration(seconds: 8));
       return true;
     }
   }
@@ -70,10 +73,21 @@ class InteressentenService extends ChangeNotifier {
 
   void _ensureWatching(String eventId) {
     if (_subs.containsKey(eventId)) return;
-    _subs[eventId] = _repository.watchForEvent(eventId).listen((list) {
-      _cache[eventId] = list;
-      notifyListeners();
-    });
+    _subs[eventId] = _repository.watchForEvent(eventId).listen(
+      (list) {
+        _cache[eventId] = list;
+        notifyListeners();
+      },
+      onError: (_) {
+        // Stream hatte Fehler (z.B. PERMISSION_DENIED vor Auth-Init)
+        // → Subscription entfernen damit beim nächsten Aufruf neu gestartet wird
+        _subs.remove(eventId);
+      },
+      onDone: () {
+        // Stream geschlossen → ebenfalls neu startbar machen
+        _subs.remove(eventId);
+      },
+    );
   }
 
   @override

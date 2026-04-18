@@ -15,7 +15,8 @@ class AppBackground extends StatelessWidget {
         // um das Durchscheinen der vorherigen Seite während der Navigation zu verhindern.
         gradient: const LinearGradient(
           colors: [
-            Color.fromARGB(255, 237, 209, 175), // Opak gemacht (vorher 128)
+            Color.fromARGB(255, 183, 155, 120), // Opak gemacht (vorher 128)
+            //255, 237, 209, 175 vorher, zu hell!?
             Color.fromARGB(255, 82, 161, 239),  // Opak gemacht (vorher 201)
             Color.fromARGB(255, 64, 108, 251),
           ],
