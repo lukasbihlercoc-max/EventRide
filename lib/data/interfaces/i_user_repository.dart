@@ -8,4 +8,10 @@ abstract class IUserRepository {
 
   /// Setzt lastSeen des eigenen Nutzers auf den aktuellen Serverzeitpunkt.
   Future<void> updateLastSeen(String userId);
+
+  /// Fügt einen FCM-Token zum Nutzer-Dokument hinzu (Multi-Gerät-fähig).
+  Future<void> saveFcmToken(String userId, String token);
+
+  /// Entfernt einen FCM-Token aus dem Nutzer-Dokument (z.B. beim Logout).
+  Future<void> removeFcmToken(String userId, String token);
 }

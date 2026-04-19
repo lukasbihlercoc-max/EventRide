@@ -5,6 +5,8 @@ class ChatConversation {
   final String ownerId;
   final String requesterId;
   final DateTime lastUpdated;
+  final String? lastMessage;
+  final String? lastSenderId;
 
   ChatConversation({
     required this.id,
@@ -12,6 +14,8 @@ class ChatConversation {
     required this.ownerId,
     required this.requesterId,
     required this.lastUpdated,
+    this.lastMessage,
+    this.lastSenderId,
   });
 
   /// Serialisierung für Firestore.
@@ -41,6 +45,8 @@ class ChatConversation {
       ownerId: map['ownerId'] as String,
       requesterId: map['requesterId'] as String,
       lastUpdated: lastUpdated,
+      lastMessage: map['lastMessage'] as String?,
+      lastSenderId: map['lastSenderId'] as String?,
     );
   }
 }

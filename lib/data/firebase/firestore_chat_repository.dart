@@ -60,6 +60,7 @@ class FirestoreChatRepository implements IChatRepository {
         await convoRef.update({
           'lastMessage': message.text,
           'lastMessageAt': FieldValue.serverTimestamp(),
+          'lastSenderId': message.senderId,
         });
       }
     } on FirebaseException catch (_) {

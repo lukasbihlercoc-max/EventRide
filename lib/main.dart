@@ -2,9 +2,11 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:my_app/data/chat_service.dart';
+import 'package:my_app/data/notification_service.dart';
 import 'package:my_app/data/seen_anfragen_service.dart';
 import 'package:my_app/data/event_service.dart';
 import 'package:my_app/data/firebase/firestore_event_repository.dart';
@@ -41,6 +43,16 @@ import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
+/// Globaler NavigatorKey – wird vom NotificationService für Deep-Links verwendet.
+final navigatorKey = GlobalKey<NavigatorState>();
+
+/// Top-Level-Handler für FCM-Nachrichten wenn die App beendet ist.
+/// Muss eine Top-Level-Funktion sein (kein Lambda, kein Klassenmember).
+@pragma('vm:entry-point')
+Future<void> _bgHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -50,6 +62,7 @@ void main() async {
   FirebaseFirestore.instance.settings = const Settings(
     persistenceEnabled: true,
   );
+  FirebaseMessaging.onBackgroundMessage(_bgHandler);
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('de_DE', null);
 
@@ -81,6 +94,11 @@ void main() async {
 
   final userRepository = FirestoreUserRepository();
 
+  final notificationService = NotificationService(
+    userRepo: userRepository,
+    navigatorKey: navigatorKey,
+  );
+
   final chatService = ChatService(FirestoreChatRepository());
 
   final seenAnfragenService = SeenAnfragenService();
@@ -100,6 +118,7 @@ void main() async {
     userRepository: userRepository,
     seenAnfragenService: seenAnfragenService,
     interessentenService: interessentenService,
+    notificationService: notificationService,
   ));
 }
 
@@ -113,6 +132,7 @@ class MyApp extends StatefulWidget {
   final IUserRepository userRepository;
   final SeenAnfragenService seenAnfragenService;
   final InteressentenService interessentenService;
+  final NotificationService notificationService;
 
   const MyApp({
     super.key,
@@ -125,6 +145,7 @@ class MyApp extends StatefulWidget {
     required this.userRepository,
     required this.seenAnfragenService,
     required this.interessentenService,
+    required this.notificationService,
   });
 
   @override
@@ -141,11 +162,28 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _authSub = widget.authRepository.authStateChanges.listen((user) {
-      _currentUserId = user?.userId ?? '';
-      if (_currentUserId.isNotEmpty) {
+      final newUserId = user?.userId ?? '';
+      if (newUserId.isNotEmpty && _currentUserId.isEmpty) {
+        // Login: Heartbeat + Notifications starten
+        _currentUserId = newUserId;
         _startHeartbeat();
-      } else {
+        // userId als lokale Variable sichern – _currentUserId könnte sich
+        // durch einen Logout-Event ändern bevor then() ausgeführt wird.
+        final uid = _currentUserId;
+        widget.notificationService.init(uid).then((_) {
+          widget.notificationService.startChatMonitoring(
+            userId: uid,
+            conversationsStream: widget.chatService.conversationsStream(uid),
+          );
+        });
+      } else if (newUserId.isEmpty && _currentUserId.isNotEmpty) {
+        // Logout: Token entfernen, dann aufräumen
+        widget.notificationService.removeToken(_currentUserId);
+        widget.notificationService.stopChatMonitoring();
+        _currentUserId = '';
         _stopHeartbeat();
+      } else {
+        _currentUserId = newUserId;
       }
     });
   }
@@ -224,6 +262,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         Provider<IAuthRepository>.value(value: widget.authRepository),
         Provider<IFahrtRepository>.value(value: widget.fahrtRepository),
         Provider<IUserRepository>.value(value: widget.userRepository),
+        Provider<NotificationService>.value(value: widget.notificationService),
       ],
 
       
@@ -232,6 +271,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           final isDarkMode = context.watch<bool>();
 
           return MaterialApp(
+            navigatorKey: navigatorKey,
             debugShowCheckedModeBanner: false,
             theme: ThemeData(
               textTheme: GoogleFonts.poppinsTextTheme(

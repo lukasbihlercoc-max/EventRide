@@ -36,4 +36,20 @@ class FirestoreUserRepository implements IUserRepository {
       SetOptions(merge: true),
     );
   }
+
+  @override
+  Future<void> saveFcmToken(String userId, String token) async {
+    if (userId.isEmpty || token.isEmpty) return;
+    await _db.collection('users').doc(userId).update({
+      'fcmTokens': FieldValue.arrayUnion([token]),
+    });
+  }
+
+  @override
+  Future<void> removeFcmToken(String userId, String token) async {
+    if (userId.isEmpty || token.isEmpty) return;
+    await _db.collection('users').doc(userId).update({
+      'fcmTokens': FieldValue.arrayRemove([token]),
+    });
+  }
 }

@@ -1,4 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
     android:label="EventRide"
     android:name="${applicationName}"
@@ -9,6 +10,13 @@
     <meta-data
     android:name="com.google.android.geo.API_KEY"
     android:value="AIzaSyAw6u3iPrM-_jL0rSI1nsvbQOmJXAkhvtk"/>
+
+    <meta-data
+        android:name="com.google.firebase.messaging.default_notification_channel_id"
+        android:value="eventride_channel"/>
+    <meta-data
+        android:name="com.google.firebase.messaging.default_notification_icon"
+        android:resource="@mipmap/ic_launcher"/>
 
         <activity
             android:name=".MainActivity"
