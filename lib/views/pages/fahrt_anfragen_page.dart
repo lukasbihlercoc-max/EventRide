@@ -729,11 +729,6 @@ class _AnfrageCardState extends State<_AnfrageCard> {
                                 seatsRequested: a.seatsRequested,
                               );
 
-                              final updatedFahrt = aktuelleFahrt.copyWith(
-                                freiePlaetze: freie - _acceptedSeats,
-                              );
-                              await fahrtService.update(updatedFahrt);
-
                               await chatService.updateSystemMessage(
                                 conversationId: convo.id,
                                 eventName: widget.fahrt.eventName,

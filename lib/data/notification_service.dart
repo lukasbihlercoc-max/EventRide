@@ -17,6 +17,13 @@ class NotificationService {
   final IUserRepository _userRepo;
   final GlobalKey<NavigatorState> _navigatorKey;
 
+  /// Wird aufgerufen wenn der User auf eine Chat-Notification tippt.
+  /// Parameter: conversationId, senderId
+  Function(String convId, String senderId)? onChatTapped;
+
+  /// Wird aufgerufen wenn der User auf eine Anfrage-Notification tippt.
+  VoidCallback? onAnfrageTapped;
+
   StreamSubscription<List<ChatConversation>>? _chatSub;
   final Map<String, DateTime> _knownLastMessageAt = {};
 
@@ -123,9 +130,13 @@ class NotificationService {
 
     _chatSub = conversationsStream.listen((conversations) {
       if (isFirstEmission) {
-        // Basis-Zeitstempel merken, noch keine Notifications zeigen
+        // Baseline = jetzt, nicht conv.lastUpdated.
+        // Firestore emittiert beim Start zweimal (Cache → Server). Würden wir
+        // conv.lastUpdated als Baseline nehmen, gilt die zweite Emission als
+        // "neue" Nachricht und löst eine Duplicate-Notification aus.
+        final now = DateTime.now();
         for (final conv in conversations) {
-          _knownLastMessageAt[conv.id] = conv.lastUpdated;
+          _knownLastMessageAt[conv.id] = now;
         }
         isFirstEmission = false;
         return;
@@ -177,7 +188,7 @@ class NotificationService {
         ),
         iOS: const DarwinNotificationDetails(),
       ),
-      payload: 'type=chat&conversationId=${conv.id}',
+      payload: 'type=chat&conversationId=${conv.id}&senderId=${conv.lastSenderId ?? ""}',
     );
   }
 
@@ -208,7 +219,6 @@ class NotificationService {
   /// Navigiert anhand des `data`-Felds einer FCM-Nachricht.
   void _navigateFromData(Map<String, dynamic> data) {
     if (_navigatorKey.currentState == null) {
-      // navigatorKey noch nicht bereit → nochmals verzögern
       Future.delayed(const Duration(milliseconds: 300), () {
         _navigateFromData(data);
       });
@@ -217,9 +227,12 @@ class NotificationService {
     final type = data['type'] as String?;
     if (type == 'chat') {
       final convId = data['conversationId'] as String?;
-      _navigatorKey.currentState?.pushNamed('/chat', arguments: convId);
+      final senderId = data['senderId'] as String?;
+      if (convId != null && senderId != null && senderId.isNotEmpty) {
+        onChatTapped?.call(convId, senderId);
+      }
     } else if (type == 'anfrage') {
-      _navigatorKey.currentState?.pushNamed('/anfragen');
+      onAnfrageTapped?.call();
     }
   }
 

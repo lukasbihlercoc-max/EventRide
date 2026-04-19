@@ -64,16 +64,57 @@ export const onAnfrageUpdated = onDocumentUpdated(
     const before = change.before.data();
     const after = change.after.data();
 
-    if (before["status"] === after["status"]) return;
+    const statusBefore = before["status"] as number;
+    const statusAfter = after["status"] as number;
 
-    const statusMap: Record<number, string> = {1: "akzeptiert", 2: "abgelehnt"};
-    const statusText = statusMap[after["status"] as number];
+    if (statusBefore === statusAfter) return;
+
+    // ── freiePlaetze atomisch anpassen ──────────────────────────────────────
+    const fahrtId = after["fahrtId"] as string | undefined;
+    if (fahrtId) {
+      if (statusAfter === 1) {
+        // akzeptiert: Platz(e) belegen
+        const seats = (after["seatsAccepted"] as number | undefined) ?? 1;
+        await db.doc(`fahrten/${fahrtId}`).update({
+          freiePlaetze: admin.firestore.FieldValue.increment(-seats),
+        });
+      } else if (statusBefore === 1 && (statusAfter === 2 || statusAfter === 3)) {
+        // war akzeptiert, jetzt abgelehnt/storniert: Platz(e) freigeben
+        const seats = (before["seatsAccepted"] as number | undefined) ?? 1;
+        await db.doc(`fahrten/${fahrtId}`).update({
+          freiePlaetze: admin.firestore.FieldValue.increment(seats),
+        });
+      }
+    }
+
+    // ── Notification senden ─────────────────────────────────────────────────
+    const statusMap: Record<number, string> = {
+      1: "akzeptiert",
+      2: "abgelehnt",
+      3: "storniert",
+    };
+    const statusText = statusMap[statusAfter];
     if (!statusText) return;
 
-    const tokens = await getTokens(after["requesterId"] as string);
-    await sendNotification(tokens, after["requesterId"] as string, {
-      title: `Anfrage ${statusText}`,
-      body: `${after["fahrerName"] as string} hat deine Anfrage ${statusText}`,
+    const vonFahrer = after["vonFahrer"] === true;
+    const targetUserId = vonFahrer
+      ? (after["fahrtOwnerId"] as string | undefined)
+      : (after["requesterId"] as string | undefined);
+    if (!targetUserId) return;
+
+    const title = vonFahrer
+      ? `Einladung ${statusText}`
+      : `Anfrage ${statusText}`;
+    const body = vonFahrer
+      ? `${after["requesterName"] ?? "Ein Nutzer"} hat deine Einladung ${statusText}`
+      : `${after["fahrerName"] ?? "Der Fahrer"} hat deine Anfrage ${statusText}`;
+
+    const tokens = await getTokens(targetUserId);
+    if (!tokens.length) return;
+
+    await sendNotification(tokens, targetUserId, {
+      title,
+      body,
       data: {type: "anfrage", anfrageId: event.params["anfrageId"]},
     });
   }
@@ -118,7 +159,11 @@ export const onMessageCreated = onDocumentCreated(
     await sendNotification(tokens, targetUserId, {
       title: "Neue Nachricht",
       body: preview,
-      data: {type: "chat", conversationId: event.params["convId"]},
+      data: {
+        type: "chat",
+        conversationId: event.params["convId"],
+        senderId: msg["senderId"] as string,
+      },
     });
   }
 );

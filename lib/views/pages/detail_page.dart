@@ -859,10 +859,6 @@ class _EinladungsBottomSheetState extends State<_EinladungsBottomSheet> {
       return;
     }
 
-    await fahrtService.update(
-      aktuelleFahrt.copyWith(freiePlaetze: aktuelleFahrt.freiePlaetze - 1),
-    );
-
     if (currentUser != null) {
       await interessentenService.removeForUser(
           widget.einladung.eventId, currentUser.userId);
@@ -1205,10 +1201,6 @@ class _EinladungCardState extends State<_EinladungCard> {
       setState(() => _loading = false);
       return;
     }
-
-    await fahrtService.update(
-      aktuelleFahrt.copyWith(freiePlaetze: aktuelleFahrt.freiePlaetze - 1),
-    );
 
     if (currentUser != null) {
       await interessentenService.removeForUser(

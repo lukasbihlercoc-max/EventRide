@@ -28,6 +28,7 @@ import 'package:my_app/data/interfaces/i_user_repository.dart';
 import 'package:my_app/data/firebase/firebase_auth_repository.dart';
 
 import 'package:my_app/views/auth/auth_gate.dart';
+import 'package:my_app/views/pages/chat_page.dart';
 import 'package:my_app/data/firebase/firestore_anfrage_repository.dart';
 import 'package:my_app/data/firebase/firestore_interessenten_repository.dart';
 
@@ -98,6 +99,26 @@ void main() async {
     userRepo: userRepository,
     navigatorKey: navigatorKey,
   );
+
+  notificationService.onChatTapped = (convId, senderId) async {
+    final doc =
+        await FirebaseFirestore.instance.doc('users/$senderId').get();
+    final d = doc.data();
+    final name = [d?['firstName'], d?['lastName']]
+        .whereType<String>()
+        .where((s) => s.isNotEmpty)
+        .join(' ');
+
+    final ctx = navigatorKey.currentContext;
+    if (ctx == null || !ctx.mounted) return;
+    Navigator.of(ctx).push(MaterialPageRoute(
+      builder: (_) => ChatPage(
+        conversationId: convId,
+        otherUserId: senderId,
+        otherUserName: name.isEmpty ? 'Nutzer' : name,
+      ),
+    ));
+  };
 
   final chatService = ChatService(FirestoreChatRepository());
 
@@ -206,7 +227,16 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      if (_currentUserId.isNotEmpty) _startHeartbeat();
+      if (_currentUserId.isNotEmpty) {
+        _startHeartbeat();
+        // Monitoring neu starten: setzt isFirstEmission zurück und verhindert
+        // doppelte Notifications durch Firestore-Stream-Reconnect nach Resume.
+        widget.notificationService.startChatMonitoring(
+          userId: _currentUserId,
+          conversationsStream:
+              widget.chatService.conversationsStream(_currentUserId),
+        );
+      }
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.detached) {

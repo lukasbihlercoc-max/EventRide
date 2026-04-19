@@ -2018,8 +2018,8 @@ class _RequestedRideCardState extends State<_RequestedRideCard> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(22),
                     border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.8),
-                      width: 0.7,
+                      color: Colors.white.withValues(alpha: 0.4),
+                      width: 0.5,
                     ),
                   ),
                 ),
@@ -2095,12 +2095,6 @@ class _EinladungButtonsState extends State<_EinladungButtons> {
       if (mounted) setState(() => _loading = false);
       return;
     }
-
-    // Platz in Fahrt belegen
-    await fahrtService.update(
-      aktuelleFahrt.copyWith(
-          freiePlaetze: aktuelleFahrt.freiePlaetze - 1),
-    );
 
     // Aus Interessenten entfernen
     if (currentUser != null) {
