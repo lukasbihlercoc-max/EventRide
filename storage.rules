@@ -9,7 +9,7 @@ service firebase.storage {
     // Schreiben: Nur der eigene Account
     // ----------------------------------------------------------------
     match /users/{userId}/{allPaths=**} {
-      allow read:  if request.auth != null;
+      allow read:  if true;
       allow write: if request.auth != null
                    && request.auth.uid == userId;
     }

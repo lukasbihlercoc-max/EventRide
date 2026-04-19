@@ -1,4 +1,5 @@
 // detail_page.dart
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'dart:ui'; // Für ImageFilter.blur
@@ -796,7 +797,7 @@ class _InteressentenInlineState extends State<_InteressentenInline>
         );
       }
     } catch (e) {
-      debugPrint('[Toggle] FEHLER: $e');
+      if (kDebugMode) debugPrint('[Toggle] FEHLER: $e');
       if (mounted) AppSnackbar.show(context, message: 'Fehler: $e');
     } finally {
       if (mounted) setState(() => _loading = false);
