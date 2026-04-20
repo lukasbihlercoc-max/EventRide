@@ -69,6 +69,9 @@ export const onAnfrageUpdated = onDocumentUpdated(
 
     if (statusBefore === statusAfter) return;
 
+    // Status 4 = fahrtGeloescht: Fahrt wird gelöscht, onFahrtDeleted übernimmt
+    if (statusAfter === 4) return;
+
     // ── freiePlaetze atomisch anpassen ──────────────────────────────────────
     const fahrtId = after["fahrtId"] as string | undefined;
     if (fahrtId) {
@@ -174,7 +177,7 @@ export const onFahrtDeleted = onDocumentDeleted(
     const fahrtId = event.params["fahrtId"];
     const eventName = (fahrt["eventName"] as string | undefined) ?? "das Event";
     const zielOrt = (fahrt["standort"] as string | undefined) ?? "?";
-    const fahrerName = (fahrt["fahrerName"] as string | undefined) ?? "Der Fahrer";
+    const fahrerName = (fahrt["ownerName"] as string | undefined) ?? "Der Fahrer";
 
     // Alle akzeptierten Anfragen für diese Fahrt laden (status = 1)
     const snapshot = await db

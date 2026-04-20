@@ -187,7 +187,7 @@ class AnfrageService with ChangeNotifier {
       final relevant = _alleAnfragen.where((a) => a.fahrtId == fahrtId).toList();
 
       for (final a in relevant) {
-        final updated = a.copyWith(status: AnfrageStatus.abgelehnt);
+        final updated = a.copyWith(status: AnfrageStatus.fahrtGeloescht);
         await _repository.update(updated);
         final index = _alleAnfragen.indexWhere((x) => x.id == a.id);
         if (index != -1) _alleAnfragen[index] = updated;

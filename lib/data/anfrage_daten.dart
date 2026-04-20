@@ -5,6 +5,7 @@ enum AnfrageStatus {
   akzeptiert,
   abgelehnt,
   storniert,
+  fahrtGeloescht,
 }
 
 class AnfrageDaten {
