@@ -2304,8 +2304,9 @@ class _MitfahrerAktionenState extends State<_MitfahrerAktionen> {
           ),
         );
 
-      // ── STORNIERT: andere Fahrt finden ───────────────────────
+      // ── STORNIERT / FAHRT GELÖSCHT: andere Fahrt finden ─────
       case AnfrageStatus.storniert:
+      case AnfrageStatus.fahrtGeloescht:
         return TextButton.icon(
           onPressed: () => Navigator.of(context).push(
             MaterialPageRoute(
@@ -2597,6 +2598,10 @@ class _StatusBadge extends StatelessWidget {
         color = _InaktivStyles.storniertColor;
         textFarbe = _InaktivStyles.storniertTextFarbe;
         text = 'Zurückgezogen';
+      case AnfrageStatus.fahrtGeloescht:
+        color = Colors.deepOrange.withValues(alpha: 0.2);
+        textFarbe = Colors.deepOrange;
+        text = 'Fahrt abgesagt';
     }
 
     return Container(

@@ -864,6 +864,8 @@ Widget buildStatusChip(AnfrageStatus status) {
       return _chip("Abgelehnt", Colors.red);
     case AnfrageStatus.storniert:
       return _chip("Storniert", Colors.blueGrey);
+    case AnfrageStatus.fahrtGeloescht:
+      return _chip("Fahrt abgesagt", Colors.deepOrange);
   }
 }
 
