@@ -186,7 +186,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _authSub = widget.authRepository.authStateChanges.listen((user) {
+    _authSub = widget.authRepository.authStateChanges.listen((user) async {
       final newUserId = user?.userId ?? '';
       if (newUserId.isNotEmpty && _currentUserId.isEmpty) {
         // Login: Heartbeat + Notifications starten
@@ -195,18 +195,20 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         // userId als lokale Variable sichern – _currentUserId könnte sich
         // durch einen Logout-Event ändern bevor then() ausgeführt wird.
         final uid = _currentUserId;
-        widget.notificationService.init(uid).then((_) {
-          widget.notificationService.startChatMonitoring(
-            userId: uid,
-            conversationsStream: widget.chatService.conversationsStream(uid),
-          );
-        });
+        await widget.notificationService.init(uid);
+        widget.notificationService.startChatMonitoring(
+          userId: uid,
+          conversationsStream: widget.chatService.conversationsStream(uid),
+        );
       } else if (newUserId.isEmpty && _currentUserId.isNotEmpty) {
-        // Logout: Token entfernen, dann aufräumen
-        widget.notificationService.removeToken(_currentUserId);
-        widget.notificationService.stopChatMonitoring();
+        // Logout: erst Token entfernen (await!), dann aufräumen.
+        // Ohne await bleibt das Token im alten User-Dokument wenn dasselbe
+        // Gerät danach mit einem anderen Account einloggt.
+        final uid = _currentUserId;
         _currentUserId = '';
         _stopHeartbeat();
+        widget.notificationService.stopChatMonitoring();
+        await widget.notificationService.removeToken(uid);
       } else {
         _currentUserId = newUserId;
       }
