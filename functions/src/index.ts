@@ -1,5 +1,5 @@
 import * as admin from "firebase-admin";
-import {onDocumentCreated, onDocumentUpdated} from "firebase-functions/v2/firestore";
+import {onDocumentCreated, onDocumentUpdated, onDocumentDeleted} from "firebase-functions/v2/firestore";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -162,7 +162,48 @@ export const onAnfrageCreated = onDocumentCreated(
 );
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Trigger 3: Neue Chat-Nachricht → anderen Teilnehmer benachrichtigen
+// Trigger 3: Fahrt gelöscht → akzeptierte Mitfahrer benachrichtigen
+// ──────────────────────────────────────────────────────────────────────────────
+
+export const onFahrtDeleted = onDocumentDeleted(
+  "fahrten/{fahrtId}",
+  async (event) => {
+    const fahrt = event.data?.data();
+    if (!fahrt) return;
+
+    const fahrtId = event.params["fahrtId"];
+    const eventName = (fahrt["eventName"] as string | undefined) ?? "das Event";
+    const zielOrt = (fahrt["standort"] as string | undefined) ?? "?";
+    const fahrerName = (fahrt["fahrerName"] as string | undefined) ?? "Der Fahrer";
+
+    // Alle akzeptierten Anfragen für diese Fahrt laden (status = 1)
+    const snapshot = await db
+      .collection("anfragen")
+      .where("fahrtId", "==", fahrtId)
+      .where("status", "==", 1)
+      .get();
+
+    if (snapshot.empty) return;
+
+    const sends = snapshot.docs.map(async (doc) => {
+      const anfrage = doc.data();
+      const targetUserId = anfrage["requesterId"] as string | undefined;
+      if (!targetUserId) return;
+
+      const tokens = await getTokens(targetUserId);
+      await sendNotification(tokens, targetUserId, {
+        title: "Fahrt abgesagt",
+        body: `${fahrerName} hat die Fahrt nach ${zielOrt} (${eventName}) abgesagt`,
+        data: {type: "fahrt_geloescht", fahrtId},
+      });
+    });
+
+    await Promise.all(sends);
+  }
+);
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Trigger 4: Neue Chat-Nachricht → anderen Teilnehmer benachrichtigen
 // ──────────────────────────────────────────────────────────────────────────────
 
 export const onMessageCreated = onDocumentCreated(

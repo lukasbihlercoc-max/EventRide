@@ -231,7 +231,7 @@ class NotificationService {
       if (convId != null && senderId != null && senderId.isNotEmpty) {
         onChatTapped?.call(convId, senderId);
       }
-    } else if (type == 'anfrage') {
+    } else if (type == 'anfrage' || type == 'fahrt_geloescht') {
       onAnfrageTapped?.call();
     }
   }
