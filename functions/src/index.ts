@@ -121,7 +121,48 @@ export const onAnfrageUpdated = onDocumentUpdated(
 );
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Trigger 2: Neue Chat-Nachricht → anderen Teilnehmer benachrichtigen
+// Trigger 2: Neue Anfrage erstellt → Fahrer benachrichtigen
+//            Neue Einladung erstellt → Interessent benachrichtigen
+// ──────────────────────────────────────────────────────────────────────────────
+
+export const onAnfrageCreated = onDocumentCreated(
+  "anfragen/{anfrageId}",
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+
+    const data = snap.data();
+    const vonFahrer = data["vonFahrer"] === true;
+
+    let targetUserId: string | undefined;
+    let title: string;
+    let body: string;
+
+    if (vonFahrer) {
+      // Fahrer lädt Interessenten ein → Interessent benachrichtigen
+      targetUserId = data["requesterId"] as string | undefined;
+      title = "Neue Einladung";
+      body = `${data["fahrerName"] ?? "Ein Fahrer"} lädt dich zur Fahrt nach ${data["zielOrt"] ?? "?"} ein`;
+    } else {
+      // Mitfahrer fragt an → Fahrer benachrichtigen
+      targetUserId = data["fahrtOwnerId"] as string | undefined;
+      title = "Neue Anfrage";
+      body = `${data["requesterName"] ?? "Jemand"} möchte mitfahren nach ${data["zielOrt"] ?? "?"}`;
+    }
+
+    if (!targetUserId) return;
+
+    const tokens = await getTokens(targetUserId);
+    await sendNotification(tokens, targetUserId, {
+      title,
+      body,
+      data: {type: "anfrage", anfrageId: event.params["anfrageId"]},
+    });
+  }
+);
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Trigger 3: Neue Chat-Nachricht → anderen Teilnehmer benachrichtigen
 // ──────────────────────────────────────────────────────────────────────────────
 
 export const onMessageCreated = onDocumentCreated(

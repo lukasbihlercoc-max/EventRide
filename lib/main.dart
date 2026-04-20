@@ -100,6 +100,10 @@ void main() async {
     navigatorKey: navigatorKey,
   );
 
+  notificationService.onAnfrageTapped = () {
+    selectedPageNotifier.value = 1; // Fahrten-Tab
+  };
+
   notificationService.onChatTapped = (convId, senderId) async {
     final doc =
         await FirebaseFirestore.instance.doc('users/$senderId').get();
