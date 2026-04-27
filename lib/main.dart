@@ -28,6 +28,7 @@ import 'package:my_app/data/interfaces/i_user_repository.dart';
 import 'package:my_app/data/firebase/firebase_auth_repository.dart';
 
 import 'package:my_app/views/auth/auth_gate.dart';
+import 'package:my_app/views/pages/admin_license_page.dart';
 import 'package:my_app/views/pages/chat_page.dart';
 import 'package:my_app/data/firebase/firestore_anfrage_repository.dart';
 import 'package:my_app/data/firebase/firestore_interessenten_repository.dart';
@@ -102,6 +103,14 @@ void main() async {
 
   notificationService.onAnfrageTapped = () {
     selectedPageNotifier.value = 1; // Fahrten-Tab
+  };
+
+  notificationService.onLicenseReviewTapped = () {
+    final ctx = navigatorKey.currentContext;
+    if (ctx == null || !ctx.mounted) return;
+    Navigator.of(ctx).push(MaterialPageRoute(
+      builder: (_) => const AdminLicensePage(),
+    ));
   };
 
   notificationService.onChatTapped = (convId, senderId) async {

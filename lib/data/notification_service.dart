@@ -24,6 +24,9 @@ class NotificationService {
   /// Wird aufgerufen wenn der User auf eine Anfrage-Notification tippt.
   VoidCallback? onAnfrageTapped;
 
+  /// Wird aufgerufen wenn der Admin auf eine Führerschein-Notification tippt.
+  VoidCallback? onLicenseReviewTapped;
+
   StreamSubscription<List<ChatConversation>>? _chatSub;
   final Map<String, DateTime> _knownLastMessageAt = {};
 
@@ -233,6 +236,8 @@ class NotificationService {
       }
     } else if (type == 'anfrage' || type == 'fahrt_geloescht') {
       onAnfrageTapped?.call();
+    } else if (type == 'license_review') {
+      onLicenseReviewTapped?.call();
     }
   }
 
