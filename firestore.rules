@@ -31,8 +31,12 @@ service cloud.firestore {
       allow read:   if isSignedIn();
       allow create: if isOwner(uid)
                     && request.resource.data.keys().hasAll(['firstName', 'lastName', 'email']);
-      allow update: if isOwner(uid)
-                    && request.resource.data.email == resource.data.email;
+      allow update: if (isOwner(uid)
+                        && request.resource.data.email == resource.data.email
+                        && request.resource.data.get('isAdmin', false) == resource.data.get('isAdmin', false))
+                    || (isAdmin()
+                        && request.resource.data.get('email', '') == resource.data.get('email', '')
+                        && request.resource.data.get('isAdmin', false) == resource.data.get('isAdmin', false));
       allow delete: if isOwner(uid);
     }
 
@@ -123,6 +127,26 @@ service cloud.firestore {
     match /events/{eventId} {
       allow read:  if true;
       allow write: if isAdmin();
+    }
+
+    // ----------------------------------------------------------------
+    // licenseRequests/{uid}
+    //
+    // Erstellen: Nur der eigene Nutzer (status muss 'pending' sein)
+    // Updaten:   Eigener Nutzer (nur als 'pending', uid unveränderlich)
+    //            ODER Admin (für approve/reject)
+    // Lesen:     Nur Eigentümer + Admin
+    // Löschen:   Nie
+    // ----------------------------------------------------------------
+    match /licenseRequests/{uid} {
+      allow create: if isSignedIn() && isOwner(uid)
+                    && request.resource.data.status == 'pending';
+      allow update: if (isSignedIn() && isOwner(uid)
+                        && request.resource.data.status == 'pending'
+                        && request.resource.data.uid == request.auth.uid)
+                    || isAdmin();
+      allow read:   if isSignedIn() && (isOwner(uid) || isAdmin());
+      allow delete: if false;
     }
 
     match /chat_conversations/{conversationId} {
