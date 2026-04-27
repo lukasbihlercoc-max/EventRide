@@ -1,5 +1,5 @@
 import * as admin from "firebase-admin";
-import {onDocumentCreated, onDocumentUpdated, onDocumentDeleted} from "firebase-functions/v2/firestore";
+import {onDocumentCreated, onDocumentUpdated, onDocumentDeleted, onDocumentWritten} from "firebase-functions/v2/firestore";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -206,7 +206,47 @@ export const onFahrtDeleted = onDocumentDeleted(
 );
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Trigger 4: Neue Chat-Nachricht → anderen Teilnehmer benachrichtigen
+// Trigger 4: Führerschein hochgeladen → alle Admins benachrichtigen
+// ──────────────────────────────────────────────────────────────────────────────
+
+export const onLicenseRequestWritten = onDocumentWritten(
+  "licenseRequests/{uid}",
+  async (event) => {
+    const after = event.data?.after?.data();
+    const before = event.data?.before?.data();
+
+    // Nur feuern wenn Status auf 'pending' gesetzt wird
+    if (!after || after["status"] !== "pending") return;
+
+    // Re-Submissions erkennen: submittedAt muss sich geändert haben
+    const submittedBefore = before?.["submittedAt"];
+    const submittedAfter = after["submittedAt"];
+    if (submittedBefore && submittedAfter &&
+        submittedBefore.isEqual(submittedAfter)) return;
+
+    const userName = (after["userName"] as string | undefined) ?? "Ein Nutzer";
+
+    const adminsSnap = await db
+      .collection("users")
+      .where("isAdmin", "==", true)
+      .get();
+
+    await Promise.all(
+      adminsSnap.docs.map(async (adminDoc) => {
+        const tokens = (adminDoc.data()["fcmTokens"] as string[]) ?? [];
+        if (!tokens.length) return;
+        await sendNotification(tokens, adminDoc.id, {
+          title: "Neue Führerschein-Prüfung",
+          body: `${userName} hat einen Führerschein hochgeladen`,
+          data: {type: "license_review", uid: event.params["uid"]},
+        });
+      })
+    );
+  }
+);
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Trigger 5: Neue Chat-Nachricht → anderen Teilnehmer benachrichtigen
 // ──────────────────────────────────────────────────────────────────────────────
 
 export const onMessageCreated = onDocumentCreated(
