@@ -2,13 +2,20 @@
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_places_flutter/google_places_flutter.dart';
+import 'package:google_places_flutter/model/place_type.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:my_app/config/feature_flags.dart';
 import 'package:my_app/data/app_user.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/views/pages/login_page.dart';
 import 'package:my_app/views/pages/register_page.dart';
 import 'package:my_app/views/widgets/app_card.dart';
+import 'package:my_app/views/widgets/app_snackbar.dart';
+import 'package:my_app/data/license_request.dart';
+import 'package:my_app/views/pages/admin_license_page.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/widgets/trust_shields_widget.dart';
 import 'package:provider/provider.dart';
@@ -211,6 +218,34 @@ class _LoggedInView extends StatefulWidget {
 class _LoggedInViewState extends State<_LoggedInView> {
   bool _uploading = false;
 
+  // ── Hilfsmethoden ──────────────────────────────────────────────────────────
+
+  int _trustLevel(AppUser user) {
+    if (user.emailVerified &&
+        user.phoneVerified &&
+        user.licenseStatus == 'verified') {
+      return 3;
+    }
+    if (user.emailVerified && user.phoneVerified) return 2;
+    if (user.emailVerified) return 1;
+    return 0;
+  }
+
+  VerifState _licenseState(String status) {
+    switch (status) {
+      case 'verified':
+        return VerifState.done;
+      case 'pending':
+        return VerifState.pending;
+      case 'rejected':
+        return VerifState.rejected;
+      default:
+        return VerifState.open;
+    }
+  }
+
+  // ── Sheets ─────────────────────────────────────────────────────────────────
+
   void _showVerifInfo() {
     showModalBottomSheet(
       context: context,
@@ -315,6 +350,68 @@ class _LoggedInViewState extends State<_LoggedInView> {
     );
   }
 
+  void _showEmailSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1A1F2E),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => _EmailVerifSheet(email: widget.user.email),
+    );
+  }
+
+  void _showPhoneSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1A1F2E),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => const _PhoneVerifSheet(),
+    );
+  }
+
+  void _showLicenseSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1A1F2E),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => const _LicenseSheet(),
+    );
+  }
+
+  void _showHomeTownSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1A1F2E),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => _HomeTownSheet(current: widget.user.homeTown ?? ''),
+    );
+  }
+
+  void _showCarSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1A1F2E),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => _CarInfoSheet(current: widget.user.car),
+    );
+  }
+
+  // ── Foto-Upload ────────────────────────────────────────────────────────────
+
   Future<void> _pickAndUpload(ImageSource source) async {
     final picked = await ImagePicker().pickImage(
       source: source,
@@ -358,6 +455,8 @@ class _LoggedInViewState extends State<_LoggedInView> {
     }
   }
 
+  // ── Build ──────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     final user = widget.user;
@@ -366,27 +465,21 @@ class _LoggedInViewState extends State<_LoggedInView> {
       child: SingleChildScrollView(
         child: Column(
           children: [
-            // ── Hero ───────────────────────────────────────────────────
             _HeroSection(
               user: user,
               uploading: _uploading,
               onPickPhoto: _showSourceSheet,
+              trustLevel: _trustLevel(user),
             ),
 
             const SizedBox(height: 24),
 
-            // ── Separator ──────────────────────────────────────────────
-            //const _Separator(),
-
-            //const SizedBox(height: 24),
-
-            // ── Verifikation ────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Header: Verifikation + Info-Icon
+                  // ── Verifikation ──────────────────────────────────────
                   Row(
                     children: [
                       const Text(
@@ -416,8 +509,12 @@ class _LoggedInViewState extends State<_LoggedInView> {
                         child: _VerifCard(
                           icon: Icons.email_outlined,
                           label: "E-Mail",
-                          done: true,
+                          state: user.emailVerified
+                              ? VerifState.done
+                              : VerifState.open,
+                          cta: "Verifizieren",
                           doneLabel: "Verifiziert",
+                          onTap: user.emailVerified ? null : _showEmailSheet,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -425,9 +522,12 @@ class _LoggedInViewState extends State<_LoggedInView> {
                         child: _VerifCard(
                           icon: Icons.phone_outlined,
                           label: "Telefon",
+                          state: user.phoneVerified
+                              ? VerifState.done
+                              : VerifState.open,
                           cta: "Verifizieren",
-                          done: false,
                           doneLabel: "Verifiziert",
+                          onTap: user.phoneVerified ? null : _showPhoneSheet,
                         ),
                       ),
                     ],
@@ -436,14 +536,117 @@ class _LoggedInViewState extends State<_LoggedInView> {
                   _VerifCard(
                     icon: Icons.credit_card_outlined,
                     label: "Führerschein",
-                    cta: "Hochladen",
-                    done: false,
+                    state: _licenseState(user.licenseStatus),
+                    cta: user.licenseStatus == 'rejected'
+                        ? "Erneut hochladen"
+                        : "Hochladen",
                     doneLabel: "Verifiziert",
+                    onTap: (user.licenseStatus == 'verified' ||
+                          user.licenseStatus == 'pending')
+                        ? null
+                        : _showLicenseSheet,
                   ),
+                  if (user.licenseStatus == 'rejected' &&
+                      user.licenseRejectReason != null) ...[
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF3D0A0A),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: const Color(0xFFE63946).withValues(alpha: 0.45),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline_rounded,
+                              size: 14, color: Color(0xFFFF6B72)),
+                          const SizedBox(width: 7),
+                          Expanded(
+                            child: Text(
+                              'Abgelehnt: ${user.licenseRejectReason}',
+                              style: const TextStyle(
+                                  color: Color(0xFFFF6B72), fontSize: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  // ── Admin: offene Führerschein-Prüfungen ──────────────
+                  if (context.read<IAuthRepository>().isAdmin) ...[
+                    const SizedBox(height: 10),
+                    StreamBuilder<List<LicenseRequest>>(
+                      stream: context
+                          .read<IAuthRepository>()
+                          .pendingLicenseRequests,
+                      builder: (context, snap) {
+                        final count = snap.data?.length ?? 0;
+                        return GestureDetector(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const AdminLicensePage()),
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.04),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color(0xFFE07B00)
+                                    .withValues(alpha: 0.35),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                    Icons.admin_panel_settings_outlined,
+                                    color: Color(0xFFE07B00),
+                                    size: 18),
+                                const SizedBox(width: 10),
+                                const Expanded(
+                                  child: Text(
+                                    'Führerschein-Prüfungen',
+                                    style: TextStyle(
+                                        color: Colors.white70, fontSize: 13),
+                                  ),
+                                ),
+                                if (count > 0)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 7, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFE07B00),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      '$count',
+                                      style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600),
+                                    ),
+                                  )
+                                else
+                                  const Icon(Icons.chevron_right_rounded,
+                                      color: Colors.white38, size: 18),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
 
                   const SizedBox(height: 28),
 
-                  // Header: Profil vervollständigen
+                  // ── Profil vervollständigen ────────────────────────────
                   const Text(
                     "Profil vervollständigen",
                     style: TextStyle(
@@ -461,8 +664,9 @@ class _LoggedInViewState extends State<_LoggedInView> {
                           icon: Icons.photo_camera_outlined,
                           label: "Profilbild",
                           cta: "Hochladen",
-                          done: user.photoUrl != null &&
-                              user.photoUrl!.isNotEmpty,
+                          state: (user.photoUrl?.isNotEmpty == true)
+                              ? VerifState.done
+                              : VerifState.open,
                           doneLabel: "Erledigt",
                           onTap: _uploading ? null : _showSourceSheet,
                         ),
@@ -473,8 +677,11 @@ class _LoggedInViewState extends State<_LoggedInView> {
                           icon: Icons.location_on_outlined,
                           label: "Gemeinde",
                           cta: "Hinzufügen",
-                          done: false,
+                          state: (user.homeTown?.isNotEmpty == true)
+                              ? VerifState.done
+                              : VerifState.open,
                           doneLabel: "Erledigt",
+                          onTap: _showHomeTownSheet,
                         ),
                       ),
                     ],
@@ -483,14 +690,15 @@ class _LoggedInViewState extends State<_LoggedInView> {
                   _VerifCard(
                     icon: Icons.directions_car_outlined,
                     label: "Auto-Infos",
-                    cta: "Hinzufügen",
-                    done: false,
+                    cta: user.car != null ? "Bearbeiten" : "Hinzufügen",
+                    state: user.car != null ? VerifState.done : VerifState.open,
                     doneLabel: "Erledigt",
+                    onTap: _showCarSheet,
                   ),
 
                   const SizedBox(height: 24),
 
-                  // ── Bewertungen ───────────────────────────────────
+                  // ── Bewertungen ────────────────────────────────────────
                   const Text(
                     "Bewertungen",
                     style: TextStyle(
@@ -509,44 +717,40 @@ class _LoggedInViewState extends State<_LoggedInView> {
                         horizontal: 16,
                       ),
                       child: Column(
-                          children: [
-                            Container(
-                              width: 42,
-                              height: 42,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(
-                                Icons.star_border_rounded,
-                                color: Colors.white54,
-                              ),
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(12),
                             ),
-
-                            const SizedBox(height: 12),
-
-                            const Text(
-                              "Noch keine Bewertungen",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
+                            child: const Icon(
+                              Icons.star_border_rounded,
+                              color: Colors.white54,
                             ),
-
-                            const SizedBox(height: 4),
-
-                            const Text(
-                              "Nach deiner ersten Fahrt sichtbar",
-                              style: TextStyle(
-                                color: Colors.white38,
-                                fontSize: 12,
-                              ),
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            "Noch keine Bewertungen",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
                             ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            "Nach deiner ersten Fahrt sichtbar",
+                            style: TextStyle(
+                              color: Colors.white38,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+                  ),
 
                   const SizedBox(height: 150),
                 ],
@@ -567,11 +771,13 @@ class _HeroSection extends StatelessWidget {
   final AppUser user;
   final bool uploading;
   final VoidCallback onPickPhoto;
+  final int trustLevel;
 
   const _HeroSection({
     required this.user,
     required this.uploading,
     required this.onPickPhoto,
+    required this.trustLevel,
   });
 
   @override
@@ -583,13 +789,11 @@ class _HeroSection extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(24, 32, 24, 0),
       child: Column(
         children: [
-          // Avatar mit Progress-Arc + Tap
           GestureDetector(
             onTap: uploading ? null : onPickPhoto,
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // Arc-Ring
                 SizedBox(
                   width: 122,
                   height: 122,
@@ -599,69 +803,41 @@ class _HeroSection extends StatelessWidget {
                     ),
                   ),
                 ),
-                // Avatar
                 Container(
                   width: 100,
                   height: 100,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: hasPhoto
-                        ? null
-                        : const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [Color(0xFF3B6FE0), Color(0xFF6B4FA0)],
-                          ),
-                    boxShadow: [
-                      BoxShadow(
-                        color:
-                            const Color(0xFF4A80F0).withValues(alpha: 0.3),
-                        blurRadius: 20,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: ClipOval(
-                    child: uploading
-                        ? const Center(
-                            child: SizedBox(
-                              width: 32,
-                              height: 32,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: Colors.white,
-                              ),
-                            ),
+                    color: const Color(0xFF2A3044),
+                    image: hasPhoto
+                        ? DecorationImage(
+                            image: NetworkImage(user.photoUrl!),
+                            fit: BoxFit.cover,
                           )
-                        : hasPhoto
-                            ? Image.network(
-                                user.photoUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Center(
-                                  child: Text(
-                                    initials,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 34,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                              )
-                            : Center(
-                                child: Text(
-                                  initials,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 34,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: -0.5,
-                                  ),
-                                ),
-                              ),
+                        : null,
                   ),
+                  child: !hasPhoto
+                      ? Center(
+                          child: Text(
+                            initials,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 32,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        )
+                      : null,
                 ),
-                // Kamera-Icon über dem Avatar
+                if (uploading)
+                  const SizedBox(
+                    width: 100,
+                    height: 100,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3,
+                      color: Colors.white,
+                    ),
+                  ),
                 Positioned(
                   bottom: 8,
                   right: 8,
@@ -673,28 +849,15 @@ class _HeroSection extends StatelessWidget {
                       shape: BoxShape.circle,
                       border: Border.all(
                           color: const Color(0xFF1A1F2E), width: 2),
-                      boxShadow: [
-                        BoxShadow(
-                          color:
-                              const Color(0xFF4A80F0).withValues(alpha: 0.5),
-                          blurRadius: 6,
-                        ),
-                      ],
                     ),
-                    child: const Icon(
-                      Icons.camera_alt_rounded,
-                      size: 14,
-                      color: Colors.white,
-                    ),
+                    child: const Icon(Icons.camera_alt_rounded,
+                        size: 14, color: Colors.white),
                   ),
                 ),
               ],
             ),
           ),
-
           const SizedBox(height: 16),
-
-          // Name + Vertrauenssterne
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -708,13 +871,10 @@ class _HeroSection extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              const TrustShields(filled: 1, size: 18),
+              TrustShields(filled: trustLevel, size: 18),
             ],
           ),
-
           const SizedBox(height: 10),
-
-          // Stats-Chips
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -775,76 +935,15 @@ class _StatChip extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SEPARATOR
-// ─────────────────────────────────────────────────────────────────────────────
-
-
-
-/*
-class _Separator extends StatelessWidget {
-  const _Separator();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Row(
-        children: [
-          Expanded(
-            child: Container(
-              height: 1,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.transparent,
-                    Colors.white.withValues(alpha: 0.15),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          const SizedBox(width: 12),
-
-          Text(
-            "EVENTRIDE",
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.25),
-              fontSize: 10,
-              letterSpacing: 1.6,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-
-          const SizedBox(width: 12),
-
-          Expanded(
-            child: Container(
-              height: 1,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.white.withValues(alpha: 0.15),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-*/
-// ─────────────────────────────────────────────────────────────────────────────
 // VERIFIKATION CARD
 // ─────────────────────────────────────────────────────────────────────────────
+
+enum VerifState { open, pending, done, rejected }
 
 class _VerifCard extends StatelessWidget {
   final IconData icon;
   final String label;
-  final bool done;
+  final VerifState state;
   final String? cta;
   final String doneLabel;
   final VoidCallback? onTap;
@@ -852,11 +951,102 @@ class _VerifCard extends StatelessWidget {
   const _VerifCard({
     required this.icon,
     required this.label,
-    required this.done,
+    required this.state,
     this.cta,
     this.doneLabel = "OK",
     this.onTap,
   });
+
+  Color get _bgStart {
+    switch (state) {
+      case VerifState.done:
+        return const Color(0xFF1B4332);
+      case VerifState.pending:
+        return const Color(0xFF3D2B00);
+      case VerifState.rejected:
+        return const Color(0xFF3D0A0A);
+      case VerifState.open:
+        return const Color(0xFF1A1F2E);
+    }
+  }
+
+  Color get _bgEnd {
+    switch (state) {
+      case VerifState.done:
+        return const Color(0xFF2D6A4F);
+      case VerifState.pending:
+        return const Color(0xFF5C4000);
+      case VerifState.rejected:
+        return const Color(0xFF5C1010);
+      case VerifState.open:
+        return const Color(0xFF232940);
+    }
+  }
+
+  Color get _borderColor {
+    switch (state) {
+      case VerifState.done:
+        return const Color(0xFF52B788);
+      case VerifState.pending:
+        return const Color(0xFFF4A261);
+      case VerifState.rejected:
+        return const Color(0xFFE63946);
+      case VerifState.open:
+        return Colors.white12;
+    }
+  }
+
+  Color get _badgeColor {
+    switch (state) {
+      case VerifState.done:
+        return const Color(0xFF2D6A4F);
+      case VerifState.pending:
+        return const Color(0xFFE07B00);
+      case VerifState.rejected:
+        return const Color(0xFFE63946);
+      case VerifState.open:
+        return const Color(0xFF4A80F0);
+    }
+  }
+
+  String get _badgeLabel {
+    switch (state) {
+      case VerifState.done:
+        return doneLabel;
+      case VerifState.pending:
+        return "In Prüfung";
+      case VerifState.rejected:
+        return "Abgelehnt";
+      case VerifState.open:
+        return "Offen";
+    }
+  }
+
+  Color get _iconColor {
+    switch (state) {
+      case VerifState.done:
+        return const Color(0xFF74C69D);
+      case VerifState.pending:
+        return const Color(0xFFF4A261);
+      case VerifState.rejected:
+        return const Color(0xFFE63946);
+      case VerifState.open:
+        return Colors.white60;
+    }
+  }
+
+  IconData get _stateIcon {
+    switch (state) {
+      case VerifState.done:
+        return Icons.check_rounded;
+      case VerifState.pending:
+        return Icons.hourglass_top_rounded;
+      case VerifState.rejected:
+        return Icons.close_rounded;
+      case VerifState.open:
+        return icon;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -866,84 +1056,854 @@ class _VerifCard extends StatelessWidget {
         height: 110,
         child: AppCard(
           padding: const EdgeInsets.all(14),
-          gradientColors: done
-              ? const [Color(0xFF1B4332), Color(0xFF2D6A4F)]
+          gradientColors: state != VerifState.open
+              ? [_bgStart, _bgEnd]
               : null,
-          borderColor: done
-              ? const Color(0xFF52B788)
-              : null,
+          borderColor: _borderColor,
           child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Top Row ─────────────────────
-            Row(
-              children: [
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(10),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(_stateIcon, size: 18, color: _iconColor),
                   ),
-                  child: Icon(
-                    done ? Icons.check_rounded : icon,
-                    size: 18,
-                    color: done
-                        ? const Color(0xFF74C69D)
-                        : Colors.white60,
-                  ),
-                ),
-
-                const Spacer(),
-
-                // Status Badge (wie Plätze bei Fahrten)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: done
-                        ? const Color(0xFF2D6A4F)
-                        : const Color(0xFF4A80F0),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    done ? doneLabel : "Offen",
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                  const Spacer(),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _badgeColor,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      _badgeLabel,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
-                )
-              ],
-            ),
-
-            const Spacer(),
-
-            // ── Text ─────────────────────
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
+                ],
               ),
+              const Spacer(),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                state == VerifState.done
+                    ? doneLabel
+                    : state == VerifState.pending
+                        ? "Wird geprüft"
+                        : state == VerifState.rejected
+                            ? (cta ?? "Neu hochladen")
+                            : (cta ?? "Erforderlich"),
+                style: TextStyle(
+                  color: _iconColor.withValues(alpha: 0.85),
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EMAIL VERIF SHEET
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _EmailVerifSheet extends StatefulWidget {
+  final String email;
+  const _EmailVerifSheet({required this.email});
+
+  @override
+  State<_EmailVerifSheet> createState() => _EmailVerifSheetState();
+}
+
+class _EmailVerifSheetState extends State<_EmailVerifSheet> {
+  bool _sent = false;
+  bool _loading = false;
+  String? _error;
+
+  String _mapFirebaseError(Object e) {
+    final msg = e.toString();
+    if (msg.contains('too-many-requests')) {
+      return 'Zu viele Versuche. Bitte warte kurz und versuche es erneut.';
+    }
+    if (msg.contains('network-request-failed')) {
+      return 'Keine Internetverbindung.';
+    }
+    return 'Fehler beim Senden. Bitte versuche es erneut.';
+  }
+
+  Future<void> _sendEmail({bool isResend = false}) async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await context.read<IAuthRepository>().sendEmailVerification();
+      if (!mounted) return;
+      setState(() => _sent = true);
+      if (isResend) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Bestätigungsmail wurde erneut gesendet.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = _mapFirebaseError(e));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _checkVerified() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final verified =
+          await context.read<IAuthRepository>().reloadAndCheckEmailVerified();
+      if (!mounted) return;
+      if (verified) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('E-Mail erfolgreich verifiziert!')),
+        );
+      } else {
+        setState(() => _error = 'E-Mail noch nicht bestätigt. Bitte den Link in der Mail antippen.');
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = _mapFirebaseError(e));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+          24, 20, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SheetHandle(),
+          const SizedBox(height: 20),
+          const Text(
+            "E-Mail verifizieren",
+            style: TextStyle(
+                color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _sent
+                ? "Wir haben eine Bestätigungsmail an ${widget.email} gesendet.\nBitte öffne die E-Mail und tippe auf den Link.\n\nFalls du keine E-Mail siehst, prüfe deinen Spam-Ordner."
+                : "Zur Verifizierung senden wir dir eine E-Mail an ${widget.email}.",
+            style: const TextStyle(
+                color: Colors.white54, fontSize: 13, height: 1.5),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            Text(_error!,
+                style:
+                    const TextStyle(color: Color(0xFFE63946), fontSize: 13)),
+          ],
+          const SizedBox(height: 20),
+          if (!_sent)
+            _SheetButton(
+              label: "Bestätigungsmail senden",
+              loading: _loading,
+              onTap: _sendEmail,
+            )
+          else
+            _SheetButton(
+              label: "Bestätigung prüfen",
+              loading: _loading,
+              onTap: _checkVerified,
             ),
-
-            const SizedBox(height: 2),
-
-            Text(
-              done ? doneLabel : (cta ?? "Erforderlich"),
-              style: TextStyle(
-                color: done
-                    ? const Color(0xFF74C69D)
-                    : Colors.white54,
-                fontSize: 11,
+          if (_sent) ...[
+            const SizedBox(height: 10),
+            Center(
+              child: GestureDetector(
+                onTap: _loading ? null : () => _sendEmail(isResend: true),
+                child: const Text(
+                  "E-Mail erneut senden",
+                  style: TextStyle(color: Color(0xFF4A80F0), fontSize: 13),
+                ),
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PHONE VERIF SHEET
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _PhoneVerifSheet extends StatefulWidget {
+  const _PhoneVerifSheet();
+
+  @override
+  State<_PhoneVerifSheet> createState() => _PhoneVerifSheetState();
+}
+
+class _PhoneVerifSheetState extends State<_PhoneVerifSheet> {
+  final _ctrl = TextEditingController(text: '+43');
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final phone = _ctrl.text.trim();
+    if (phone.length < 8) {
+      setState(() => _error = 'Bitte eine gültige Telefonnummer eingeben.');
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final auth = context.read<IAuthRepository>();
+      if (!kPhoneVerifEnabled) {
+        await auth.savePhone(phone);
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Telefonnummer gespeichert.')),
+          );
+        }
+      } else {
+        await auth.startPhoneVerification(
+          phone,
+          onCodeSent: (vId) {
+            if (!mounted) return;
+            Navigator.pop(context);
+            showModalBottomSheet(
+              context: context,
+              backgroundColor: const Color(0xFF1A1F2E),
+              isScrollControlled: true,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              builder: (_) => _OtpSheet(
+                phone: phone,
+                verificationId: vId,
+              ),
+            );
+          },
+          onError: (err) {
+            if (mounted) setState(() => _error = err);
+          },
+        );
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+          24, 20, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SheetHandle(),
+          const SizedBox(height: 20),
+          const Text(
+            "Telefon verifizieren",
+            style: TextStyle(
+                color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            kPhoneVerifEnabled
+                ? "Du erhältst einen SMS-Code zur Bestätigung."
+                : "Gib deine Telefonnummer ein. Sie wird in deinem Profil gespeichert.",
+            style:
+                const TextStyle(color: Colors.white54, fontSize: 13, height: 1.5),
+          ),
+          const SizedBox(height: 16),
+          _SheetTextField(
+            controller: _ctrl,
+            label: "Telefonnummer",
+            keyboardType: TextInputType.phone,
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(_error!,
+                style:
+                    const TextStyle(color: Color(0xFFE63946), fontSize: 13)),
+          ],
+          const SizedBox(height: 20),
+          _SheetButton(
+            label: kPhoneVerifEnabled ? "SMS-Code senden" : "Speichern",
+            loading: _loading,
+            onTap: _submit,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OTP SHEET (nur bei kPhoneVerifEnabled = true)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _OtpSheet extends StatefulWidget {
+  final String phone;
+  final String verificationId;
+  const _OtpSheet({required this.phone, required this.verificationId});
+
+  @override
+  State<_OtpSheet> createState() => _OtpSheetState();
+}
+
+class _OtpSheetState extends State<_OtpSheet> {
+  final _ctrl = TextEditingController();
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _confirm() async {
+    final code = _ctrl.text.trim();
+    if (code.length != 6) {
+      setState(() => _error = 'Bitte den 6-stelligen Code eingeben.');
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await context
+          .read<IAuthRepository>()
+          .confirmPhoneCode(widget.verificationId, code);
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Telefon erfolgreich verifiziert!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Ungültiger Code.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+          24, 20, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SheetHandle(),
+          const SizedBox(height: 20),
+          const Text(
+            "SMS-Code eingeben",
+            style: TextStyle(
+                color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "Wir haben einen 6-stelligen Code an ${widget.phone} gesendet.",
+            style:
+                const TextStyle(color: Colors.white54, fontSize: 13, height: 1.5),
+          ),
+          const SizedBox(height: 16),
+          _SheetTextField(
+            controller: _ctrl,
+            label: "6-stelliger Code",
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(6),
+            ],
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(_error!,
+                style:
+                    const TextStyle(color: Color(0xFFE63946), fontSize: 13)),
+          ],
+          const SizedBox(height: 20),
+          _SheetButton(
+            label: "Bestätigen",
+            loading: _loading,
+            onTap: _confirm,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LICENSE SHEET
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _LicenseSheet extends StatefulWidget {
+  const _LicenseSheet();
+
+  @override
+  State<_LicenseSheet> createState() => _LicenseSheetState();
+}
+
+class _LicenseSheetState extends State<_LicenseSheet> {
+  bool _loading = false;
+  String? _error;
+
+  Future<void> _pick(ImageSource source) async {
+    final picked = await ImagePicker().pickImage(source: source, imageQuality: 90);
+    if (picked == null || !mounted) return;
+
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await context.read<IAuthRepository>().uploadLicense(File(picked.path));
+      if (mounted) {
+        Navigator.pop(context);
+        AppSnackbar.show(context,
+            message: 'Führerschein hochgeladen. Wird in Kürze geprüft.');
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Upload fehlgeschlagen: $e');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _showSourceChoice() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1A1F2E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded,
+                  color: Colors.white70),
+              title: const Text('Galerie',
+                  style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                _pick(ImageSource.gallery);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt_rounded,
+                  color: Colors.white70),
+              title: const Text('Kamera',
+                  style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                _pick(ImageSource.camera);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
         ),
-        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+          24, 20, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SheetHandle(),
+          const SizedBox(height: 20),
+          const Text(
+            "Führerschein hochladen",
+            style: TextStyle(
+                color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "Lade ein klares Foto deines Führerscheins hoch. Deine Daten werden vertraulich behandelt und nur zur Verifizierung verwendet.",
+            style: TextStyle(color: Colors.white54, fontSize: 13, height: 1.5),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            Text(_error!,
+                style:
+                    const TextStyle(color: Color(0xFFE63946), fontSize: 13)),
+          ],
+          const SizedBox(height: 20),
+          _loading
+              ? const Center(
+                  child: CircularProgressIndicator(color: Colors.white))
+              : _SheetButton(
+                  label: "Foto auswählen",
+                  onTap: _showSourceChoice,
+                ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HOME TOWN SHEET
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _HomeTownSheet extends StatefulWidget {
+  final String current;
+  const _HomeTownSheet({required this.current});
+
+  @override
+  State<_HomeTownSheet> createState() => _HomeTownSheetState();
+}
+
+class _HomeTownSheetState extends State<_HomeTownSheet> {
+  late final TextEditingController _ctrl;
+  bool _loading = false;
+  String? _error;
+  String? _selectedName;
+  double? _selectedLat;
+  double? _selectedLng;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.current);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_selectedLat == null) {
+      if (_ctrl.text.trim() == widget.current.trim()) {
+        Navigator.pop(context);
+        return;
+      }
+      setState(() =>
+          _error = 'Bitte eine Gemeinde aus der Vorschlagsliste auswählen.');
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await context.read<IAuthRepository>().setHomeTown(
+            _selectedName!,
+            lat: _selectedLat,
+            lng: _selectedLng,
+          );
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+          24, 20, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SheetHandle(),
+          const SizedBox(height: 20),
+          const Text(
+            "Heimatgemeinde",
+            style: TextStyle(
+                color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "Gib an, aus welcher Gemeinde du kommst. Das hilft anderen Nutzern, passende Mitfahrgelegenheiten zu finden.",
+            style: TextStyle(color: Colors.white54, fontSize: 13, height: 1.5),
+          ),
+          const SizedBox(height: 16),
+          GooglePlaceAutoCompleteTextField(
+            textEditingController: _ctrl,
+            googleAPIKey: "AIzaSyB97RZAMf-fmZKhdFFniU20CqK0QWCV3KE",
+            inputDecoration: InputDecoration(
+              labelText: "Gemeinde",
+              labelStyle: const TextStyle(color: Colors.white54),
+              filled: true,
+              fillColor: Colors.white.withValues(alpha: 0.06),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide:
+                    BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide:
+                    BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide:
+                    const BorderSide(color: Color(0xFF4A80F0), width: 1.5),
+              ),
+            ),
+            textStyle: const TextStyle(color: Colors.white),
+            boxDecoration: const BoxDecoration(color: Colors.transparent),
+            debounceTime: 500,
+            countries: const ["at"],
+            placeType: PlaceType.cities,
+            language: 'de',
+            isLatLngRequired: true,
+            getPlaceDetailWithLatLng: (prediction) {
+              setState(() {
+                _selectedName =
+                    prediction.structuredFormatting?.mainText ??
+                        prediction.description ??
+                        '';
+                _selectedLat = double.tryParse(prediction.lat ?? '');
+                _selectedLng = double.tryParse(prediction.lng ?? '');
+                _error = null;
+              });
+            },
+            itemClick: (prediction) {
+              _ctrl.text = prediction.structuredFormatting?.mainText ??
+                  prediction.description ??
+                  '';
+              _ctrl.selection = TextSelection.fromPosition(
+                TextPosition(offset: _ctrl.text.length),
+              );
+            },
+            itemBuilder: (context, index, prediction) {
+              return Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1B3F78),
+                  border: Border(
+                    left: BorderSide(
+                      color: const Color(0xFF5DA9FF).withValues(alpha: 0.6),
+                      width: 3,
+                    ),
+                  ),
+                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: Row(
+                  children: [
+                    const Icon(Icons.location_on_outlined,
+                        color: Color(0xFF5DA9FF), size: 18),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        prediction.description ?? '',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+            seperatedBuilder: Divider(
+              height: 1,
+              color: Colors.white.withValues(alpha: 0.12),
+            ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(_error!,
+                style:
+                    const TextStyle(color: Color(0xFFE63946), fontSize: 13)),
+          ],
+          const SizedBox(height: 20),
+          _SheetButton(label: "Speichern", loading: _loading, onTap: _save),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CAR INFO SHEET
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _CarInfoSheet extends StatefulWidget {
+  final CarInfo? current;
+  const _CarInfoSheet({this.current});
+
+  @override
+  State<_CarInfoSheet> createState() => _CarInfoSheetState();
+}
+
+class _CarInfoSheetState extends State<_CarInfoSheet> {
+  late final TextEditingController _makeCtrl;
+  late final TextEditingController _modelCtrl;
+  late final TextEditingController _colorCtrl;
+  late final TextEditingController _seatsCtrl;
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final c = widget.current;
+    _makeCtrl = TextEditingController(text: c?.make ?? '');
+    _modelCtrl = TextEditingController(text: c?.model ?? '');
+    _colorCtrl = TextEditingController(text: c?.color ?? '');
+    _seatsCtrl =
+        TextEditingController(text: c?.seats != null ? '${c!.seats}' : '');
+  }
+
+  @override
+  void dispose() {
+    _makeCtrl.dispose();
+    _modelCtrl.dispose();
+    _colorCtrl.dispose();
+    _seatsCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final make = _makeCtrl.text.trim();
+    final model = _modelCtrl.text.trim();
+    if (make.isEmpty || model.isEmpty) {
+      setState(() => _error = 'Marke und Modell sind erforderlich.');
+      return;
+    }
+    final seats = int.tryParse(_seatsCtrl.text.trim());
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await context.read<IAuthRepository>().updateCarInfo(
+            make,
+            model,
+            _colorCtrl.text.trim().isEmpty ? null : _colorCtrl.text.trim(),
+            seats,
+          );
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+          24, 20, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SheetHandle(),
+          const SizedBox(height: 20),
+          const Text(
+            "Auto-Infos",
+            style: TextStyle(
+                color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "Deine Auto-Daten helfen Mitfahrern zu wissen, was sie erwartet.",
+            style: TextStyle(color: Colors.white54, fontSize: 13, height: 1.5),
+          ),
+          const SizedBox(height: 16),
+          _SheetTextField(
+              controller: _makeCtrl, label: "Marke (z. B. VW)"),
+          const SizedBox(height: 10),
+          _SheetTextField(
+              controller: _modelCtrl, label: "Modell (z. B. Golf)"),
+          const SizedBox(height: 10),
+          _SheetTextField(
+              controller: _colorCtrl,
+              label: "Farbe (optional)"),
+          const SizedBox(height: 10),
+          _SheetTextField(
+            controller: _seatsCtrl,
+            label: "Verfügbare Sitzplätze (optional)",
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(1),
+            ],
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(_error!,
+                style:
+                    const TextStyle(color: Color(0xFFE63946), fontSize: 13)),
+          ],
+          const SizedBox(height: 20),
+          _SheetButton(label: "Speichern", loading: _loading, onTap: _save),
+        ],
       ),
     );
   }
@@ -995,6 +1955,110 @@ class _PrimaryButton extends StatelessWidget {
   }
 }
 
+class _SheetHandle extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        width: 36,
+        height: 4,
+        decoration: BoxDecoration(
+          color: Colors.white24,
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetButton extends StatelessWidget {
+  final String label;
+  final bool loading;
+  final VoidCallback? onTap;
+
+  const _SheetButton({
+    required this.label,
+    this.loading = false,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: loading ? null : onTap,
+      child: Container(
+        width: double.infinity,
+        height: 48,
+        decoration: BoxDecoration(
+          color:
+              loading ? Colors.white12 : const Color(0xFF4A80F0),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Center(
+          child: loading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white),
+                )
+              : Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetTextField extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
+  final TextInputType? keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
+
+  const _SheetTextField({
+    required this.controller,
+    required this.label,
+    this.keyboardType,
+    this.inputFormatters,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
+      style: const TextStyle(color: Colors.white),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.white54),
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.06),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide:
+              const BorderSide(color: Color(0xFF4A80F0), width: 1.5),
+        ),
+      ),
+    );
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // PROGRESS ARC PAINTER
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1009,7 +2073,6 @@ class _ProgressArcPainter extends CustomPainter {
     final radius = (size.width - 8) / 2;
     final rect = Rect.fromCircle(center: center, radius: radius);
 
-    // Hintergrund-Track
     final trackPaint = Paint()
       ..color = Colors.white.withValues(alpha: 0.1)
       ..strokeWidth = 3
@@ -1017,7 +2080,6 @@ class _ProgressArcPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
     canvas.drawCircle(center, radius, trackPaint);
 
-    // Fortschritts-Arc mit Gradient
     final progressPaint = Paint()
       ..shader = SweepGradient(
         startAngle: -math.pi / 2,
@@ -1037,7 +2099,6 @@ class _ProgressArcPainter extends CustomPainter {
       progressPaint,
     );
 
-    // Leuchtpunkt am Ende des Arcs
     final endAngle = -math.pi / 2 + 2 * math.pi * progress;
     final dotX = center.dx + radius * math.cos(endAngle);
     final dotY = center.dy + radius * math.sin(endAngle);
