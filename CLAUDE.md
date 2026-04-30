@@ -25,6 +25,12 @@ Model → Repository → Service (ChangeNotifier) → Provider → View
 Hive-Repositories werden durch Firebase-Repositories ersetzt.
 Service-API bleibt dabei unverändert.
 
+## Firebase-Konfiguration (vor Release erledigen)
+- **E-Mail-Verifikation landet im Spam:** Firebase sendet von `noreply@[projekt-id].firebaseapp.com`.
+  Fix: Firebase Console → Authentication → Templates → „E-Mail-Adresse bestätigen" → eigene Absender-Domain konfigurieren.
+- **Telefon-Verifikation aktivieren:** `lib/config/feature_flags.dart` → `kPhoneVerifEnabled = true` setzen.
+  Voraussetzung: Phone Auth in Firebase Console aktiviert + SHA-1-Fingerprint für Android hinterlegt.
+
 ## Wichtige Regeln
 - Immer Manuel approve edits (nicht auto-accept)
 - Eine Aufgabe pro Session
