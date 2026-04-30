@@ -1162,9 +1162,7 @@ class _EmailVerifSheetState extends State<_EmailVerifSheet> {
       if (!mounted) return;
       setState(() => _sent = true);
       if (isResend) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Bestätigungsmail wurde erneut gesendet.')),
-        );
+        AppSnackbar.show(context, message: 'Bestätigungsmail wurde erneut gesendet.');
       }
     } catch (e) {
       if (mounted) setState(() => _error = _mapFirebaseError(e));
@@ -1184,9 +1182,7 @@ class _EmailVerifSheetState extends State<_EmailVerifSheet> {
       if (!mounted) return;
       if (verified) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('E-Mail erfolgreich verifiziert!')),
-        );
+        AppSnackbar.show(context, message: 'E-Mail erfolgreich verifiziert!');
       } else {
         setState(() => _error = 'E-Mail noch nicht bestätigt. Bitte den Link in der Mail antippen.');
       }
@@ -1296,9 +1292,7 @@ class _PhoneVerifSheetState extends State<_PhoneVerifSheet> {
         await auth.savePhone(phone);
         if (mounted) {
           Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Telefonnummer gespeichert.')),
-          );
+          AppSnackbar.show(context, message: 'Telefonnummer gespeichert.');
         }
       } else {
         await auth.startPhoneVerification(
@@ -1419,9 +1413,7 @@ class _OtpSheetState extends State<_OtpSheet> {
           .confirmPhoneCode(widget.verificationId, code);
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Telefon erfolgreich verifiziert!')),
-        );
+        AppSnackbar.show(context, message: 'Telefon erfolgreich verifiziert!');
       }
     } catch (e) {
       if (mounted) setState(() => _error = 'Ungültiger Code.');
