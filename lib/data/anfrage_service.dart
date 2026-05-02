@@ -1,5 +1,6 @@
 // lib/data/anfrage_service.dart
 import 'dart:async';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import 'package:my_app/data/anfrage_daten.dart';
 import 'package:my_app/data/app_user.dart';
@@ -67,12 +68,8 @@ class AnfrageService with ChangeNotifier {
   // -------------------------------------------------------------
 
   Future<void> addAnfrage(AnfrageDaten anfrage) async {
-    try {
-      await _repository.add(anfrage);
-      // Stream-Update kommt automatisch via _startListening().
-    } catch (_) {
-      rethrow;
-    }
+    await _repository.add(anfrage);
+    // Stream-Update kommt automatisch via _startListening().
   }
 
   /// Rückgabe: true wenn erfolgreich, false wenn nicht gefunden oder Fehler.
@@ -86,7 +83,8 @@ class AnfrageService with ChangeNotifier {
       notifyListeners();
 
       return true;
-    } catch (_) {
+    } catch (e, stack) {
+      if (kDebugMode) debugPrint('[AnfrageService] updateAnfrage fehlgeschlagen: $e\n$stack');
       return false;
     }
   }
@@ -167,6 +165,20 @@ class AnfrageService with ChangeNotifier {
     return true;
   }
 
+  /// Atomar: Einladung annehmen, alle anderen offenen Einladungen stornieren
+  /// und den User aus der Interessentenliste entfernen — via Cloud Function.
+  Future<bool> acceptAnfrageAtomisch({
+    required AnfrageDaten anfrage,
+    required int seatsAccepted,
+  }) async {
+    final callable = FirebaseFunctions.instance.httpsCallable('acceptInvitation');
+    final result = await callable.call({
+      'anfrageId': anfrage.id,
+      'seatsAccepted': seatsAccepted,
+    });
+    return result.data['success'] == true;
+  }
+
   Future<bool> ablehnenAnfrage(AnfrageDaten anfrage) async {
     final updated = anfrage.copyWith(status: AnfrageStatus.abgelehnt);
     return await updateAnfrage(anfrage.id, updated);
@@ -176,6 +188,29 @@ class AnfrageService with ChangeNotifier {
   Future<bool> storniereAnfrage(AnfrageDaten anfrage) async {
     final updated = anfrage.copyWith(status: AnfrageStatus.storniert);
     return await updateAnfrage(anfrage.id, updated);
+  }
+
+  /// Storniert alle offenen Anfragen/Einladungen dieses Users für ein Event.
+  /// Wird aufgerufen wenn der User selbst eine Fahrt anbietet — er braucht
+  /// dann weder Einladungen anderer Fahrer noch eigene Mitfahrtanfragen mehr.
+  Future<void> storniereOffeneAnfragenFuerEvent({
+    required String eventId,
+    required String requesterId,
+  }) async {
+    final offen = _alleAnfragen
+        .where((a) =>
+            a.eventId == eventId &&
+            a.requesterId == requesterId &&
+            a.status == AnfrageStatus.offen)
+        .toList();
+
+    for (final anfrage in offen) {
+      final updated = anfrage.copyWith(status: AnfrageStatus.storniert);
+      await _repository.update(updated);
+      final idx = _alleAnfragen.indexWhere((a) => a.id == anfrage.id);
+      if (idx != -1) _alleAnfragen[idx] = updated;
+    }
+    if (offen.isNotEmpty) notifyListeners();
   }
 
   // -------------------------------------------------------------
@@ -194,7 +229,8 @@ class AnfrageService with ChangeNotifier {
       }
       notifyListeners();
       return true;
-    } catch (_) {
+    } catch (e, stack) {
+      if (kDebugMode) debugPrint('[AnfrageService] storniereAnfragenFuerFahrt fehlgeschlagen: $e\n$stack');
       return false;
     }
   }

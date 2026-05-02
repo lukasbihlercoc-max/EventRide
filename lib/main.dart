@@ -65,13 +65,10 @@ void main() async {
     persistenceEnabled: true,
   );
   FirebaseMessaging.onBackgroundMessage(_bgHandler);
-  WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('de_DE', null);
 
   // Favoriten initialisieren
   await initFavouriteEvents();
-
-
 
   // ----------------------------
   // Services initialisieren
@@ -139,7 +136,8 @@ void main() async {
   await seenAnfragenService.init();
 
   final interessentenService =
-      InteressentenService(FirestoreInteressentenRepository());
+      InteressentenService(FirestoreInteressentenRepository())
+        ..init(authRepository);
 
   // App starten
   runApp(MyApp(

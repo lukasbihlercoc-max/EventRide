@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:my_app/data/chat_conversation.dart';
@@ -37,7 +38,7 @@ class NotificationService {
         _navigatorKey = navigatorKey;
 
   Future<void> init(String userId) async {
-    debugPrint('[FCM] init() für userId=$userId');
+    if (kDebugMode) debugPrint('[FCM] init() für userId=$userId');
 
     // 1. Berechtigung anfragen
     final settings = await FirebaseMessaging.instance.requestPermission(
@@ -45,7 +46,7 @@ class NotificationService {
       badge: true,
       sound: true,
     );
-    debugPrint('[FCM] Berechtigung: ${settings.authorizationStatus}');
+    if (kDebugMode) debugPrint('[FCM] Berechtigung: ${settings.authorizationStatus}');
 
     // 2. Android Notification Channel einrichten (Pflicht ab Android 8)
     const androidChannel = AndroidNotificationChannel(
@@ -72,51 +73,57 @@ class NotificationService {
 
     // 4. FCM-Token holen & in Firestore speichern
     final token = await FirebaseMessaging.instance.getToken();
-    debugPrint('[FCM] Token: $token');
+    if (kDebugMode) debugPrint('[FCM] Token: $token');
     if (token != null) {
       await _userRepo.saveFcmToken(userId, token);
-      debugPrint('[FCM] Token in Firestore gespeichert');
+      if (kDebugMode) debugPrint('[FCM] Token in Firestore gespeichert');
     } else {
-      debugPrint('[FCM] KEIN TOKEN erhalten – Notifications werden nicht funktionieren');
+      if (kDebugMode) debugPrint('[FCM] KEIN TOKEN erhalten – Notifications werden nicht funktionieren');
     }
 
     // 5. Token-Refresh beobachten
     FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
-      debugPrint('[FCM] Token aktualisiert: $newToken');
+      if (kDebugMode) debugPrint('[FCM] Token aktualisiert: $newToken');
       _userRepo.saveFcmToken(userId, newToken);
     });
 
     // 6. Vordergrund: FCM-Nachrichten als lokale Notification anzeigen.
     // Chat-Nachrichten werden bereits durch startChatMonitoring angezeigt → überspringen.
     FirebaseMessaging.onMessage.listen((message) {
-      debugPrint('[FCM] Vordergrund-Nachricht: ${message.notification?.title} / data=${message.data}');
+      if (kDebugMode) debugPrint('[FCM] Vordergrund-Nachricht: ${message.notification?.title} / data=${message.data}');
       if (message.data['type'] == 'chat') return;
       _showLocalNotification(message);
     });
 
     // 7. Hintergrund → Vordergrund
     FirebaseMessaging.onMessageOpenedApp.listen((message) {
-      debugPrint('[FCM] App durch Notification geöffnet: ${message.data}');
+      if (kDebugMode) debugPrint('[FCM] App durch Notification geöffnet: ${message.data}');
       _navigateFromData(message.data);
     });
 
-    // 8. Cold Start
+    // 8. Cold Start – Navigation erst nach dem ersten Frame, damit der
+    // Navigator sicher initialisiert ist.
     final initial = await FirebaseMessaging.instance.getInitialMessage();
     if (initial != null) {
-      debugPrint('[FCM] Cold-Start-Notification: ${initial.data}');
-      Future.delayed(const Duration(milliseconds: 500), () {
+      if (kDebugMode) debugPrint('[FCM] Cold-Start-Notification: ${initial.data}');
+      WidgetsBinding.instance.addPostFrameCallback((_) {
         _navigateFromData(initial.data);
       });
     }
 
-    debugPrint('[FCM] init() abgeschlossen');
+    if (kDebugMode) debugPrint('[FCM] init() abgeschlossen');
   }
 
   /// FCM-Token beim Logout aus Firestore entfernen.
   Future<void> removeToken(String userId) async {
     final token = await FirebaseMessaging.instance.getToken();
     if (token != null) {
-      await _userRepo.removeFcmToken(userId, token);
+      try {
+        await _userRepo.removeFcmToken(userId, token);
+      } catch (_) {
+        // Auth-Token kann bereits ungültig sein (z.B. signOut vor diesem Aufruf).
+        // Token wird beim nächsten Login automatisch aktualisiert.
+      }
     }
   }
 
@@ -164,7 +171,7 @@ class NotificationService {
         final age = DateTime.now().difference(conv.lastUpdated);
         if (age > const Duration(seconds: 30)) continue;
 
-        debugPrint('[FCM] Neue Chat-Nachricht von $senderId in ${conv.id}');
+        if (kDebugMode) debugPrint('[FCM] Neue Chat-Nachricht von $senderId in ${conv.id}');
         _showChatLocalNotification(conv);
       }
     });
@@ -220,10 +227,13 @@ class NotificationService {
   }
 
   /// Navigiert anhand des `data`-Felds einer FCM-Nachricht.
-  void _navigateFromData(Map<String, dynamic> data) {
+  /// [_retries] verhindert eine unendliche Retry-Schleife falls der Navigator
+  /// nie bereit wird (z. B. nach Auth-Fehler).
+  void _navigateFromData(Map<String, dynamic> data, {int retries = 0}) {
     if (_navigatorKey.currentState == null) {
+      if (retries >= 5) return;
       Future.delayed(const Duration(milliseconds: 300), () {
-        _navigateFromData(data);
+        _navigateFromData(data, retries: retries + 1);
       });
       return;
     }

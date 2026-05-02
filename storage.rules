@@ -2,16 +2,39 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
+    function isAdmin() {
+      return firestore.get(
+        /databases/(default)/documents/users/$(request.auth.uid)
+      ).data.isAdmin == true;
+    }
+
     // ----------------------------------------------------------------
     // users/{userId}/profile.jpg
     //
     // Lesen:    Alle eingeloggten Nutzer (Avatar in FahrtenCard etc.)
     // Schreiben: Nur der eigene Account
     // ----------------------------------------------------------------
-    match /users/{userId}/{allPaths=**} {
-      allow read:  if true;
+    match /users/{userId}/profile.jpg {
+      allow read:  if request.auth != null;
       allow write: if request.auth != null
-                   && request.auth.uid == userId;
+                   && request.auth.uid == userId
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType == 'image/jpeg';
+    }
+
+    // ----------------------------------------------------------------
+    // users/{userId}/license.jpg
+    //
+    // Lesen:    Nur Eigentümer oder Admin (via Firebase SDK – kein Download-Link)
+    // Schreiben: Nur der eigene Account
+    // ----------------------------------------------------------------
+    match /users/{userId}/license.jpg {
+      allow read:  if request.auth != null
+                   && (request.auth.uid == userId || isAdmin());
+      allow write: if request.auth != null
+                   && request.auth.uid == userId
+                   && request.resource.size < 10 * 1024 * 1024
+                   && request.resource.contentType == 'image/jpeg';
     }
 
   }

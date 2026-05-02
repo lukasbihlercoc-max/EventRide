@@ -1,13 +1,14 @@
 // firebase_auth_repository.dart
 // Produktions-Implementierung von IAuthRepository via Firebase Auth + Firestore.
-// Ersetzt LocalAuthRepository sobald in main.dart eingebunden.
 
+import 'dart:async';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:my_app/data/app_user.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
+import 'package:my_app/data/license_request.dart';
 
 class FirebaseAuthRepository implements IAuthRepository {
   final FirebaseAuth _auth;
@@ -23,7 +24,6 @@ class FirebaseAuthRepository implements IAuthRepository {
   })  : _auth = auth ?? FirebaseAuth.instance,
         _firestore = firestore ?? FirebaseFirestore.instance,
         _storage = storage ?? FirebaseStorage.instance {
-    // Admin-Status laden falls Nutzer beim App-Start bereits eingeloggt ist.
     final currentUser = _auth.currentUser;
     if (currentUser != null) _loadAdminStatus(currentUser.uid);
   }
@@ -33,14 +33,36 @@ class FirebaseAuthRepository implements IAuthRepository {
     _isAdmin = doc.data()?['isAdmin'] == true;
   }
 
-  // Mappt einen Firebase-User auf AppUser.
-  // Name kommt aus displayName, photoUrl aus photoURL.
+  // Minimales AppUser-Objekt aus Firebase Auth (ohne Firestore-Daten).
+  // Wird nur für den Rückgabewert von signIn/register verwendet.
   AppUser _mapUser(User fbUser) => AppUser(
         userId: fbUser.uid,
         name: fbUser.displayName ?? '',
         email: fbUser.email ?? '',
         photoUrl: fbUser.photoURL,
+        emailVerified: fbUser.emailVerified,
       );
+
+  // Vollständiges AppUser-Objekt aus Firebase Auth + Firestore-Dokument.
+  AppUser _toAppUser(User fbUser, DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>? ?? {};
+    final carData = data['car'] as Map<String, dynamic>?;
+    return AppUser(
+      userId: fbUser.uid,
+      name: fbUser.displayName ?? '',
+      email: fbUser.email ?? '',
+      photoUrl: fbUser.photoURL,
+      emailVerified: data['emailVerified'] as bool? ?? fbUser.emailVerified,
+      phone: data['phone'] as String?,
+      phoneVerified: data['phoneVerified'] as bool? ?? false,
+      licenseStatus: data['licenseStatus'] as String? ?? 'none',
+      homeTown: data['homeTown'] as String?,
+      homeTownLat: (data['homeTownLat'] as num?)?.toDouble(),
+      homeTownLng: (data['homeTownLng'] as num?)?.toDouble(),
+      car: carData != null ? CarInfo.fromMap(carData) : null,
+      licenseRejectReason: data['licenseRejectReason'] as String?,
+    );
+  }
 
   @override
   AppUser? get currentUser {
@@ -49,14 +71,50 @@ class FirebaseAuthRepository implements IAuthRepository {
     return _mapUser(fbUser);
   }
 
-  // userChanges() feuert auch bei Profil-Updates (photoURL, displayName),
-  // nicht nur bei Sign-in/Sign-out wie authStateChanges().
+  // Kombiniert Firebase Auth-Stream mit dem Firestore-Nutzerdokument.
+  // Jede Änderung am Firestore-Dokument (Telefon, Führerschein, Auto, ...)
+  // löst automatisch einen Rebuild in der UI aus.
+  //
+  // switchMap-Verhalten: beim Logout wird der Firestore-Stream sofort
+  // abgebrochen, damit der nächste Login-Event nicht gepuffert bleibt.
   @override
   Stream<AppUser?> get authStateChanges {
-    return _auth.userChanges().map((fbUser) {
-      if (fbUser == null) return null;
-      return _mapUser(fbUser);
-    });
+    StreamSubscription<dynamic>? firestoreSub;
+    StreamSubscription<User?>? authSub;
+    late final StreamController<AppUser?> controller;
+
+    controller = StreamController<AppUser?>(
+      onListen: () {
+        authSub = _auth.userChanges().listen(
+          (fbUser) {
+            firestoreSub?.cancel();
+            firestoreSub = null;
+            if (fbUser == null) {
+              controller.add(null);
+              return;
+            }
+            firestoreSub = _firestore
+                .collection('users')
+                .doc(fbUser.uid)
+                .snapshots()
+                .listen(
+                  (doc) {
+                    _isAdmin = doc.data()?['isAdmin'] == true;
+                    controller.add(_toAppUser(fbUser, doc));
+                  },
+                  onError: controller.addError,
+                );
+          },
+          onError: controller.addError,
+        );
+      },
+      onCancel: () {
+        firestoreSub?.cancel();
+        authSub?.cancel();
+      },
+    );
+
+    return controller.stream;
   }
 
   @override
@@ -67,8 +125,6 @@ class FirebaseAuthRepository implements IAuthRepository {
     );
     final fbUser = credential.user!;
 
-    // displayName ist bei bestehenden Nutzern gesetzt.
-    // Fallback: Firestore-Dokument lesen.
     String name = fbUser.displayName ?? '';
     if (name.isEmpty) {
       final doc = await _firestore.collection('users').doc(fbUser.uid).get();
@@ -97,16 +153,17 @@ class FirebaseAuthRepository implements IAuthRepository {
     final fbUser = credential.user!;
     final fullName = '$firstName $lastName';
 
-    // displayName in Firebase Auth setzen (macht currentUser getter sofort nutzbar)
     await fbUser.updateDisplayName(fullName);
 
-    // Nutzerprofil in Firestore anlegen
     await _firestore.collection('users').doc(fbUser.uid).set({
       'firstName': firstName,
       'lastName': lastName,
       'email': email,
       'phone': '',
+      'phoneVerified': false,
       'homeTown': '',
+      'emailVerified': false,
+      'licenseStatus': 'none',
       'createdAt': FieldValue.serverTimestamp(),
     });
 
@@ -128,9 +185,11 @@ class FirebaseAuthRepository implements IAuthRepository {
     final user = _auth.currentUser;
     if (user == null) return;
 
-    // Profilbild aus Storage entfernen (ignorieren falls nicht vorhanden)
     try {
       await _storage.ref('users/${user.uid}/profile.jpg').delete();
+    } catch (_) {}
+    try {
+      await _storage.ref('users/${user.uid}/license.jpg').delete();
     } catch (_) {}
 
     await _firestore.collection('users').doc(user.uid).delete();
@@ -144,10 +203,13 @@ class FirebaseAuthRepository implements IAuthRepository {
   bool get isAdmin => _isAdmin;
 
   @override
-  Future<void> setHomeTown(String town) async {
+  Future<void> setHomeTown(String town, {double? lat, double? lng}) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
-    await _firestore.collection('users').doc(uid).update({'homeTown': town});
+    final update = <String, dynamic>{'homeTown': town};
+    if (lat != null) update['homeTownLat'] = lat;
+    if (lng != null) update['homeTownLng'] = lng;
+    await _firestore.collection('users').doc(uid).update(update);
   }
 
   @override
@@ -159,26 +221,199 @@ class FirebaseAuthRepository implements IAuthRepository {
   }
 
   @override
+  Future<({double? lat, double? lng})> getHomeTownCoords() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return (lat: null, lng: null);
+    final doc = await _firestore.collection('users').doc(uid).get();
+    final data = doc.data();
+    return (
+      lat: (data?['homeTownLat'] as num?)?.toDouble(),
+      lng: (data?['homeTownLng'] as num?)?.toDouble(),
+    );
+  }
+
+  @override
   Future<String> uploadProfilePhoto(File image) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) throw Exception('Nicht eingeloggt');
 
-    // Upload nach: users/{uid}/profile.jpg
     final ref = _storage.ref('users/$uid/profile.jpg');
-    await ref.putFile(
-      image,
-      SettableMetadata(contentType: 'image/jpeg'),
-    );
-
+    await ref.putFile(image, SettableMetadata(contentType: 'image/jpeg'));
     final url = await ref.getDownloadURL();
 
-    // URL in Firebase Auth und Firestore speichern
     await _auth.currentUser!.updatePhotoURL(url);
-    await _firestore
-        .collection('users')
-        .doc(uid)
-        .update({'photoUrl': url});
+    await _firestore.collection('users').doc(uid).update({'photoUrl': url});
 
     return url;
+  }
+
+  // ── E-Mail-Verifizierung ───────────────────────────────────────────────────
+
+  @override
+  Future<void> sendEmailVerification() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    await user.sendEmailVerification();
+  }
+
+  @override
+  Future<bool> reloadAndCheckEmailVerified() async {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+    await user.reload();
+    final verified = _auth.currentUser?.emailVerified ?? false;
+    if (verified) {
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .update({'emailVerified': true});
+    }
+    return verified;
+  }
+
+  // ── Telefon ────────────────────────────────────────────────────────────────
+
+  @override
+  Future<void> savePhone(String phone) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+    await _firestore.collection('users').doc(uid).update({
+      'phone': phone,
+      'phoneVerified': true,
+    });
+  }
+
+  @override
+  Future<void> startPhoneVerification(
+    String phone, {
+    required void Function(String verificationId) onCodeSent,
+    required void Function(String error) onError,
+  }) async {
+    await _auth.verifyPhoneNumber(
+      phoneNumber: phone,
+      verificationCompleted: (PhoneAuthCredential cred) async {
+        // Android: automatisch erkannter Code
+        try {
+          await _auth.currentUser!.linkWithCredential(cred);
+          await savePhone(phone);
+        } catch (_) {
+          await _auth.currentUser!.updatePhoneNumber(cred);
+          await savePhone(phone);
+        }
+      },
+      verificationFailed: (FirebaseAuthException e) =>
+          onError(e.message ?? 'Verifizierung fehlgeschlagen'),
+      codeSent: (String verificationId, int? resendToken) =>
+          onCodeSent(verificationId),
+      codeAutoRetrievalTimeout: (_) {},
+    );
+  }
+
+  @override
+  Future<void> confirmPhoneCode(
+      String verificationId, String smsCode) async {
+    final cred = PhoneAuthProvider.credential(
+      verificationId: verificationId,
+      smsCode: smsCode,
+    );
+    try {
+      await _auth.currentUser!.linkWithCredential(cred);
+    } catch (_) {
+      await _auth.currentUser!.updatePhoneNumber(cred);
+    }
+    final phone = _auth.currentUser?.phoneNumber ?? '';
+    await savePhone(phone);
+  }
+
+  // ── Führerschein ───────────────────────────────────────────────────────────
+
+  @override
+  Future<void> uploadLicense(File image) async {
+    final fbUser = _auth.currentUser;
+    if (fbUser == null) throw Exception('Nicht eingeloggt');
+    final uid = fbUser.uid;
+    final path = 'users/$uid/license.jpg';
+
+    final ref = _storage.ref(path);
+    await ref.putFile(image, SettableMetadata(contentType: 'image/jpeg'));
+    // Kein getDownloadURL() – nur der Pfad wird gespeichert
+
+    final batch = _firestore.batch();
+    batch.update(_firestore.collection('users').doc(uid), {
+      'licenseStatus': 'pending',
+      'licenseRejectReason': FieldValue.delete(),
+    });
+    batch.set(_firestore.collection('licenseRequests').doc(uid), {
+      'uid': uid,
+      'userName': fbUser.displayName ?? '',
+      'userPhotoUrl': fbUser.photoURL,
+      'licensePath': path,
+      'status': 'pending',
+      'submittedAt': FieldValue.serverTimestamp(),
+      'rejectReason': null,
+    });
+    await batch.commit();
+  }
+
+  // ── Admin: Führerschein-Prüfung ────────────────────────────────────────────
+
+  @override
+  Stream<List<LicenseRequest>> get pendingLicenseRequests => _firestore
+      .collection('licenseRequests')
+      .where('status', isEqualTo: 'pending')
+      .snapshots()
+      .map((s) {
+        final list = s.docs.map(LicenseRequest.fromDoc).toList();
+        list.sort((a, b) => a.submittedAt.compareTo(b.submittedAt));
+        return list;
+      });
+
+  @override
+  Future<void> approveLicense(String userId) async {
+    final doc =
+        await _firestore.collection('licenseRequests').doc(userId).get();
+    if (doc.data()?['status'] != 'pending') return;
+
+    final batch = _firestore.batch();
+    batch.update(doc.reference, {
+      'status': 'verified',
+      'reviewedAt': FieldValue.serverTimestamp(),
+    });
+    batch.update(_firestore.collection('users').doc(userId), {
+      'licenseStatus': 'verified',
+    });
+    await batch.commit();
+  }
+
+  @override
+  Future<void> rejectLicense(String userId, String reason) async {
+    final doc =
+        await _firestore.collection('licenseRequests').doc(userId).get();
+    if (doc.data()?['status'] != 'pending') return;
+
+    final batch = _firestore.batch();
+    batch.update(doc.reference, {
+      'status': 'rejected',
+      'rejectReason': reason,
+      'reviewedAt': FieldValue.serverTimestamp(),
+    });
+    batch.update(_firestore.collection('users').doc(userId), {
+      'licenseStatus': 'rejected',
+      'licenseRejectReason': reason,
+    });
+    await batch.commit();
+  }
+
+  // ── Auto-Infos ─────────────────────────────────────────────────────────────
+
+  @override
+  Future<void> updateCarInfo(
+      String make, String model, String? color, int? seats) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+    await _firestore.collection('users').doc(uid).update({
+      'car': CarInfo(make: make, model: model, color: color, seats: seats)
+          .toMap(),
+    });
   }
 }
