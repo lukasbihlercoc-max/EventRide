@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -15,7 +16,6 @@ import 'package:my_app/data/event_daten.dart';
 import 'package:my_app/data/event_service.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/data/chat_service.dart';
-import 'package:my_app/data/interessenten_service.dart';
 import 'package:my_app/data/seen_anfragen_service.dart';
 import 'package:my_app/views/pages/login_page.dart';
 import 'package:my_app/views/pages/fahrt_anfragen_page.dart';
@@ -25,6 +25,7 @@ import 'package:my_app/views/widgets/user_avatar_widget.dart';
 import 'package:my_app/views/pages/public_profile_page.dart';
 import 'package:my_app/views/pages/fahrt_finden_page.dart';
 
+import 'package:my_app/views/auth/verification_guard.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/pages/chat_page.dart';
 import 'package:my_app/views/pages/detail_page.dart';
@@ -275,28 +276,20 @@ class _LoggedInFahrtenViewState extends State<_LoggedInFahrtenView>
 
   void _markCurrentTabAsSeen() {
     if (!mounted) return;
+    if (_tabController.index != 0) return;
     final anfrageService = context.read<AnfrageService>();
     final seenService = context.read<SeenAnfragenService>();
     final userId = widget.user.userId;
 
-    if (_tabController.index == 0) {
-      final ids = anfrageService
-          .getAnfragenByRequester(userId)
-          .where((a) =>
-              (a.status != AnfrageStatus.offen &&
-                  a.status != AnfrageStatus.storniert) ||
-              a.vonFahrer)
-          .map((a) => a.id)
-          .toList();
-      seenService.markRequesterAsSeen(userId, ids);
-    } else {
-      final ids = anfrageService
-          .getAnfragenForFahrer(userId)
-          .where((a) => a.status == AnfrageStatus.offen)
-          .map((a) => a.id)
-          .toList();
-      seenService.markOwnerAsSeen(userId, ids);
-    }
+    final ids = anfrageService
+        .getAnfragenByRequester(userId)
+        .where((a) =>
+            (a.status != AnfrageStatus.offen &&
+                a.status != AnfrageStatus.storniert) ||
+            a.vonFahrer)
+        .map((a) => a.id)
+        .toList();
+    seenService.markRequesterAsSeen(userId, ids);
   }
 
   @override
@@ -364,11 +357,6 @@ class _FahrtenTabBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer2<AnfrageService, SeenAnfragenService>(
       builder: (context, anfrageService, seenService, _) {
-        final ownerIds = anfrageService
-            .getAnfragenForFahrer(userId)
-            .where((a) => a.status == AnfrageStatus.offen)
-            .map((a) => a.id);
-
         final requesterIds = anfrageService
             .getAnfragenByRequester(userId)
             .where((a) =>
@@ -384,7 +372,7 @@ class _FahrtenTabBar extends StatelessWidget {
           unselectedLabelColor: Colors.white70,
           tabs: [
             _tabLabel('Mitfahrten', seenService.hasUnseenRequester(userId, requesterIds)),
-            _tabLabel('Meine Fahrten', seenService.hasUnseenOwner(userId, ownerIds)),
+            const Tab(child: Text('Meine Fahrten')),
           ],
         );
       },
@@ -1127,10 +1115,10 @@ class _EinladungsCardState extends State<_EinladungsCard> {
                 // Badge "Einladung" — rechts, leuchtender Stil
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 3),
+                      horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: _orange.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(7),
                     border: Border.all(
                         color: _orange.withValues(alpha: 0.55), width: 1),
                   ),
@@ -1138,8 +1126,8 @@ class _EinladungsCardState extends State<_EinladungsCard> {
                     'Einladung',
                     style: TextStyle(
                       color: _orange,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
@@ -1563,6 +1551,7 @@ class _RequestedRideCardState extends State<_RequestedRideCard> {
   AnfrageDaten get anfrage => widget.anfrage;
 
   void _openChat(BuildContext context) {
+    if (!requireVerified(context)) return;
     widget.onInteracted?.call();
     final chatService = context.read<ChatService>();
 
@@ -1660,26 +1649,26 @@ class _RequestedRideCardState extends State<_RequestedRideCard> {
 
     // ── Einladungs-Label ──
     Widget? einladungsLabel;
-    if (anfrage.vonFahrer) {
+    if (anfrage.vonFahrer && anfrage.status == AnfrageStatus.offen) {
       einladungsLabel = Container(
         margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
           color: Colors.amber.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(7),
           border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.mail_outline, color: Colors.amber.shade400, size: 12),
-            const SizedBox(width: 4),
+            Icon(Icons.mail_outline, color: Colors.amber.shade400, size: 11),
+            const SizedBox(width: 3),
             Text(
               'Einladung',
               style: TextStyle(
                 color: Colors.amber.shade400,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
@@ -1717,7 +1706,7 @@ class _RequestedRideCardState extends State<_RequestedRideCard> {
             Container(width: 1, color: Colors.white.withValues(alpha: 0.12)),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1766,22 +1755,22 @@ class _RequestedRideCardState extends State<_RequestedRideCard> {
                         _StatusBadge(status: anfrage.status),
                       ],
                     ),
-                    const Divider(color: Colors.white12, thickness: 1, height: 20),
+                    const Divider(color: Colors.white12, thickness: 1, height: 16),
                     _FahrerProfilRow(userId: fahrt.ownerId, name: fahrt.ownerName),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Container(height: 1, color: Colors.white.withValues(alpha: 0.08)),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Text(
                       '${fahrt.abfahrtsortAnzeige}  →  ${fahrt.standort}',
                       style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 16,
+                          fontSize: 15,
                           fontWeight: FontWeight.w600),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
+                      spacing: 6,
+                      runSpacing: 5,
                       children: [
                         _TimeBadge(
                             icon: Icons.schedule,
@@ -1796,7 +1785,7 @@ class _RequestedRideCardState extends State<_RequestedRideCard> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     aktionenWidget,
                   ],
                 ),
@@ -2067,44 +2056,32 @@ class _EinladungButtonsState extends State<_EinladungButtons> {
   bool _loading = false;
 
   Future<void> _annehmen() async {
+    if (!requireVerified(context)) return;
     setState(() => _loading = true);
     final anfrageService = context.read<AnfrageService>();
-    final fahrtService = context.read<FahrtService>();
-    final interessentenService = context.read<InteressentenService>();
-    final currentUser = context.read<IAuthRepository>().currentUser;
-
-    final aktuelleFahrt = fahrtService.alleFahrten
-        .firstWhere((f) => f.id == widget.fahrt.id, orElse: () => widget.fahrt);
-
-    if (aktuelleFahrt.freiePlaetze <= 0) {
-      if (mounted) {
-        AppSnackbar.show(context,
-            message: 'Leider keine Plätze mehr frei.');
-        setState(() => _loading = false);
+    try {
+      final ok = await anfrageService.acceptAnfrageAtomisch(
+        anfrage: widget.anfrage,
+        seatsAccepted: 1,
+      );
+      if (!ok || !mounted) {
+        if (mounted) setState(() => _loading = false);
+        return;
       }
-      return;
-    }
-
-    final ok = await anfrageService.akzeptiereAnfrage(
-      anfrage: widget.anfrage,
-      fahrt: aktuelleFahrt,
-      seatsAccepted: 1,
-    );
-
-    if (!ok || !mounted) {
-      if (mounted) setState(() => _loading = false);
-      return;
-    }
-
-    // Aus Interessenten entfernen
-    if (currentUser != null) {
-      await interessentenService.removeForUser(
-          widget.fahrt.eventId, currentUser.userId);
-    }
-
-    if (mounted) {
-      widget.onInteracted?.call();
-      AppSnackbar.show(context, message: 'Einladung angenommen!');
+      if (mounted) {
+        widget.onInteracted?.call();
+        AppSnackbar.show(context, message: 'Einladung angenommen!');
+      }
+    } on FirebaseFunctionsException catch (e) {
+      if (!mounted) return;
+      final msg = switch (e.code) {
+        'already-exists' => 'Du hast bereits eine Fahrt für dieses Event.',
+        'failed-precondition' => e.message ?? 'Einladung wurde zurückgezogen.',
+        'not-found' => 'Fahrt oder Einladung nicht mehr vorhanden.',
+        _ => 'Fehler: ${e.message ?? e.code}',
+      };
+      AppSnackbar.show(context, message: msg);
+      setState(() => _loading = false);
     }
   }
 
@@ -2208,56 +2185,69 @@ class _MitfahrerAktionenState extends State<_MitfahrerAktionen> {
     switch (widget.anfrage.status) {
       // ── OFFEN: warten + zurückziehen ──────────────────────────
       case AnfrageStatus.offen:
-        return Align(
-          alignment: Alignment.centerRight,
-          child: TextButton(
-            onPressed: () async {
-              final confirmed = await showDialog<bool>(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  backgroundColor: const Color(0xFF1A1F2E),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
-                  title: const Text('Anfrage zurückziehen?',
-                      style: TextStyle(color: Colors.white, fontSize: 16)),
-                  content: const Text(
-                    'Möchtest du deine Anfrage wirklich zurückziehen?',
-                    style: TextStyle(color: Colors.white70, fontSize: 14),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx, false),
-                      child: const Text('Abbrechen',
-                          style: TextStyle(color: Colors.white54)),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx, true),
-                      child: const Text('Zurückziehen',
-                          style: TextStyle(
-                              color: Colors.redAccent,
-                              fontWeight: FontWeight.w600)),
-                    ),
-                  ],
-                ),
-              );
-              if (confirmed == true) _stornieren();
-            },
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.white38,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              minimumSize: Size.zero,
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            IconButton(
+              onPressed: widget.openChat,
+              icon: const Icon(Icons.chat_bubble_outline,
+                  color: Colors.white38, size: 18),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              style: IconButton.styleFrom(
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              tooltip: 'Chat öffnen',
             ),
-            child: const Text(
-              'Anfrage zurückziehen',
-              style: TextStyle(
-                fontSize: 12,
-                decoration: TextDecoration.underline,
-                decorationColor: Colors.white24,
+            TextButton(
+              onPressed: () async {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    backgroundColor: const Color(0xFF1A1F2E),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                    title: const Text('Anfrage zurückziehen?',
+                        style: TextStyle(color: Colors.white, fontSize: 16)),
+                    content: const Text(
+                      'Möchtest du deine Anfrage wirklich zurückziehen?',
+                      style: TextStyle(color: Colors.white70, fontSize: 14),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Abbrechen',
+                            style: TextStyle(color: Colors.white54)),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('Zurückziehen',
+                            style: TextStyle(
+                                color: Colors.redAccent,
+                                fontWeight: FontWeight.w600)),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed == true) _stornieren();
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white38,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                minimumSize: Size.zero,
+              ),
+              child: const Text(
+                'Anfrage zurückziehen',
+                style: TextStyle(
+                  fontSize: 12,
+                  decoration: TextDecoration.underline,
+                  decorationColor: Colors.white24,
+                ),
               ),
             ),
-          ),
+          ],
         );
 
       // ── AKZEPTIERT: mit Fahrer chatten ────────────────────────
@@ -2268,16 +2258,16 @@ class _MitfahrerAktionenState extends State<_MitfahrerAktionen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blueAccent,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 10),
+              padding: const EdgeInsets.symmetric(vertical: 7),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
-            icon: const Icon(Icons.chat_bubble_outline, size: 16),
+            icon: const Icon(Icons.chat_bubble_outline, size: 14),
             label: const Text(
               'Mit Fahrer chatten',
-              style: TextStyle(fontSize: 13),
+              style: TextStyle(fontSize: 12),
             ),
             onPressed: widget.openChat,
           ),
@@ -2293,11 +2283,13 @@ class _MitfahrerAktionenState extends State<_MitfahrerAktionen> {
           ),
           style: TextButton.styleFrom(
             foregroundColor: _InaktivStyles.andereFahrtFarbe,
+            overlayColor: Colors.transparent,
             padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             minimumSize: Size.zero,
           ),
-          icon: const Icon(Icons.search, size: 15),
+          icon: const Icon(Icons.search, size: 15,
+              color: Color.fromARGB(255, 255, 170, 60)),
           label: const Text(
             'Andere Fahrt finden',
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
@@ -2315,11 +2307,13 @@ class _MitfahrerAktionenState extends State<_MitfahrerAktionen> {
           ),
           style: TextButton.styleFrom(
             foregroundColor: _InaktivStyles.andereFahrtFarbe,
+            overlayColor: Colors.transparent,
             padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             minimumSize: Size.zero,
           ),
-          icon: const Icon(Icons.search, size: 15),
+          icon: const Icon(Icons.search, size: 15,
+              color: Color.fromARGB(255, 255, 170, 60)),
           label: const Text(
             'Andere Fahrt finden',
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
@@ -2447,12 +2441,14 @@ class _RequestedRideDeletedCard extends StatelessWidget {
                   ),
                   style: TextButton.styleFrom(
                     foregroundColor: _InaktivStyles.andereFahrtFarbe,
+                    overlayColor: Colors.transparent,
                     padding: const EdgeInsets.symmetric(
                         horizontal: 0, vertical: 4),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     minimumSize: Size.zero,
                   ),
-                  icon: const Icon(Icons.search, size: 15),
+                  icon: const Icon(Icons.search, size: 15,
+                      color: Color.fromARGB(255, 255, 170, 60)),
                   label: const Text(
                     'Andere Fahrt finden',
                     style:
@@ -2544,7 +2540,8 @@ class _InaktivStyles {
   static const double cardOpacity = 0.95;
 
   // ── Link „Andere Fahrt finden" ────────────────────────────────────────────
-  static const Color andereFahrtFarbe = Color.fromARGB(180, 255, 170, 60);
+  static const Color andereFahrtFarbe    = Color.fromARGB(180, 255, 170, 60);
+  static const Color andereFahrtLupeFarbe = Color.fromARGB(115, 255, 170, 60);
 
   // ── Kartenhintergrund ─────────────────────────────────────────────────────
   static BoxDecoration cardDecoration() => BoxDecoration(
@@ -2670,10 +2667,10 @@ class _TimeBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(9),
         border: Border.all(
           color: Colors.white.withValues(alpha: 0.12),
         ),
@@ -2681,14 +2678,14 @@ class _TimeBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 13, color: Colors.white60),
-          const SizedBox(width: 5),
+          Icon(icon, size: 12, color: Colors.white60),
+          const SizedBox(width: 4),
           Text(
             text,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
