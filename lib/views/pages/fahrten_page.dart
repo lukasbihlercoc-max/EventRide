@@ -529,6 +529,7 @@ class _AngeboteneFahrtenTabState extends State<_AngeboteneFahrtenTab>
     return Consumer<FahrtService>(
       builder: (context, fahrtService, _) {
         final es = context.read<EventService>();
+        final anfrageService = context.watch<AnfrageService>();
         final datumCache = {for (final e in es.events) e.id: e.datum};
         final meineFahrten = List<FahrtDaten>.from(
           fahrtService.getFahrtenByUser(widget.userId),
@@ -548,6 +549,15 @@ class _AngeboteneFahrtenTabState extends State<_AngeboteneFahrtenTab>
           ..sort((a, b) => (datumCache[b.eventId] ?? DateTime(2000))
               .compareTo(datumCache[a.eventId] ?? DateTime(2000)));
 
+        final fahrtById = {for (final f in meineFahrten) f.id: f};
+        final offeneAnfragen = <_AnfrageWithFahrt>[];
+        for (final a in anfrageService.getAnfragenForFahrer(widget.userId)) {
+          if (a.status == AnfrageStatus.offen && !a.vonFahrer) {
+            final f = fahrtById[a.fahrtId];
+            if (f != null) offeneAnfragen.add(_AnfrageWithFahrt(a, f));
+          }
+        }
+
         if (aktiveFahrten.isEmpty && vergangeneFahrten.isEmpty) {
           return const _EmptyState(
             icon: Icons.directions_car_filled_outlined,
@@ -562,6 +572,10 @@ class _AngeboteneFahrtenTabState extends State<_AngeboteneFahrtenTab>
             Expanded(
               child: CustomScrollView(
                 slivers: [
+                  if (offeneAnfragen.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: _OffeneAnfragenSection(items: offeneAnfragen),
+                    ),
                   SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
@@ -943,6 +957,202 @@ class _RequestedRideItem {
   final FahrtDaten? fahrt;
 
   _RequestedRideItem(this.anfrage, this.fahrt);
+}
+
+/// ------------------------------------------------------------
+/// Offene-Anfragen-Sektion (collapsible, oben im Meine-Fahrten-Tab)
+/// ------------------------------------------------------------
+class _AnfrageWithFahrt {
+  final AnfrageDaten anfrage;
+  final FahrtDaten fahrt;
+  const _AnfrageWithFahrt(this.anfrage, this.fahrt);
+}
+
+class _OffeneAnfragenSection extends StatefulWidget {
+  final List<_AnfrageWithFahrt> items;
+  const _OffeneAnfragenSection({required this.items});
+
+  @override
+  State<_OffeneAnfragenSection> createState() => _OffeneAnfragenSectionState();
+}
+
+class _OffeneAnfragenSectionState extends State<_OffeneAnfragenSection> {
+  bool _expanded = false;
+
+  static const _accent = Color(0xFF64B5F6);
+
+  @override
+  Widget build(BuildContext context) {
+    final items = widget.items;
+    final extraCount = items.length - 1;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: Divider(
+                    color: Colors.white.withValues(alpha: 0.25), thickness: 1),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Row(
+                  children: const [
+                    Icon(Icons.inbox_outlined, size: 13, color: Colors.white),
+                    SizedBox(width: 5),
+                    Text(
+                      'ANFRAGEN',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Divider(
+                    color: Colors.white.withValues(alpha: 0.25), thickness: 1),
+              ),
+            ],
+          ),
+        ),
+        RepaintBoundary(child: _AnfrageMiniCard(item: items[0])),
+        if (extraCount > 0) ...[
+          AnimatedSize(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeInOut,
+            child: _expanded
+                ? Column(
+                    children: items
+                        .skip(1)
+                        .map((item) =>
+                            RepaintBoundary(child: _AnfrageMiniCard(item: item)))
+                        .toList(),
+                  )
+                : const SizedBox.shrink(),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            child: GestureDetector(
+              onTap: () => setState(() => _expanded = !_expanded),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: _accent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _accent.withValues(alpha: 0.35)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      _expanded ? Icons.expand_less : Icons.expand_more,
+                      size: 16,
+                      color: _accent,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _expanded
+                          ? 'Weniger anzeigen'
+                          : '+ $extraCount weitere anzeigen',
+                      style: const TextStyle(
+                        color: _accent,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _AnfrageMiniCard extends StatelessWidget {
+  final _AnfrageWithFahrt item;
+  const _AnfrageMiniCard({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final anfrage = item.anfrage;
+    final fahrt = item.fahrt;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: GestureDetector(
+        onTap: () => Navigator.push(
+          context,
+          AppRoute(builder: (_) => FahrtAnfragenPage(fahrt: fahrt)),
+        ),
+        child: AppCard(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              UserAvatarById(
+                userId: anfrage.requesterId,
+                name: anfrage.requesterName,
+                radius: 22,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      anfrage.requesterName,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      anfrage.eventName,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.65),
+                        fontSize: 12,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (anfrage.seatsRequested > 1) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        '${anfrage.seatsRequested} Plätze',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.5),
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right,
+                color: Colors.white.withValues(alpha: 0.45),
+                size: 20,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// ------------------------------------------------------------
@@ -2056,11 +2266,9 @@ class _RequestedRideCardState extends State<_RequestedRideCard> {
         ? Opacity(
             opacity: _InaktivStyles.cardOpacity,
             child: Container(
+              clipBehavior: Clip.hardEdge,
               decoration: _InaktivStyles.cardDecoration(),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(22),
-                child: cardChild,
-              ),
+              child: cardChild,
             ),
           )
         : AppCard(
@@ -2828,7 +3036,7 @@ class _FahrerProfilRowState extends State<_FahrerProfilRow> {
             name: widget.name,
             radius: widget.avatarRadius,
             backgroundColor: widget.avatarBg,
-            onPhotoLoaded: (url) => setState(() => _photoUrl = url),
+            onPhotoLoaded: (url) => _photoUrl = url,
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -2891,12 +3099,18 @@ class _ReviewPrompt extends StatefulWidget {
 }
 
 class _ReviewPromptState extends State<_ReviewPrompt> {
+  static final _cache = <String, bool>{};
   bool? _reviewExists; // null = loading, true = schon bewertet, false = ausstehend
 
   @override
   void initState() {
     super.initState();
-    _check();
+    final cached = _cache[widget.fahrtId];
+    if (cached != null) {
+      _reviewExists = cached;
+    } else {
+      _check();
+    }
   }
 
   Future<void> _check() async {
@@ -2906,6 +3120,7 @@ class _ReviewPromptState extends State<_ReviewPrompt> {
 
     // Event noch nicht vorbei → kein CTA
     if (cutoff.isAfter(now)) {
+      _cache[widget.fahrtId] = true;
       if (mounted) setState(() => _reviewExists = true);
       return;
     }
@@ -2915,6 +3130,7 @@ class _ReviewPromptState extends State<_ReviewPrompt> {
       if (widget.showReviewedStatus) {
         // weiter zum Firestore-Check
       } else {
+        _cache[widget.fahrtId] = true;
         if (mounted) setState(() => _reviewExists = true);
         return;
       }
@@ -2922,6 +3138,7 @@ class _ReviewPromptState extends State<_ReviewPrompt> {
 
     final currentUid = context.read<IAuthRepository>().currentUser?.userId;
     if (currentUid == null) {
+      _cache[widget.fahrtId] = true;
       if (mounted) setState(() => _reviewExists = true);
       return;
     }
@@ -2934,7 +3151,9 @@ class _ReviewPromptState extends State<_ReviewPrompt> {
           .where('fahrtId', isEqualTo: widget.fahrtId)
           .limit(1)
           .get();
-      if (mounted) setState(() => _reviewExists = snap.docs.isNotEmpty);
+      final exists = snap.docs.isNotEmpty;
+      _cache[widget.fahrtId] = exists;
+      if (mounted) setState(() => _reviewExists = exists);
     } catch (_) {
       if (mounted) setState(() => _reviewExists = true);
     }
@@ -3177,14 +3396,13 @@ class _VergangeneAnfrageCard extends StatelessWidget {
       child: Opacity(
         opacity: 0.82,
         child: Container(
+          clipBehavior: Clip.hardEdge,
           decoration: _InaktivStyles.cardDecoration(),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(22),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                   // Eventname + Vergangen-Badge
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -3341,7 +3559,6 @@ class _VergangeneAnfrageCard extends StatelessWidget {
                 ],
               ),
             ),
-          ),
         ),
       ),
     );
@@ -3488,14 +3705,13 @@ class _VergangeneGlassCard extends StatelessWidget {
       child: Opacity(
         opacity: 0.82,
         child: Container(
+          clipBehavior: Clip.hardEdge,
           decoration: _InaktivStyles.cardDecoration(),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(22),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                   // Eventname + Badge
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -3617,7 +3833,6 @@ class _VergangeneGlassCard extends StatelessWidget {
                 ],
               ),
             ),
-          ),
         ),
       ),
     );
