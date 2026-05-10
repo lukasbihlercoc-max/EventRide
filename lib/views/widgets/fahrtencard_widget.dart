@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import 'package:my_app/data/fahrt_daten.dart';
 import 'package:my_app/data/event_daten.dart';
+import 'package:my_app/utils/app_route.dart';
 import 'package:my_app/data/anfrage_daten.dart';
 import 'package:my_app/views/widgets/trust_shields_widget.dart';
 import 'package:my_app/data/anfrage_service.dart';
@@ -101,7 +102,7 @@ void showEventDetailsPopup(BuildContext context, Event event) {
                           Navigator.pop(ctx);
                           Navigator.push(
                             context,
-                            MaterialPageRoute(
+                            AppRoute(
                               builder: (_) => DetailPage(event: event),
                             ),
                           );
@@ -182,57 +183,63 @@ void showEventDetailsPopup(BuildContext context, Event event) {
 class FahrtenCard extends StatefulWidget {
   final FahrtDaten fahrt;
   final bool isEditable;
-  
+  final double? homeTownDistanceKm;
 
-  const FahrtenCard({super.key, required this.fahrt, this.isEditable = false});
+  const FahrtenCard({
+    super.key,
+    required this.fahrt,
+    this.isEditable = false,
+    this.homeTownDistanceKm,
+  });
 
   @override
   State<FahrtenCard> createState() => _FahrtenCardState();
 }
 
 class _FahrtenCardState extends State<FahrtenCard> {
-  bool _pressed = false;
+  final _pressed = ValueNotifier<bool>(false);
 
   // Getter damit alle bestehenden Methoden unverändert bleiben
   FahrtDaten get fahrt => widget.fahrt;
   bool get isEditable => widget.isEditable;
 
   @override
+  void dispose() {
+    _pressed.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final offeneAnfragenCount = context.select<AnfrageService, int>(
-      (s) => s
-          .getAnfragenForFahrt(fahrt.id)
-          .where((a) => a.status == AnfrageStatus.offen)
-          .length,
+      (s) => s.offeneAnfragenProFahrt[fahrt.id] ?? 0,
     );
-
 
     final screenHeight = MediaQuery.of(context).size.height;
 
-    return AnimatedScale(
-      scale: _pressed ? 0.975 : 1.0,
-      duration: const Duration(milliseconds: 120),
-      curve: Curves.easeOut,
-      child: GestureDetector(
-        onTapDown: (_) => setState(() => _pressed = true),
-        onTapUp: (_) => setState(() => _pressed = false),
-        onTapCancel: () => setState(() => _pressed = false),
-        child: Padding(
+    return RepaintBoundary(
+      child: ValueListenableBuilder<bool>(
+        valueListenable: _pressed,
+        builder: (_, pressed, child) => AnimatedScale(
+          scale: pressed ? 0.975 : 1.0,
+          duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOut,
+          child: child,
+        ),
+        child: GestureDetector(
+          onTapDown: (_) => _pressed.value = true,
+          onTapUp: (_) => _pressed.value = false,
+          onTapCancel: () => _pressed.value = false,
+          child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(22),
+            decoration: const BoxDecoration(
+              borderRadius: BorderRadius.all(Radius.circular(22)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.2),
-                  blurRadius: 30,
-                  spreadRadius: 1,
-                  offset: const Offset(0, 10),
-                ),
-                BoxShadow(
-                  color: const Color(0xFF1A2744).withValues(alpha: 0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+                  color: Colors.black26,
+                  blurRadius: 12,
+                  offset: Offset(0, 6),
                 ),
               ],
             ),
@@ -250,6 +257,7 @@ class _FahrtenCardState extends State<FahrtenCard> {
                         getBackgroundImage(fahrt.richtung),
                         fit: BoxFit.cover,
                         alignment: getBackgroundAlignment(fahrt.richtung),
+                        cacheWidth: 800,
                       ),
                     ),
 
@@ -287,7 +295,7 @@ class _FahrtenCardState extends State<FahrtenCard> {
                               ),
                               onPressed: () => Navigator.push(
                                 context,
-                                MaterialPageRoute(
+                                AppRoute(
                                   builder: (_) =>
                                       FahrtAnfragenPage(fahrt: fahrt),
                                 ),
@@ -364,6 +372,7 @@ class _FahrtenCardState extends State<FahrtenCard> {
           ),
         ),
       ),
+    ),
     );
   }
 
@@ -437,6 +446,32 @@ class _FahrtenCardState extends State<FahrtenCard> {
                       'Ausgebucht',
                       style: TextStyle(
                         color: Colors.blueGrey,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            if (widget.homeTownDistanceKm != null) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white38),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.near_me_rounded, color: Colors.white70, size: 13),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${widget.homeTownDistanceKm! < 10 ? widget.homeTownDistanceKm!.toStringAsFixed(1) : widget.homeTownDistanceKm!.round()} km entfernt',
+                      style: const TextStyle(
+                        color: Colors.white70,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -595,13 +630,6 @@ class _FahrtenCardState extends State<FahrtenCard> {
               Colors.blue.withValues(alpha: 0.69),
             ],
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.amber.withValues(alpha: 0.2),
-              blurRadius: 18,
-              spreadRadius: 1,
-            ),
-          ],
         ),
         child: const Center(
           child: Text(
@@ -631,7 +659,7 @@ class _FahrtenCardState extends State<FahrtenCard> {
 
     Navigator.push(
       context,
-      MaterialPageRoute(
+      AppRoute(
         builder: (context) =>
             FahrtAnbietenPage(event: event, existingFahrt: fahrt),
       ),
@@ -1035,16 +1063,22 @@ class _FahrerProfilBlock extends StatefulWidget {
 }
 
 class _FahrerProfilBlockState extends State<_FahrerProfilBlock> {
-  String? _photoUrl;
+  final _photoUrl = ValueNotifier<String?>(null);
+
+  @override
+  void dispose() {
+    _photoUrl.dispose();
+    super.dispose();
+  }
 
   void _navigate() {
     Navigator.push(
       context,
-      MaterialPageRoute(
+      AppRoute(
         builder: (_) => PublicProfilePage(
           userId: widget.userId,
           name: widget.name,
-          photoUrl: _photoUrl,
+          photoUrl: _photoUrl.value,
         ),
       ),
     );
@@ -1062,7 +1096,7 @@ class _FahrerProfilBlockState extends State<_FahrerProfilBlock> {
             name: widget.name,
             radius: 21,
             backgroundColor: const Color(0xFF2F5ED6),
-            onPhotoLoaded: (url) => setState(() => _photoUrl = url),
+            onPhotoLoaded: (url) => _photoUrl.value = url,
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -1084,7 +1118,7 @@ class _FahrerProfilBlockState extends State<_FahrerProfilBlock> {
                       ),
                     ),
                     const SizedBox(width: 6),
-                    const TrustShields(filled: 1, size: 14),
+                    TrustShieldsByUserId(userId: widget.userId, size: 14),
                   ],
                 ),
               ],

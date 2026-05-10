@@ -20,6 +20,17 @@ class AnfrageService with ChangeNotifier {
   /// Unveränderliche Kopie nach außen
   List<AnfrageDaten> get alleAnfragen => List.unmodifiable(_alleAnfragen);
 
+  /// Vorberechnete Map: fahrtId → Anzahl offener Anfragen (O(1) pro Karte)
+  Map<String, int> get offeneAnfragenProFahrt {
+    final map = <String, int>{};
+    for (final a in _alleAnfragen) {
+      if (a.status == AnfrageStatus.offen) {
+        map[a.fahrtId] = (map[a.fahrtId] ?? 0) + 1;
+      }
+    }
+    return map;
+  }
+
   /// Muss vor der ersten Benutzung aufgerufen werden (z. B. in main).
   Future<void> init(IAnfrageRepository repository, IAuthRepository auth) async {
     _repository = repository;
