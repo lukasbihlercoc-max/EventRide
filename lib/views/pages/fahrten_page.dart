@@ -1,9 +1,11 @@
 import 'dart:ui';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:my_app/utils/app_route.dart';
 import 'package:my_app/views/widgets/app_card.dart';
 import 'package:my_app/views/widgets/trust_shields_widget.dart';
 
@@ -86,7 +88,7 @@ void _showEventInfoDialog(BuildContext context, Event event) {
                           Navigator.pop(ctx);
                           Navigator.push(
                             context,
-                            MaterialPageRoute(
+                            AppRoute(
                               builder: (_) => DetailPage(event: event),
                             ),
                           );
@@ -166,6 +168,16 @@ void _showEventInfoDialog(BuildContext context, Event event) {
 // Hilfsfunktion: Eventdatum für Sortierung (unbekannte Events ans Ende)
 // ---------------------------------------------------------------------------
 
+/// Gibt true zurück wenn das Event bereits vorbei ist (+ 3h Puffer)
+/// UND weniger als 30 Tage her ist → Anzeige-Grenze.
+bool _istVergangen(DateTime eventDatum) {
+  if (eventDatum.year == 2000) return false; // unbekanntes Datum → aktiv lassen
+  final ende = eventDatum.add(const Duration(hours: 3));
+  final anzeigeGrenze = ende.add(const Duration(days: 30));
+  final now = DateTime.now();
+  return ende.isBefore(now) && anzeigeGrenze.isAfter(now);
+}
+
 class MeineFahrtenPage extends StatelessWidget {
   const MeineFahrtenPage({super.key});
 
@@ -213,7 +225,7 @@ class MeineFahrtenPage extends StatelessWidget {
                       ElevatedButton.icon(
                         onPressed: () => Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => const LoginPage()),
+                          AppRoute(builder: (_) => const LoginPage()),
                         ),
                         icon: const Icon(Icons.login),
                         label: const Text('Anmelden'),
@@ -505,7 +517,7 @@ class _AngeboteneFahrtenTabState extends State<_AngeboteneFahrtenTab>
     );
     Navigator.push(
       context,
-      MaterialPageRoute(
+      AppRoute(
         builder: (_) => FahrtAnbietenPage(event: event, existingFahrt: fahrt),
       ),
     );
@@ -524,7 +536,19 @@ class _AngeboteneFahrtenTabState extends State<_AngeboteneFahrtenTab>
             (datumCache[a.eventId] ?? DateTime(9999))
                 .compareTo(datumCache[b.eventId] ?? DateTime(9999)));
 
-        if (meineFahrten.isEmpty) {
+        // Aktive vs. vergangene Fahrten trennen
+        final aktiveFahrten = meineFahrten
+            .where((f) =>
+                !_istVergangen(datumCache[f.eventId] ?? DateTime(9999)))
+            .toList();
+        final vergangeneFahrten = meineFahrten
+            .where((f) =>
+                _istVergangen(datumCache[f.eventId] ?? DateTime(9999)))
+            .toList()
+          ..sort((a, b) => (datumCache[b.eventId] ?? DateTime(2000))
+              .compareTo(datumCache[a.eventId] ?? DateTime(2000)));
+
+        if (aktiveFahrten.isEmpty && vergangeneFahrten.isEmpty) {
           return const _EmptyState(
             icon: Icons.directions_car_filled_outlined,
             title: 'Noch keine Fahrten erstellt',
@@ -534,31 +558,44 @@ class _AngeboteneFahrtenTabState extends State<_AngeboteneFahrtenTab>
 
         return Column(
           children: [
-            const _SwipeHint(),
+            if (aktiveFahrten.isNotEmpty) const _SwipeHint(),
             Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.only(bottom: 130),
-                itemCount: meineFahrten.length,
-                itemBuilder: (context, index) {
-                  final fahrt = meineFahrten[index];
-                  return RepaintBoundary(
-                    child: Dismissible(
-                      key: ValueKey(fahrt.id),
-                      direction: DismissDirection.horizontal,
-                      confirmDismiss: (direction) async {
-                        if (direction == DismissDirection.startToEnd) {
-                          _handleEdit(fahrt);
-                          return false;
-                        }
-                        return _confirmDelete(fahrt);
+              child: CustomScrollView(
+                slivers: [
+                  SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final fahrt = aktiveFahrten[index];
+                        return RepaintBoundary(
+                          child: Dismissible(
+                            key: ValueKey(fahrt.id),
+                            direction: DismissDirection.horizontal,
+                            confirmDismiss: (direction) async {
+                              if (direction == DismissDirection.startToEnd) {
+                                _handleEdit(fahrt);
+                                return false;
+                              }
+                              return _confirmDelete(fahrt);
+                            },
+                            onDismissed: (_) => _deleteFahrt(fahrt),
+                            background: const _SwipeEditBackground(),
+                            secondaryBackground: const _SwipeDeleteBackground(),
+                            child: _FahrerGlassCard(fahrt: fahrt),
+                          ),
+                        );
                       },
-                      onDismissed: (_) => _deleteFahrt(fahrt),
-                      background: const _SwipeEditBackground(),
-                      secondaryBackground: const _SwipeDeleteBackground(),
-                      child: _FahrerGlassCard(fahrt: fahrt),
+                      childCount: aktiveFahrten.length,
                     ),
-                  );
-                },
+                  ),
+                  if (vergangeneFahrten.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: _VergangeneGlassSection(
+                        fahrten: vergangeneFahrten,
+                        datumCache: datumCache,
+                      ),
+                    ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 130)),
+                ],
               ),
             ),
           ],
@@ -716,13 +753,18 @@ class _AngefragteFahrtenTabState extends State<_AngefragteFahrtenTab>
   final Set<String> _unseenCardIds = {};
 
   /// Fügt neue unseen-IDs aus dem SeenService hinzu (ohne setState — wird in build aufgerufen).
+  /// Nur Status-Änderungen (akzeptiert/abgelehnt) und Fahrer-Einladungen lösen den Dot aus —
+  /// eigene offene Anfragen werden bewusst ignoriert.
   void _syncUnseenIds(List<_RequestedRideItem> items, SeenAnfragenService seenService) {
     for (final item in items) {
-      if (item.fahrt != null) {
-        final id = item.anfrage.id;
-        if (seenService.hasUnseenRequester(widget.userId, [id])) {
-          _unseenCardIds.add(id);
-        }
+      if (item.fahrt == null) continue;
+      final a = item.anfrage;
+      final isRelevant = (a.status != AnfrageStatus.offen &&
+                          a.status != AnfrageStatus.storniert) ||
+                         a.vonFahrer;
+      if (!isRelevant) continue;
+      if (seenService.hasUnseenRequester(widget.userId, [a.id])) {
+        _unseenCardIds.add(a.id);
       }
     }
   }
@@ -740,6 +782,8 @@ class _AngefragteFahrtenTabState extends State<_AngefragteFahrtenTab>
     return Consumer3<AnfrageService, FahrtService, SeenAnfragenService>(
       builder: (context, anfrageService, fahrtService, seenService, _) {
         final fahrtMap = {for (final f in fahrtService.alleFahrten) f.id: f};
+        final es = context.read<EventService>();
+        final eventDatumCache = {for (final e in es.events) e.id: e.datum};
 
         final items = anfrageService
             .getAnfragenByRequester(widget.userId)
@@ -762,11 +806,30 @@ class _AngefragteFahrtenTabState extends State<_AngefragteFahrtenTab>
             return b.anfrage.updatedAt.compareTo(a.anfrage.updatedAt);
           });
 
-        // Normale Anfragen: alles andere
-        final normalAnfragen = items
+        // Alle restlichen Anfragen (keine offene Fahrereinladung)
+        final alleNormal = items
             .where((i) =>
                 !(i.anfrage.vonFahrer &&
                     i.anfrage.status == AnfrageStatus.offen))
+            .toList();
+
+        // Vergangene: akzeptiert + Event vorbei + innerhalb 30 Tage
+        final vergangeneAnfragen = alleNormal
+            .where((i) =>
+                i.fahrt != null &&
+                i.anfrage.status == AnfrageStatus.akzeptiert &&
+                _istVergangen(
+                    eventDatumCache[i.fahrt!.eventId] ?? DateTime(9999)))
+            .toList()
+          ..sort((a, b) =>
+              (eventDatumCache[b.fahrt!.eventId] ?? DateTime(2000))
+                  .compareTo(
+                      eventDatumCache[a.fahrt!.eventId] ?? DateTime(2000)));
+
+        // Aktive: alles andere (ohne vergangene)
+        final vergangeneSet = vergangeneAnfragen.toSet();
+        final normalAnfragen = alleNormal
+            .where((i) => !vergangeneSet.contains(i))
             .toList()
           ..sort((a, b) {
             if (a.fahrt == null && b.fahrt == null) return 0;
@@ -775,7 +838,9 @@ class _AngefragteFahrtenTabState extends State<_AngefragteFahrtenTab>
             return b.anfrage.updatedAt.compareTo(a.anfrage.updatedAt);
           });
 
-        if (einladungen.isEmpty && normalAnfragen.isEmpty) {
+        if (einladungen.isEmpty &&
+            normalAnfragen.isEmpty &&
+            vergangeneAnfragen.isEmpty) {
           return const _EmptyState(
             icon: Icons.chat_bubble_outline,
             title: 'Noch keine Mitfahranfragen',
@@ -855,6 +920,13 @@ class _AngefragteFahrtenTabState extends State<_AngefragteFahrtenTab>
                 ),
               ),
             ],
+            if (vergangeneAnfragen.isNotEmpty)
+              SliverToBoxAdapter(
+                child: _VergangeneAnfragenSection(
+                  items: vergangeneAnfragen,
+                  eventDatumCache: eventDatumCache,
+                ),
+              ),
             const SliverToBoxAdapter(child: SizedBox(height: 130)),
           ],
         );
@@ -911,7 +983,7 @@ class _EinladungsSectionState extends State<_EinladungsSection> {
             children: [
               Expanded(
                 child: Divider(
-                    color: _orange.withValues(alpha: 0.5), thickness: 1),
+                    color: Colors.white.withValues(alpha: 0.25), thickness: 1),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -933,7 +1005,7 @@ class _EinladungsSectionState extends State<_EinladungsSection> {
               ),
               Expanded(
                 child: Divider(
-                    color: _orange.withValues(alpha: 0.5), thickness: 1),
+                    color: Colors.white.withValues(alpha: 0.25), thickness: 1),
               ),
             ],
           ),
@@ -1440,7 +1512,7 @@ class _FahrerGlassCard extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(12),
                                 onTap: () => Navigator.push(
                                   context,
-                                  MaterialPageRoute(
+                                  AppRoute(
                                     builder: (_) =>
                                         FahrtAnfragenPage(fahrt: fahrt),
                                   ),
@@ -1562,9 +1634,8 @@ class _RequestedRideCardState extends State<_RequestedRideCard> {
     );
 
     Navigator.of(context).push(
-      PageRouteBuilder(
-        opaque: true,
-        pageBuilder: (_, __, ___) => ChatPage(
+      AppRoute(
+        builder: (_) => ChatPage(
           conversationId: conversationId,
           otherUserName: fahrt.ownerName,
           otherUserId: fahrt.ownerId,
@@ -1787,6 +1858,14 @@ class _RequestedRideCardState extends State<_RequestedRideCard> {
                     ),
                     const SizedBox(height: 8),
                     aktionenWidget,
+                    // Review-Prompt: nur nach abgeschlossener Fahrt anzeigen
+                    _ReviewPrompt(
+                      fahrtId: fahrt.id,
+                      reviewedId: fahrt.ownerId,
+                      reviewedName: fahrt.ownerName,
+                      reviewedPhotoUrl: null,
+                      eventDatum: event.datum,
+                    ),
                   ],
                 ),
               ),
@@ -2277,7 +2356,7 @@ class _MitfahrerAktionenState extends State<_MitfahrerAktionen> {
       case AnfrageStatus.abgelehnt:
         return TextButton.icon(
           onPressed: () => Navigator.of(context).push(
-            MaterialPageRoute(
+            AppRoute(
               builder: (_) => FahrtFindenPage(event: widget.event),
             ),
           ),
@@ -2301,7 +2380,7 @@ class _MitfahrerAktionenState extends State<_MitfahrerAktionen> {
       case AnfrageStatus.fahrtGeloescht:
         return TextButton.icon(
           onPressed: () => Navigator.of(context).push(
-            MaterialPageRoute(
+            AppRoute(
               builder: (_) => FahrtFindenPage(event: widget.event),
             ),
           ),
@@ -2435,7 +2514,7 @@ class _RequestedRideDeletedCard extends StatelessWidget {
                 const SizedBox(height: 12),
                 TextButton.icon(
                   onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(
+                    AppRoute(
                       builder: (_) => FahrtFindenPage(event: event),
                     ),
                   ),
@@ -2727,7 +2806,7 @@ class _FahrerProfilRowState extends State<_FahrerProfilRow> {
   void _navigate() {
     Navigator.push(
       context,
-      MaterialPageRoute(
+      AppRoute(
         builder: (_) => PublicProfilePage(
           userId: widget.userId,
           name: widget.name,
@@ -2770,7 +2849,7 @@ class _FahrerProfilRowState extends State<_FahrerProfilRow> {
                       ),
                     ),
                     const SizedBox(width: 6),
-                    const TrustShields(filled: 1, size: 12),
+                    TrustShieldsByUserId(userId: widget.userId, size: 12),
                   ],
                 ),
               ],
@@ -2778,6 +2857,768 @@ class _FahrerProfilRowState extends State<_FahrerProfilRow> {
           ),
           Icon(Icons.chevron_right, color: widget.chevronFarbe, size: 18),
         ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// _ReviewPrompt
+// Erscheint nach abgeschlossener Fahrt (Event + 3h vorbei), wenn noch kein
+// Review für diesen Fahrer abgegeben wurde. Navigiert zur PublicProfilePage.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ReviewPrompt extends StatefulWidget {
+  final String fahrtId;
+  final String reviewedId;
+  final String reviewedName;
+  final String? reviewedPhotoUrl;
+  final DateTime eventDatum;
+  /// Wenn true: zeigt "Bewertet ✓" an statt nichts wenn Review bereits existiert.
+  final bool showReviewedStatus;
+
+  const _ReviewPrompt({
+    required this.fahrtId,
+    required this.reviewedId,
+    required this.reviewedName,
+    required this.reviewedPhotoUrl,
+    required this.eventDatum,
+    this.showReviewedStatus = false,
+  });
+
+  @override
+  State<_ReviewPrompt> createState() => _ReviewPromptState();
+}
+
+class _ReviewPromptState extends State<_ReviewPrompt> {
+  bool? _reviewExists; // null = loading, true = schon bewertet, false = ausstehend
+
+  @override
+  void initState() {
+    super.initState();
+    _check();
+  }
+
+  Future<void> _check() async {
+    final cutoff = widget.eventDatum.add(const Duration(hours: 3));
+    final reviewDeadline = cutoff.add(const Duration(days: 14));
+    final now = DateTime.now();
+
+    // Event noch nicht vorbei → kein CTA
+    if (cutoff.isAfter(now)) {
+      if (mounted) setState(() => _reviewExists = true);
+      return;
+    }
+    // 14-Tage-Frist abgelaufen → kein CTA (aber "Bewertet" bleibt sichtbar wenn nötig)
+    if (reviewDeadline.isBefore(now)) {
+      // Wenn showReviewedStatus aktiv, trotzdem prüfen ob bewertet → Status anzeigen
+      if (widget.showReviewedStatus) {
+        // weiter zum Firestore-Check
+      } else {
+        if (mounted) setState(() => _reviewExists = true);
+        return;
+      }
+    }
+
+    final currentUid = context.read<IAuthRepository>().currentUser?.userId;
+    if (currentUid == null) {
+      if (mounted) setState(() => _reviewExists = true);
+      return;
+    }
+
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('reviews')
+          .where('reviewerId', isEqualTo: currentUid)
+          .where('reviewedId', isEqualTo: widget.reviewedId)
+          .where('fahrtId', isEqualTo: widget.fahrtId)
+          .limit(1)
+          .get();
+      if (mounted) setState(() => _reviewExists = snap.docs.isNotEmpty);
+    } catch (_) {
+      if (mounted) setState(() => _reviewExists = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Bereits bewertet: optional kleinen Status zeigen
+    if (_reviewExists == true) {
+      if (widget.showReviewedStatus) {
+        return Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Row(
+            children: const [
+              Icon(Icons.check_circle_outline, size: 13, color: Colors.white30),
+              SizedBox(width: 4),
+              Text('Bewertet',
+                  style: TextStyle(color: Colors.white30, fontSize: 12)),
+            ],
+          ),
+        );
+      }
+      return const SizedBox.shrink();
+    }
+    if (_reviewExists != false) return const SizedBox.shrink(); // loading
+
+    // 14-Tage-Frist abgelaufen → kein CTA mehr
+    final reviewDeadline = widget.eventDatum
+        .add(const Duration(hours: 3))
+        .add(const Duration(days: 14));
+    if (reviewDeadline.isBefore(DateTime.now())) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            AppRoute(
+              builder: (_) => PublicProfilePage(
+                userId: widget.reviewedId,
+                name: widget.reviewedName,
+                photoUrl: widget.reviewedPhotoUrl,
+              ),
+            ),
+          ).then((_) => _check());
+        },
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFF2D2000).withValues(alpha: 0.7),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: const Color(0xFFB8860B).withValues(alpha: 0.5),
+            ),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.star_border_rounded,
+                  color: Colors.amber, size: 16),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Wie war deine Fahrt mit ${widget.reviewedName}?',
+                  style: const TextStyle(
+                    color: Colors.amber,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: Colors.amber, size: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Vergangene Fahrten — Mitfahrer-Tab
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _VergangeneAnfragenSection extends StatefulWidget {
+  final List<_RequestedRideItem> items;
+  final Map<String, DateTime> eventDatumCache;
+
+  const _VergangeneAnfragenSection({
+    required this.items,
+    required this.eventDatumCache,
+  });
+
+  @override
+  State<_VergangeneAnfragenSection> createState() =>
+      _VergangeneAnfragenSectionState();
+}
+
+class _VergangeneAnfragenSectionState
+    extends State<_VergangeneAnfragenSection> {
+  static const _kInitialCount = 3;
+  bool _expanded = false;
+
+  static const _grey = Colors.white38;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = widget.items;
+    final visibleCount =
+        _expanded ? items.length : items.length.clamp(0, _kInitialCount);
+    final hasMore = items.length > _kInitialCount;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Section-Header mit Trennlinien
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 24, 16, 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: Divider(
+                    color: Colors.white.withValues(alpha: 0.25), thickness: 1),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Row(
+                  children: const [
+                    Icon(Icons.history, size: 13, color: Colors.white),
+                    SizedBox(width: 5),
+                    Text(
+                      'VERGANGENE FAHRTEN',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Divider(
+                    color: Colors.white.withValues(alpha: 0.25), thickness: 1),
+              ),
+            ],
+          ),
+        ),
+        // Karten
+        for (var i = 0; i < visibleCount; i++)
+          RepaintBoundary(
+            child: _VergangeneAnfrageCard(
+              fahrt: items[i].fahrt!,
+              anfrage: items[i].anfrage,
+              eventDatum:
+                  widget.eventDatumCache[items[i].fahrt!.eventId] ??
+                      DateTime(2000),
+            ),
+          ),
+        // Expand-Button
+        if (hasMore)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: GestureDetector(
+              onTap: () => setState(() => _expanded = !_expanded),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 9),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      _expanded ? Icons.expand_less : Icons.expand_more,
+                      size: 15,
+                      color: _grey,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      _expanded
+                          ? 'Weniger anzeigen'
+                          : '+ ${items.length - _kInitialCount} weitere',
+                      style: const TextStyle(
+                        color: _grey,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _VergangeneAnfrageCard extends StatelessWidget {
+  final FahrtDaten fahrt;
+  final AnfrageDaten anfrage;
+  final DateTime eventDatum;
+
+  const _VergangeneAnfrageCard({
+    required this.fahrt,
+    required this.anfrage,
+    required this.eventDatum,
+  });
+
+  void _openChat(BuildContext context) {
+    final chatService = context.read<ChatService>();
+    final conversationId = chatService.buildConversationId(
+      fahrtId: fahrt.id,
+      userA: fahrt.ownerId,
+      userB: anfrage.requesterId,
+    );
+    Navigator.of(context).push(AppRoute(
+      builder: (_) => ChatPage(
+        conversationId: conversationId,
+        otherUserName: fahrt.ownerName,
+        otherUserId: fahrt.ownerId,
+      ),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final rueckuhrzeit = fahrt.rueckuhrzeit?.format(context);
+    final istHinUndZurueck =
+        fahrt.richtung == Fahrtrichtung.hinUndZurueck && rueckuhrzeit != null;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+      child: Opacity(
+        opacity: 0.82,
+        child: Container(
+          decoration: _InaktivStyles.cardDecoration(),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Eventname + Vergangen-Badge
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            final es = context.read<EventService>();
+                            final event = es.events.firstWhere(
+                              (e) => e.id == fahrt.eventId,
+                              orElse: () => Event(
+                                name: fahrt.eventName,
+                                datum: eventDatum,
+                                standort: fahrt.standort,
+                                beschreibung: '',
+                                typ: '',
+                                adresse: '',
+                              ),
+                            );
+                            _showEventInfoDialog(context, event);
+                          },
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                fahrt.eventName,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              if (eventDatum.year != 2000) ...[
+                                const SizedBox(height: 1),
+                                Text(
+                                  DateFormat('dd. MMMM yyyy', 'de')
+                                      .format(eventDatum),
+                                  style: const TextStyle(
+                                      color: Colors.white38, fontSize: 11),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(7),
+                          border: Border.all(color: Colors.white24),
+                        ),
+                        child: const Text(
+                          'Vergangen',
+                          style: TextStyle(
+                            color: Colors.white38,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Divider(
+                      color: _InaktivStyles.dividerFarbe,
+                      thickness: 1,
+                      height: 14),
+                  // Fahrerprofil
+                  _FahrerProfilRow(
+                    userId: fahrt.ownerId,
+                    name: fahrt.ownerName,
+                    nameFarbe: _InaktivStyles.fahrerNameFarbe,
+                    chevronFarbe: _InaktivStyles.fahrerChevronFarbe,
+                    avatarBg: _InaktivStyles.fahrerAvatarBg,
+                    avatarRadius: 15,
+                  ),
+                  const SizedBox(height: 6),
+                  // Route
+                  Text(
+                    '${fahrt.abfahrtsortAnzeige}  →  ${fahrt.standort}',
+                    style: const TextStyle(
+                      color: Colors.white54,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  // Zeiten
+                  Wrap(
+                    spacing: 6,
+                    children: [
+                      _TimeBadge(
+                          icon: Icons.schedule,
+                          text: fahrt.uhrzeit.format(context)),
+                      if (istHinUndZurueck)
+                        _TimeBadge(icon: Icons.sync, text: rueckuhrzeit),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // Aktionszeile: Chat + Profil
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      IconButton(
+                        onPressed: () => _openChat(context),
+                        icon: const Icon(Icons.chat_bubble_outline,
+                            color: Colors.white24, size: 16),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        style: IconButton.styleFrom(
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                        tooltip: 'Chat öffnen',
+                      ),
+                      GestureDetector(
+                        onTap: () => Navigator.push(
+                          context,
+                          AppRoute(
+                            builder: (_) => PublicProfilePage(
+                              userId: fahrt.ownerId,
+                              name: fahrt.ownerName,
+                              photoUrl: null,
+                            ),
+                          ),
+                        ),
+                        child: const Row(
+                          children: [
+                            Text(
+                              'Profil ansehen',
+                              style: TextStyle(
+                                color: Colors.white30,
+                                fontSize: 12,
+                              ),
+                            ),
+                            SizedBox(width: 2),
+                            Icon(Icons.chevron_right,
+                                color: Colors.white24, size: 14),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  // Bewertungs-CTA
+                  _ReviewPrompt(
+                    fahrtId: fahrt.id,
+                    reviewedId: fahrt.ownerId,
+                    reviewedName: fahrt.ownerName,
+                    reviewedPhotoUrl: null,
+                    eventDatum: eventDatum,
+                    showReviewedStatus: true,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Vergangene Fahrten — Fahrer-Tab
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _VergangeneGlassSection extends StatefulWidget {
+  final List<FahrtDaten> fahrten;
+  final Map<String, DateTime> datumCache;
+
+  const _VergangeneGlassSection({
+    required this.fahrten,
+    required this.datumCache,
+  });
+
+  @override
+  State<_VergangeneGlassSection> createState() =>
+      _VergangeneGlassSectionState();
+}
+
+class _VergangeneGlassSectionState extends State<_VergangeneGlassSection> {
+  static const _kInitialCount = 3;
+  bool _expanded = false;
+
+  static const _grey = Colors.white38;
+
+  @override
+  Widget build(BuildContext context) {
+    final fahrten = widget.fahrten;
+    final visibleCount =
+        _expanded ? fahrten.length : fahrten.length.clamp(0, _kInitialCount);
+    final hasMore = fahrten.length > _kInitialCount;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Section-Header
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 24, 16, 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: Divider(
+                    color: Colors.white.withValues(alpha: 0.25), thickness: 1),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Row(
+                  children: const [
+                    Icon(Icons.history, size: 13, color: Colors.white),
+                    SizedBox(width: 5),
+                    Text(
+                      'VERGANGENE FAHRTEN',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Divider(
+                    color: Colors.white.withValues(alpha: 0.25), thickness: 1),
+              ),
+            ],
+          ),
+        ),
+        // Karten
+        for (var i = 0; i < visibleCount; i++)
+          RepaintBoundary(
+            child: _VergangeneGlassCard(
+              fahrt: fahrten[i],
+              eventDatum: widget.datumCache[fahrten[i].eventId] ?? DateTime(2000),
+            ),
+          ),
+        // Expand-Button
+        if (hasMore)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: GestureDetector(
+              onTap: () => setState(() => _expanded = !_expanded),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 9),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      _expanded ? Icons.expand_less : Icons.expand_more,
+                      size: 15,
+                      color: _grey,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      _expanded
+                          ? 'Weniger anzeigen'
+                          : '+ ${fahrten.length - _kInitialCount} weitere',
+                      style: const TextStyle(
+                        color: _grey,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _VergangeneGlassCard extends StatelessWidget {
+  final FahrtDaten fahrt;
+  final DateTime eventDatum;
+
+  const _VergangeneGlassCard({
+    required this.fahrt,
+    required this.eventDatum,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final uhrzeit = fahrt.uhrzeit.format(context);
+    final rueckuhrzeit = fahrt.rueckuhrzeit?.format(context);
+    final istHinUndZurueck =
+        fahrt.richtung == Fahrtrichtung.hinUndZurueck && rueckuhrzeit != null;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+      child: Opacity(
+        opacity: 0.82,
+        child: Container(
+          decoration: _InaktivStyles.cardDecoration(),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Eventname + Badge
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            final es = context.read<EventService>();
+                            final event = es.events.firstWhere(
+                              (e) => e.id == fahrt.eventId,
+                              orElse: () => Event(
+                                name: fahrt.eventName,
+                                datum: eventDatum,
+                                standort: fahrt.standort,
+                                beschreibung: '',
+                                typ: '',
+                                adresse: '',
+                              ),
+                            );
+                            _showEventInfoDialog(context, event);
+                          },
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                fahrt.eventName,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              if (eventDatum.year != 2000) ...[
+                                const SizedBox(height: 1),
+                                Text(
+                                  DateFormat('dd. MMMM yyyy', 'de')
+                                      .format(eventDatum),
+                                  style: const TextStyle(
+                                      color: Colors.white38, fontSize: 11),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(7),
+                          border: Border.all(color: Colors.white24),
+                        ),
+                        child: const Text(
+                          'Vergangen',
+                          style: TextStyle(
+                            color: Colors.white38,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Divider(
+                      color: _InaktivStyles.dividerFarbe,
+                      thickness: 1,
+                      height: 14),
+                  // Route
+                  Text(
+                    '${fahrt.abfahrtsortAnzeige}  →  ${fahrt.standort}',
+                    style: const TextStyle(
+                      color: Colors.white54,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  // Zeiten
+                  Wrap(
+                    spacing: 6,
+                    children: [
+                      _TimeBadge(icon: Icons.schedule, text: uhrzeit),
+                      if (istHinUndZurueck)
+                        _TimeBadge(icon: Icons.sync, text: rueckuhrzeit),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // Anfragen-Link (klein, kein voller Button)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: GestureDetector(
+                      onTap: () => Navigator.push(
+                        context,
+                        AppRoute(
+                          builder: (_) => FahrtAnfragenPage(fahrt: fahrt, istVergangen: true),
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.inbox_outlined,
+                              size: 13, color: Colors.white30),
+                          SizedBox(width: 4),
+                          Text(
+                            'Anfragen ansehen',
+                            style:
+                                TextStyle(color: Colors.white30, fontSize: 12),
+                          ),
+                          SizedBox(width: 2),
+                          Icon(Icons.chevron_right,
+                              size: 14, color: Colors.white24),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
