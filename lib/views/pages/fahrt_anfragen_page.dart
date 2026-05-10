@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import 'package:my_app/data/fahrt_daten.dart';
 import 'package:my_app/data/anfrage_daten.dart';
+import 'package:my_app/utils/app_route.dart';
 import 'package:my_app/data/anfrage_service.dart';
 import 'package:my_app/data/fahrt_service.dart';
 import 'package:my_app/views/widgets/trust_shields_widget.dart';
@@ -16,14 +17,17 @@ import 'package:my_app/views/widgets/user_avatar_widget.dart';
 import 'package:my_app/views/pages/public_profile_page.dart';
 
 import 'package:my_app/views/widgets/background_widget.dart';
+import 'package:my_app/data/chat_conversation.dart';
 import 'package:my_app/views/pages/chat_page.dart';
 
 class FahrtAnfragenPage extends StatelessWidget {
   final FahrtDaten fahrt;
+  final bool istVergangen;
 
   const FahrtAnfragenPage({
     super.key,
     required this.fahrt,
+    this.istVergangen = false,
   });
 
   @override
@@ -41,7 +45,7 @@ class FahrtAnfragenPage extends StatelessWidget {
           appBar: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
-            title: const Text("Anfragen zu deiner Fahrt"),
+            title: Text(istVergangen ? "Mitfahrer deiner Fahrt" : "Anfragen zu deiner Fahrt"),
           ),
           body: Consumer3<AnfrageService, InteressentenService, FahrtService>(
             builder: (context, anfrageService, interessentenService, fahrtService, _) {
@@ -49,6 +53,44 @@ class FahrtAnfragenPage extends StatelessWidget {
                   .firstWhere((f) => f.id == fahrt.id, orElse: () => fahrt);
               final istVoll = aktuelleFahrt.freiePlaetze <= 0;
               final anfragen = anfrageService.getAnfragenForFahrt(fahrt.id);
+
+              // Vergangene Fahrt: nur akzeptierte Mitfahrer anzeigen
+              if (istVergangen) {
+                final mitfahrer = anfragen
+                    .where((a) => a.status == AnfrageStatus.akzeptiert)
+                    .toList();
+
+                final hatContent = mitfahrer.isNotEmpty;
+
+                if (!hatContent) {
+                  return const Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.sentiment_neutral,
+                            size: 64, color: Colors.white38),
+                        SizedBox(height: 16),
+                        Text(
+                          "Niemand ist mitgefahren",
+                          style: TextStyle(color: Colors.white70, fontSize: 18),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  itemCount: mitfahrer.length,
+                  itemBuilder: (context, index) => _AnfrageCard(
+                    key: ValueKey(mitfahrer[index].id),
+                    anfrage: mitfahrer[index],
+                    fahrt: aktuelleFahrt,
+                    conversation: null,
+                    istVergangen: true,
+                  ),
+                );
+              }
 
               // Interessenten für dieses Event laden; Nutzer rausfiltern,
               // die bereits eine akzeptierte Anfrage für eine Fahrt dieses
@@ -105,116 +147,146 @@ class FahrtAnfragenPage extends StatelessWidget {
                 );
               }
 
-              return CustomScrollView(
-                slivers: [
-                  // ── Voll-Banner ──
-                  if (istVoll)
-                    SliverToBoxAdapter(child: _VollBanner()),
+              final chatService = context.read<ChatService>();
 
-                  // ── Mitfahrer-Sektion (nur wenn Fahrt voll) ──
-                  if (istVoll && akzeptierte.isNotEmpty) ...[
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.check_circle_outline,
-                                color: Colors.greenAccent, size: 20),
-                            const SizedBox(width: 8),
-                            Text(
-                              '${akzeptierte.length} Mitfahrer',
-                              style: const TextStyle(
-                                color: Colors.greenAccent,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
+              return StreamBuilder<List<ChatConversation>>(
+                stream: chatService.conversationsStream(fahrt.ownerId),
+                builder: (context, convoSnap) {
+                  final convos = convoSnap.data ?? [];
+                  final convoMap = {for (final c in convos) c.id: c};
+
+                  ChatConversation? getConvo(AnfrageDaten a) =>
+                      convoMap[chatService.buildConversationId(
+                        fahrtId: fahrt.id,
+                        userA: fahrt.ownerId,
+                        userB: a.requesterId,
+                      )];
+
+                  int cmpUnread(AnfrageDaten a, AnfrageDaten b) {
+                    final ua = getConvo(a)?.isUnreadFor(fahrt.ownerId) ?? false;
+                    final ub = getConvo(b)?.isUnreadFor(fahrt.ownerId) ?? false;
+                    return ua == ub ? 0 : (ua ? -1 : 1);
+                  }
+
+                  final sortedAkzeptierte = [...akzeptierte]..sort(cmpUnread);
+                  final sortedRest = [...restlicheAnfragen]..sort(cmpUnread);
+
+                  return CustomScrollView(
+                    slivers: [
+                      // ── Voll-Banner ──
+                      if (istVoll)
+                        SliverToBoxAdapter(child: _VollBanner()),
+
+                      // ── Mitfahrer-Sektion (nur wenn Fahrt voll) ──
+                      if (istVoll && sortedAkzeptierte.isNotEmpty) ...[
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.check_circle_outline,
+                                    color: Colors.greenAccent, size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '${sortedAkzeptierte.length} Mitfahrer',
+                                  style: const TextStyle(
+                                    color: Colors.greenAccent,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
-                      ),
-                    ),
-                    SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) => _AnfrageCard(
-                          anfrage: akzeptierte[index],
-                          fahrt: aktuelleFahrt,
-                        ),
-                        childCount: akzeptierte.length,
-                      ),
-                    ),
-                  ],
-
-                  // ── Interessenten-Sektion (nur wenn noch Plätze frei) ──
-                  if (!istVoll && interessenten.isNotEmpty) ...[
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.emoji_people,
-                                color: Colors.amber, size: 20),
-                            const SizedBox(width: 8),
-                            Text(
-                              '${interessenten.length} Interessent'
-                              '${interessenten.length == 1 ? '' : 'en'} ohne Fahrt',
-                              style: const TextStyle(
-                                color: Colors.amber,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
+                        SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) => _AnfrageCard(
+                              key: ValueKey(sortedAkzeptierte[index].id),
+                              anfrage: sortedAkzeptierte[index],
+                              fahrt: aktuelleFahrt,
+                              conversation: getConvo(sortedAkzeptierte[index]),
                             ),
-                          ],
+                            childCount: sortedAkzeptierte.length,
+                          ),
                         ),
-                      ),
-                    ),
-                    SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) => _InteressentCard(
-                          interessent: interessenten[index],
-                          fahrt: aktuelleFahrt,
-                          anfrageService: anfrageService,
-                        ),
-                        childCount: interessenten.length,
-                      ),
-                    ),
-                  ],
+                      ],
 
-                  // ── Anfragen-Sektion ──
-                  if (restlicheAnfragen.isNotEmpty) ...[
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.mail_outline,
-                                color: Colors.white70, size: 20),
-                            const SizedBox(width: 8),
-                            Text(
-                              '${restlicheAnfragen.length} Anfrage'
-                              '${restlicheAnfragen.length == 1 ? '' : 'n'}',
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
+                      // ── Interessenten-Sektion (nur wenn noch Plätze frei) ──
+                      if (!istVoll && interessenten.isNotEmpty) ...[
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.emoji_people,
+                                    color: Colors.amber, size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '${interessenten.length} Interessent'
+                                  '${interessenten.length == 1 ? '' : 'en'} ohne Fahrt',
+                                  style: const TextStyle(
+                                    color: Colors.amber,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
-                      ),
-                    ),
-                    SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) => _AnfrageCard(
-                          anfrage: restlicheAnfragen[index],
-                          fahrt: aktuelleFahrt,
+                        SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) => _InteressentCard(
+                              interessent: interessenten[index],
+                              fahrt: aktuelleFahrt,
+                              anfrageService: anfrageService,
+                            ),
+                            childCount: interessenten.length,
+                          ),
                         ),
-                        childCount: restlicheAnfragen.length,
-                      ),
-                    ),
-                  ],
+                      ],
 
-                  const SliverToBoxAdapter(child: SizedBox(height: 24)),
-                ],
+                      // ── Anfragen-Sektion ──
+                      if (sortedRest.isNotEmpty) ...[
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.mail_outline,
+                                    color: Colors.white70, size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '${sortedRest.length} Anfrage'
+                                  '${sortedRest.length == 1 ? '' : 'n'}',
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) => _AnfrageCard(
+                              key: ValueKey(sortedRest[index].id),
+                              anfrage: sortedRest[index],
+                              fahrt: aktuelleFahrt,
+                              conversation: getConvo(sortedRest[index]),
+                            ),
+                            childCount: sortedRest.length,
+                          ),
+                        ),
+                      ],
+
+                      const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                    ],
+                  );
+                },
               );
             },
           ),
@@ -259,7 +331,7 @@ class _InteressentCard extends StatelessWidget {
               backgroundColor: Colors.amber.shade700,
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(
+                AppRoute(
                   builder: (_) => PublicProfilePage(
                     userId: interessent.userId,
                     name: interessent.userName,
@@ -289,7 +361,7 @@ class _InteressentCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      const TrustShields(filled: 1, size: 14),
+                      TrustShieldsByUserId(userId: interessent.userId, size: 14),
                     ],
                   ),
                   if (interessent.bezirk != null &&
@@ -367,6 +439,7 @@ class _AnfragenButtonState extends State<_AnfragenButton> {
         fahrerName: widget.fahrt.ownerName,
         message: 'Ich habe noch einen Platz frei — möchtest du mitfahren?',
         vonFahrer: true,
+        eventDatum: widget.fahrt.eventDatum,
       );
 
       await widget.anfrageService.addAnfrage(anfrage);
@@ -434,10 +507,15 @@ class _AnfragenButtonState extends State<_AnfragenButton> {
 class _AnfrageCard extends StatefulWidget {
   final AnfrageDaten anfrage;
   final FahrtDaten fahrt;
+  final ChatConversation? conversation;
+  final bool istVergangen;
 
   const _AnfrageCard({
+    super.key,
     required this.anfrage,
     required this.fahrt,
+    this.conversation,
+    this.istVergangen = false,
   });
 
   @override
@@ -447,6 +525,7 @@ class _AnfrageCard extends StatefulWidget {
 class _AnfrageCardState extends State<_AnfrageCard> {
   late int _acceptedSeats;
   bool _loading = false;
+  String? _photoUrl;
 
   @override
   void initState() {
@@ -467,7 +546,7 @@ class _AnfrageCardState extends State<_AnfrageCard> {
 
     Navigator.push(
       context,
-      MaterialPageRoute(
+      AppRoute(
         builder: (_) => ChatPage(
           conversationId: conversationId,
           otherUserName: widget.anfrage.requesterName,
@@ -499,12 +578,15 @@ class _AnfrageCardState extends State<_AnfrageCard> {
         Fahrtrichtung.hinUndZurueck => 'Hin und Zurück',
       },
       ownerName: widget.fahrt.ownerName,
-    ));
+    )).catchError((_) {});
   }
 
   @override
   Widget build(BuildContext context) {
     final a = widget.anfrage;
+    final isUnread = widget.conversation?.isUnreadFor(widget.fahrt.ownerId) ?? false;
+    final lastMsg = widget.conversation?.lastMessage;
+    final hasPreview = lastMsg != null && lastMsg.isNotEmpty;
 
     return Card(
       color: Colors.black.withValues(alpha: 0.5),
@@ -518,33 +600,110 @@ class _AnfrageCardState extends State<_AnfrageCard> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Avatar
+                UserAvatarById(
+                  userId: a.requesterId,
+                  name: a.requesterName,
+                  radius: 22,
+                  onPhotoLoaded: (url) => setState(() => _photoUrl = url),
+                  onTap: (photoUrl) => Navigator.push(
+                    context,
+                    AppRoute(
+                      builder: (_) => PublicProfilePage(
+                        userId: a.requesterId,
+                        name: a.requesterName,
+                        photoUrl: photoUrl,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Name + Vorschau
                 Expanded(
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Flexible(
-                        child: Text(
-                          a.requesterName,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Flexible(
+                            child: GestureDetector(
+                              onTap: () => Navigator.push(
+                                context,
+                                AppRoute(
+                                  builder: (_) => PublicProfilePage(
+                                    userId: a.requesterId,
+                                    name: a.requesterName,
+                                    photoUrl: _photoUrl,
+                                  ),
+                                ),
+                              ),
+                              child: Text(
+                                a.requesterName,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
                           ),
+                          const SizedBox(width: 6),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 3),
+                            child: TrustShieldsByUserId(userId: a.requesterId, size: 15),
+                          ),
+                        ],
+                      ),
+                      if (hasPreview)
+                        Text(
+                          lastMsg,
+                          style: TextStyle(
+                            color: isUnread ? Colors.white60 : Colors.white30,
+                            fontSize: 13,
+                            fontWeight: isUnread ? FontWeight.w600 : FontWeight.normal,
+                          ),
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                      const SizedBox(width: 6),
-                      const TrustShields(filled: 1, size: 15),
                     ],
                   ),
                 ),
-                buildStatusChip(a.status),
-                if (a.status != AnfrageStatus.abgelehnt)
-                  IconButton(
-                    icon: const Icon(Icons.chat_bubble_outline,
-                        color: Colors.white),
-                    onPressed: () => _openChat(context),
-                  ),
+                // Badge oben, Chat-Button darunter
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    buildStatusChip(a.status),
+                    if (a.status != AnfrageStatus.abgelehnt)
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          IconButton(
+                            icon: Icon(
+                              Icons.chat_bubble_outline,
+                              color: isUnread ? Colors.amber : Colors.white,
+                            ),
+                            onPressed: () => _openChat(context),
+                          ),
+                          if (isUnread)
+                            Positioned(
+                              top: 6,
+                              right: 6,
+                              child: Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: Colors.redAccent,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                  ],
+                ),
               ],
             ),
 
@@ -591,7 +750,7 @@ class _AnfrageCardState extends State<_AnfrageCard> {
                   style: const TextStyle(color: Colors.white)),
             ],
 
-            if (a.status == AnfrageStatus.offen && !a.vonFahrer) ...[
+            if (a.status == AnfrageStatus.offen && !a.vonFahrer && !widget.istVergangen) ...[
               const SizedBox(height: 12),
               const Text(
                 "Plätze annehmen",

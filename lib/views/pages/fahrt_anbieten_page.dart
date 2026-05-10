@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import 'package:my_app/data/event_daten.dart';
 import 'package:my_app/data/fahrt_daten.dart';
+import 'package:my_app/data/anfrage_service.dart';
 import 'package:my_app/data/fahrt_service.dart';
 import 'package:my_app/data/interessenten_service.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
@@ -102,6 +103,7 @@ class _FahrtAnbietenPageState extends State<FahrtAnbietenPage>
   @override
   Widget build(BuildContext context) {
     final fahrtService = context.read<FahrtService>();
+    final anfrageService = context.read<AnfrageService>();
     final interessentenService = context.read<InteressentenService>();
 
     return Stack(
@@ -335,6 +337,7 @@ if (fahrtrichtung == Fahrtrichtung.hinUndZurueck && rueckuhrzeit == null) {
                                   abfahrtsortLat: _abfahrtsortLat,
                                   abfahrtsortLng: _abfahrtsortLng,
                                   abfahrtsortFullAddress: _abfahrtsortFullAddress,
+                                  eventDatum: widget.event.datum,
                                 )
                               : widget.existingFahrt!.copyWith(
                                   abfahrtsort: abfahrtsort,
@@ -347,15 +350,22 @@ if (fahrtrichtung == Fahrtrichtung.hinUndZurueck && rueckuhrzeit == null) {
                                   abfahrtsortLat: _abfahrtsortLat,
                                   abfahrtsortLng: _abfahrtsortLng,
                                   abfahrtsortFullAddress: _abfahrtsortFullAddress,
+                                  eventDatum: widget.event.datum,
                                 );
 
 
                           try {
                             if (widget.existingFahrt == null) {
                               await fahrtService.add(fahrt);
-                              // Fahrer aus Interessentenliste entfernen
                               await interessentenService
                                   .removeForUser(widget.event.id, fahrt.ownerId);
+                              // Offene Einladungen/Anfragen stornieren —
+                              // der User braucht keine Mitfahrt mehr
+                              await anfrageService
+                                  .storniereOffeneAnfragenFuerEvent(
+                                eventId: widget.event.id,
+                                requesterId: fahrt.ownerId,
+                              );
                             } else {
                               await fahrtService.update(fahrt);
                             }

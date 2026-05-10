@@ -26,17 +26,27 @@ class AnfrageService with ChangeNotifier {
     _startListening();
 
     _authSub?.cancel();
-    _authSub = auth.authStateChanges.listen((user) {
-      if (user != null) {
-        _startListening();
-      } else {
-        // Logout: Stream stoppen, damit keine Permission-Denied-Fehler entstehen
-        _streamSub?.cancel();
-        _streamSub = null;
-        _alleAnfragen.clear();
-        notifyListeners();
-      }
-    });
+    _authSub = auth.authStateChanges.listen(
+      (user) {
+        if (user != null) {
+          _startListening();
+        } else {
+          // Logout: Stream stoppen, damit keine Permission-Denied-Fehler entstehen
+          _streamSub?.cancel();
+          _streamSub = null;
+          _alleAnfragen.clear();
+          notifyListeners();
+        }
+      },
+      onError: (_) {},
+    );
+  }
+
+  static bool _istNichtAbgelaufen(AnfrageDaten a) {
+    if (a.status != AnfrageStatus.offen) return true;
+    if (a.eventDatum == null) return true;
+    final cutoff = DateTime.now().subtract(const Duration(hours: 48));
+    return a.eventDatum!.isAfter(cutoff);
   }
 
   void _startListening() {
@@ -45,7 +55,7 @@ class AnfrageService with ChangeNotifier {
       (anfragen) {
         _alleAnfragen
           ..clear()
-          ..addAll(anfragen);
+          ..addAll(anfragen.where(_istNichtAbgelaufen));
         notifyListeners();
       },
       onError: (_) {
@@ -122,6 +132,7 @@ class AnfrageService with ChangeNotifier {
       zielOrt: fahrt.standort,
       fahrerName: fahrerName,
       vonFahrer: true,
+      eventDatum: fahrt.eventDatum,
     );
     await addAnfrage(anfrage);
     return true;

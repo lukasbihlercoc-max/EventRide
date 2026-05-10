@@ -34,6 +34,7 @@ class RideRequestService {
       zielOrt: fahrt.standort,
       fahrerName: fahrt.ownerName,
       message: message,
+      eventDatum: fahrt.eventDatum,
     );
 
     await _anfrageService.addAnfrage(anfrage);

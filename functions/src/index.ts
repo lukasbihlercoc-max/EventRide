@@ -1,5 +1,7 @@
 import * as admin from "firebase-admin";
 import {onDocumentCreated, onDocumentUpdated, onDocumentDeleted, onDocumentWritten} from "firebase-functions/v2/firestore";
+import {onCall, HttpsError} from "firebase-functions/v2/https";
+import {onSchedule} from "firebase-functions/v2/scheduler";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -246,6 +248,315 @@ export const onLicenseRequestWritten = onDocumentWritten(
 );
 
 // ──────────────────────────────────────────────────────────────────────────────
+// Trigger 5b: Neue Event-Anfrage erstellt → alle Admins benachrichtigen
+// ──────────────────────────────────────────────────────────────────────────────
+
+export const onEventRequestCreated = onDocumentCreated(
+  "eventRequests/{requestId}",
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+
+    const data = snap.data();
+    const userName = (data["userName"] as string | undefined) ?? "Ein Nutzer";
+    const isFlyer = data["submissionType"] === "flyer";
+    const eventName = (data["eventName"] as string | undefined) ?? "";
+
+    const body = isFlyer
+      ? `${userName} hat einen Flyer hochgeladen`
+      : `${userName} hat ein Event eingetragen${eventName ? `: ${eventName}` : ""}`;
+
+    const adminsSnap = await db
+      .collection("users")
+      .where("isAdmin", "==", true)
+      .get();
+
+    await Promise.all(
+      adminsSnap.docs.map(async (adminDoc) => {
+        const tokens = (adminDoc.data()["fcmTokens"] as string[]) ?? [];
+        if (!tokens.length) return;
+        await sendNotification(tokens, adminDoc.id, {
+          title: "Neue Event-Anfrage",
+          body,
+          data: {type: "event_request", requestId: event.params["requestId"]},
+        });
+      })
+    );
+  }
+);
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Callable 6: Einladung atomar annehmen
+//   – verifiziert Anfrage-Status in einer Transaction
+//   – storniert alle anderen offenen Einladungen des Users für das Event
+//   – entfernt den User aus der Interessentenliste
+// ──────────────────────────────────────────────────────────────────────────────
+
+export const acceptInvitation = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Nicht eingeloggt");
+  }
+
+  const uid = request.auth.uid;
+  const data = request.data as {anfrageId?: unknown; seatsAccepted?: unknown};
+
+  // Input-Validierung
+  if (typeof data.anfrageId !== "string" || !data.anfrageId) {
+    throw new HttpsError("invalid-argument", "anfrageId fehlt");
+  }
+  const seatsAccepted = Math.floor(Number(data.seatsAccepted));
+  if (!Number.isFinite(seatsAccepted) || seatsAccepted <= 0 || seatsAccepted > 8) {
+    throw new HttpsError("invalid-argument", "Ungültige Sitzanzahl (1–8)");
+  }
+
+  const anfrageId = data.anfrageId;
+  const anfrageRef = db.collection("anfragen").doc(anfrageId);
+
+  // Anfrage laden
+  const anfrageDoc = await anfrageRef.get();
+  if (!anfrageDoc.exists) {
+    throw new HttpsError("not-found", "Anfrage nicht gefunden");
+  }
+  const anfrage = anfrageDoc.data()!;
+
+  if (anfrage["requesterId"] !== uid) {
+    throw new HttpsError("permission-denied", "Keine Berechtigung");
+  }
+
+  const eventId = anfrage["eventId"] as string;
+  const fahrtId = anfrage["fahrtId"] as string;
+
+  // (1) Bereits akzeptierte Fahrt für dieses Event?
+  const acceptedSnap = await db
+    .collection("anfragen")
+    .where("requesterId", "==", uid)
+    .where("eventId", "==", eventId)
+    .where("status", "==", 1)
+    .get();
+  if (!acceptedSnap.empty) {
+    throw new HttpsError("already-exists", "Du hast bereits eine Fahrt für dieses Event");
+  }
+
+  // (2) Andere offene Anfragen dieses Users für dieses Event
+  const otherOpenSnap = await db
+    .collection("anfragen")
+    .where("requesterId", "==", uid)
+    .where("eventId", "==", eventId)
+    .where("status", "==", 0)
+    .get();
+  const otherOpenIds = otherOpenSnap.docs
+    .filter((d) => d.id !== anfrageId)
+    .map((d) => d.id);
+
+  // (3) Kapazitäts-Check
+  const fahrtDoc = await db.doc(`fahrten/${fahrtId}`).get();
+  if (!fahrtDoc.exists) {
+    throw new HttpsError("not-found", "Fahrt nicht gefunden");
+  }
+  const freiePlaetze = (fahrtDoc.data()!["freiePlaetze"] as number | undefined) ?? 0;
+  if (freiePlaetze < seatsAccepted) {
+    throw new HttpsError("failed-precondition", "Keine freien Plätze mehr");
+  }
+
+  // (4) Atomare Transaction
+  const now = Date.now();
+  await db.runTransaction(async (txn) => {
+    // Status nochmals prüfen (Race-Condition-Schutz)
+    const latest = await txn.get(anfrageRef);
+    if (!latest.exists || latest.data()!["status"] !== 0) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Diese Einladung wurde zwischenzeitlich bearbeitet"
+      );
+    }
+
+    // Annehmen
+    txn.update(anfrageRef, {status: 1, seatsAccepted, updatedAt: now});
+
+    // Andere offene Einladungen stornieren
+    for (const id of otherOpenIds) {
+      txn.update(db.collection("anfragen").doc(id), {status: 3, updatedAt: now});
+    }
+
+    // Aus Interessentenliste entfernen (ID-Format: eventId_userId)
+    txn.delete(db.collection("interessenten").doc(`${eventId}_${uid}`));
+  });
+
+  return {success: true};
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Callable 7: Bewertung abgeben
+//   – Vollständige serverseitige Validierung:
+//     1. Authentifizierung
+//     2. reviewer !== reviewed
+//     3. rating 1–5
+//     4. comment max. 120 Zeichen
+//     5. Review noch nicht vorhanden
+//     6. Gemeinsame akzeptierte Anfrage vorhanden
+//     7. Event bereits vorbei (datum + 3h Puffer)
+//   – Bei Erfolg: Review anlegen + ratingAvg/ratingCount im User-Dokument aktualisieren
+// ──────────────────────────────────────────────────────────────────────────────
+
+export const submitReview = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Nicht eingeloggt");
+  }
+
+  const reviewerId = request.auth.uid;
+  const data = request.data as {
+    reviewedId?: unknown;
+    fahrtId?: unknown;
+    rating?: unknown;
+    comment?: unknown;
+  };
+
+  // ── Input-Validierung ──
+  if (typeof data.reviewedId !== "string" || !data.reviewedId) {
+    throw new HttpsError("invalid-argument", "reviewedId fehlt");
+  }
+  if (typeof data.fahrtId !== "string" || !data.fahrtId) {
+    throw new HttpsError("invalid-argument", "fahrtId fehlt");
+  }
+  const rating = Math.floor(Number(data.rating));
+  if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
+    throw new HttpsError("invalid-argument", "Bewertung muss zwischen 1 und 5 Sternen liegen");
+  }
+  const comment = typeof data.comment === "string" ? data.comment.trim() : "";
+  if (comment.length > 120) {
+    throw new HttpsError("invalid-argument", "Kommentar darf maximal 120 Zeichen lang sein");
+  }
+
+  const reviewedId = data.reviewedId;
+  const fahrtId = data.fahrtId;
+
+  // ── reviewer !== reviewed ──
+  if (reviewerId === reviewedId) {
+    throw new HttpsError("invalid-argument", "Du kannst dich nicht selbst bewerten");
+  }
+
+  // ── Review bereits vorhanden? ──
+  const reviewId = `${fahrtId}_${reviewedId}`;
+  const existingDoc = await db.doc(`reviews/${reviewId}`).get();
+  if (existingDoc.exists) {
+    throw new HttpsError("already-exists", "Du hast diese Person für diese Fahrt bereits bewertet");
+  }
+
+  // ── Gemeinsame akzeptierte Anfrage vorhanden? ──
+  // Entweder: reviewer = Mitfahrer, reviewed = Fahrer
+  //       oder: reviewer = Fahrer, reviewed = Mitfahrer
+  const anfrageSnap1 = await db
+    .collection("anfragen")
+    .where("fahrtId", "==", fahrtId)
+    .where("requesterId", "==", reviewerId)
+    .where("fahrtOwnerId", "==", reviewedId)
+    .where("status", "==", 1)
+    .limit(1)
+    .get();
+
+  const anfrageSnap2 = anfrageSnap1.empty
+    ? await db
+        .collection("anfragen")
+        .where("fahrtId", "==", fahrtId)
+        .where("requesterId", "==", reviewedId)
+        .where("fahrtOwnerId", "==", reviewerId)
+        .where("status", "==", 1)
+        .limit(1)
+        .get()
+    : null;
+
+  if (anfrageSnap1.empty && (anfrageSnap2 === null || anfrageSnap2.empty)) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Keine gemeinsame Fahrt gefunden. Bewertungen sind nur nach geteilten Fahrten möglich"
+    );
+  }
+
+  // ── Event bereits vorbei + 3h Puffer? ──
+  const fahrtDoc = await db.doc(`fahrten/${fahrtId}`).get();
+  if (!fahrtDoc.exists) {
+    throw new HttpsError("not-found", "Fahrt nicht gefunden");
+  }
+  const fahrtData = fahrtDoc.data()!;
+  const eventId = fahrtData["eventId"] as string | undefined;
+
+  if (eventId) {
+    const eventDoc = await db.doc(`events/${eventId}`).get();
+    if (eventDoc.exists) {
+      const datum = eventDoc.data()!["datum"] as string | undefined;
+      if (datum) {
+        const eventTime = new Date(datum).getTime();
+        const bufferMs = 3 * 60 * 60 * 1000; // 3 Stunden
+        const reviewWindowMs = 14 * 24 * 60 * 60 * 1000; // 14 Tage
+        const now = Date.now();
+        if (eventTime + bufferMs > now) {
+          throw new HttpsError(
+            "failed-precondition",
+            "Bewertungen sind erst nach der Veranstaltung möglich"
+          );
+        }
+        if (now > eventTime + bufferMs + reviewWindowMs) {
+          throw new HttpsError(
+            "failed-precondition",
+            "Die Bewertungsfrist für diese Fahrt ist abgelaufen (14 Tage nach der Veranstaltung)."
+          );
+        }
+      }
+    }
+  }
+
+  // ── Reviewer-Name + Foto laden ──
+  const reviewerDoc = await db.doc(`users/${reviewerId}`).get();
+  const reviewerData = reviewerDoc.data() ?? {};
+  const reviewerFirst = (reviewerData["firstName"] as string | undefined) ?? "";
+  const reviewerLast = (reviewerData["lastName"] as string | undefined) ?? "";
+  const reviewerName = `${reviewerFirst} ${reviewerLast}`.trim() || "Unbekannt";
+  const reviewerPhotoUrl = (reviewerData["photoUrl"] as string | undefined) ?? null;
+
+  // ── Review anlegen + ratingAvg/ratingCount atomar aktualisieren ──
+  await db.runTransaction(async (txn) => {
+    // Nochmals prüfen ob Review inzwischen existiert (Race Condition)
+    const check = await txn.get(db.doc(`reviews/${reviewId}`));
+    if (check.exists) {
+      throw new HttpsError("already-exists", "Du hast diese Person für diese Fahrt bereits bewertet");
+    }
+
+    // Alle bestehenden Reviews für reviewedId lesen (für Avg-Berechnung)
+    const existingReviewsSnap = await db
+      .collection("reviews")
+      .where("reviewedId", "==", reviewedId)
+      .get();
+
+    const existingRatings = existingReviewsSnap.docs.map(
+      (d) => (d.data()["rating"] as number | undefined) ?? 0
+    );
+    const newCount = existingRatings.length + 1;
+    const sum = existingRatings.reduce((a, b) => a + b, 0) + rating;
+    const newAvg = Math.round((sum / newCount) * 10) / 10;
+
+    // Review-Dokument schreiben
+    txn.set(db.doc(`reviews/${reviewId}`), {
+      reviewerId,
+      reviewerName,
+      reviewerPhotoUrl,
+      reviewedId,
+      fahrtId,
+      rating,
+      comment,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // User-Dokument mit neuen Rating-Werten aktualisieren
+    txn.update(db.doc(`users/${reviewedId}`), {
+      ratingAvg: newAvg,
+      ratingCount: newCount,
+    });
+  });
+
+  return {success: true};
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Trigger 5: Neue Chat-Nachricht → anderen Teilnehmer benachrichtigen
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -290,5 +601,29 @@ export const onMessageCreated = onDocumentCreated(
         senderId: msg["senderId"] as string,
       },
     });
+  }
+);
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Täglicher Cleanup: offene Anfragen löschen, deren Event > 48h vergangen ist
+// ──────────────────────────────────────────────────────────────────────────────
+
+export const cleanupAbgelaufeneAnfragen = onSchedule(
+  {schedule: "every day 03:00", timeZone: "Europe/Vienna"},
+  async () => {
+    const cutoff = Date.now() - 48 * 60 * 60 * 1000;
+    const snapshot = await db
+      .collection("anfragen")
+      .where("status", "==", 0) // AnfrageStatus.offen
+      .where("eventDatum", "<", cutoff)
+      .get();
+
+    if (snapshot.empty) return;
+
+    const batch = db.batch();
+    snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
+
+    console.log(`Cleanup: ${snapshot.size} abgelaufene Anfragen gelöscht`);
   }
 );

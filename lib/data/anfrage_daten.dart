@@ -27,6 +27,7 @@ class AnfrageDaten {
   /// true = Fahrer hat den Gast eingeladen (umgekehrte Richtung)
   final bool vonFahrer;
   final DateTime updatedAt;
+  final DateTime? eventDatum;
 
   AnfrageDaten({
     required this.id,
@@ -46,6 +47,7 @@ class AnfrageDaten {
     required this.fahrerName,
     this.vonFahrer = false,
     DateTime? updatedAt,
+    this.eventDatum,
   }) : updatedAt = updatedAt ?? createdAt;
 
   factory AnfrageDaten.create({
@@ -63,6 +65,7 @@ class AnfrageDaten {
 
     String? message,
     bool vonFahrer = false,
+    DateTime? eventDatum,
   }) {
     return AnfrageDaten(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -81,6 +84,7 @@ class AnfrageDaten {
       zielOrt: zielOrt,
       fahrerName: fahrerName,
       vonFahrer: vonFahrer,
+      eventDatum: eventDatum,
     );
   }
 
@@ -103,6 +107,7 @@ class AnfrageDaten {
       'fahrerName': fahrerName,
       'vonFahrer': vonFahrer,
       'updatedAt': updatedAt.millisecondsSinceEpoch,
+      'eventDatum': eventDatum?.millisecondsSinceEpoch,
     };
   }
 
@@ -131,6 +136,9 @@ class AnfrageDaten {
       updatedAt: map['updatedAt'] != null
           ? DateTime.fromMillisecondsSinceEpoch(map['updatedAt'] as int)
           : null,
+      eventDatum: map['eventDatum'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(map['eventDatum'] as int)
+          : null,
     );
   }
 
@@ -156,6 +164,7 @@ class AnfrageDaten {
       fahrerName: fahrerName,
       vonFahrer: vonFahrer,
       updatedAt: status != null ? DateTime.now() : updatedAt,
+      eventDatum: eventDatum,
     );
   }
 }

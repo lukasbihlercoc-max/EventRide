@@ -29,6 +29,7 @@ class FahrtDaten {
   final double? abfahrtsortLat;
   final double? abfahrtsortLng;
   final String? abfahrtsortFullAddress;
+  final DateTime? eventDatum;
 
   FahrtDaten({
     required this.eventId,
@@ -47,6 +48,7 @@ class FahrtDaten {
     this.abfahrtsortLat,
     this.abfahrtsortLng,
     this.abfahrtsortFullAddress,
+    this.eventDatum,
   });
 
   factory FahrtDaten.fromTimeOfDay({
@@ -64,6 +66,7 @@ class FahrtDaten {
     double? abfahrtsortLat,
     double? abfahrtsortLng,
     String? abfahrtsortFullAddress,
+    DateTime? eventDatum,
   }) {
     return FahrtDaten(
       eventId: eventId,
@@ -82,6 +85,7 @@ class FahrtDaten {
       abfahrtsortLat: abfahrtsortLat,
       abfahrtsortLng: abfahrtsortLng,
       abfahrtsortFullAddress: abfahrtsortFullAddress,
+      eventDatum: eventDatum,
     );
   }
 
@@ -119,6 +123,7 @@ class FahrtDaten {
     double? abfahrtsortLat,
     double? abfahrtsortLng,
     String? abfahrtsortFullAddress,
+    DateTime? eventDatum,
   }) {
     return FahrtDaten(
       eventId: eventId ?? this.eventId,
@@ -137,6 +142,7 @@ class FahrtDaten {
       abfahrtsortLat: abfahrtsortLat ?? this.abfahrtsortLat,
       abfahrtsortLng: abfahrtsortLng ?? this.abfahrtsortLng,
       abfahrtsortFullAddress: abfahrtsortFullAddress ?? this.abfahrtsortFullAddress,
+      eventDatum: eventDatum ?? this.eventDatum,
     );
   }
 
@@ -159,6 +165,7 @@ class FahrtDaten {
       'abfahrtsortLat': abfahrtsortLat,
       'abfahrtsortLng': abfahrtsortLng,
       'abfahrtsortFullAddress': abfahrtsortFullAddress,
+      'eventDatum': eventDatum?.millisecondsSinceEpoch,
     };
   }
 
@@ -194,6 +201,9 @@ class FahrtDaten {
       abfahrtsortLat: (map['abfahrtsortLat'] as num?)?.toDouble(),
       abfahrtsortLng: (map['abfahrtsortLng'] as num?)?.toDouble(),
       abfahrtsortFullAddress: map['abfahrtsortFullAddress'] as String?,
+      eventDatum: map['eventDatum'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(map['eventDatum'] as int)
+          : null,
     );
   }
 
