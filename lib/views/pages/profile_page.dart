@@ -1,14 +1,21 @@
 // profile_page.dart
 import 'dart:io';
 import 'dart:math' as math;
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:my_app/data/review.dart';
 import 'package:google_places_flutter/google_places_flutter.dart';
 import 'package:google_places_flutter/model/place_type.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:my_app/config/feature_flags.dart';
+import 'package:my_app/config/legal_texts.dart';
+import 'package:my_app/utils/app_route.dart';
 import 'package:my_app/data/app_user.dart';
+import 'package:my_app/views/pages/legal_page.dart';
+import 'package:my_app/views/pages/reviews_list_page.dart';
+import 'package:my_app/views/widgets/review_card_widget.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/views/pages/login_page.dart';
 import 'package:my_app/views/pages/register_page.dart';
@@ -116,7 +123,7 @@ class _GuestView extends StatelessWidget {
               label: "Anmelden",
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const LoginPage()),
+                AppRoute(builder: (_) => const LoginPage()),
               ),
             ),
             const SizedBox(height: 12),
@@ -125,7 +132,7 @@ class _GuestView extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const RegisterPage()),
+                  AppRoute(builder: (_) => const RegisterPage()),
                 ),
                 icon: const Icon(Icons.person_add_rounded, size: 18),
                 label: const Text(
@@ -219,17 +226,6 @@ class _LoggedInViewState extends State<_LoggedInView> {
   bool _uploading = false;
 
   // ── Hilfsmethoden ──────────────────────────────────────────────────────────
-
-  int _trustLevel(AppUser user) {
-    if (user.emailVerified &&
-        user.phoneVerified &&
-        user.licenseStatus == 'verified') {
-      return 3;
-    }
-    if (user.emailVerified && user.phoneVerified) return 2;
-    if (user.emailVerified) return 1;
-    return 0;
-  }
 
   VerifState _licenseState(String status) {
     switch (status) {
@@ -446,8 +442,10 @@ class _LoggedInViewState extends State<_LoggedInView> {
           .uploadProfilePhoto(File(cropped.path));
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Upload fehlgeschlagen: $e')),
+        AppSnackbar.show(
+          context,
+          message: 'Upload fehlgeschlagen: $e',
+          accentColor: Colors.redAccent,
         );
       }
     } finally {
@@ -469,7 +467,7 @@ class _LoggedInViewState extends State<_LoggedInView> {
               user: user,
               uploading: _uploading,
               onPickPhoto: _showSourceSheet,
-              trustLevel: _trustLevel(user),
+              trustLevel: user.trustLevel,
             ),
 
             const SizedBox(height: 24),
@@ -588,7 +586,7 @@ class _LoggedInViewState extends State<_LoggedInView> {
                         return GestureDetector(
                           onTap: () => Navigator.push(
                             context,
-                            MaterialPageRoute(
+                            AppRoute(
                                 builder: (_) => const AdminLicensePage()),
                           ),
                           child: Container(
@@ -709,48 +707,7 @@ class _LoggedInViewState extends State<_LoggedInView> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: AppCard(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 22,
-                        horizontal: 16,
-                      ),
-                      child: Column(
-                        children: [
-                          Container(
-                            width: 42,
-                            height: 42,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(
-                              Icons.star_border_rounded,
-                              color: Colors.white54,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          const Text(
-                            "Noch keine Bewertungen",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            "Nach deiner ersten Fahrt sichtbar",
-                            style: TextStyle(
-                              color: Colors.white38,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                  _OwnReviewsSection(user: user),
 
                   const SizedBox(height: 150),
                 ],
@@ -885,7 +842,9 @@ class _HeroSection extends StatelessWidget {
               const SizedBox(width: 8),
               _StatChip(
                 icon: Icons.star_rounded,
-                label: "Keine Bewertung",
+                label: (user.ratingAvg != null && user.ratingCount > 0)
+                    ? '${user.ratingAvg!.toStringAsFixed(1)} ★  ·  ${user.ratingCount} ${user.ratingCount == 1 ? 'Bewertung' : 'Bewertungen'}'
+                    : 'Keine Bewertung',
                 iconColor: Colors.amber,
               ),
             ],
@@ -1485,6 +1444,7 @@ class _LicenseSheet extends StatefulWidget {
 
 class _LicenseSheetState extends State<_LicenseSheet> {
   bool _loading = false;
+  bool _accepted = false;
   String? _error;
 
   Future<void> _pick(ImageSource source) async {
@@ -1573,8 +1533,56 @@ class _LicenseSheetState extends State<_LicenseSheet> {
           ),
           const SizedBox(height: 8),
           const Text(
-            "Lade ein klares Foto deines Führerscheins hoch. Deine Daten werden vertraulich behandelt und nur zur Verifizierung verwendet.",
+            "Lade ein klares Foto deines Führerscheins hoch. Das Foto wird ausschließlich manuell durch den Betreiber geprüft und nur zur Verifizierung verwendet.",
             style: TextStyle(color: Colors.white54, fontSize: 13, height: 1.5),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Checkbox(
+                value: _accepted,
+                onChanged: (v) => setState(() => _accepted = v ?? false),
+                fillColor: WidgetStateProperty.resolveWith<Color>(
+                  (states) => states.contains(WidgetState.selected)
+                      ? Colors.blueAccent
+                      : Colors.white30,
+                ),
+              ),
+              Expanded(
+                child: Text.rich(
+                  TextSpan(
+                    style: const TextStyle(color: Colors.white70, fontSize: 12),
+                    children: [
+                      const TextSpan(text: 'Ich stimme der Verarbeitung meines Führerschein-Fotos gemäß der '),
+                      WidgetSpan(
+                        alignment: PlaceholderAlignment.middle,
+                        child: GestureDetector(
+                          onTap: () => Navigator.push(
+                            context,
+                            AppRoute(
+                              builder: (_) => const LegalPage(
+                                title: 'Datenschutzerklärung',
+                                content: kDatenschutzText,
+                              ),
+                            ),
+                          ),
+                          child: const Text(
+                            'Datenschutzerklärung',
+                            style: TextStyle(
+                              color: Colors.blueAccent,
+                              fontSize: 12,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const TextSpan(text: ' zu.'),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
           if (_error != null) ...[
             const SizedBox(height: 12),
@@ -1588,7 +1596,7 @@ class _LicenseSheetState extends State<_LicenseSheet> {
                   child: CircularProgressIndicator(color: Colors.white))
               : _SheetButton(
                   label: "Foto auswählen",
-                  onTap: _showSourceChoice,
+                  onTap: _accepted ? _showSourceChoice : null,
                 ),
         ],
       ),
@@ -1674,7 +1682,7 @@ class _HomeTownSheetState extends State<_HomeTownSheet> {
           ),
           const SizedBox(height: 8),
           const Text(
-            "Gib an, aus welcher Gemeinde du kommst. Das hilft anderen Nutzern, passende Mitfahrgelegenheiten zu finden.",
+            "Gib an, aus welcher Gemeinde du kommst, um Events und Mitfahrten dorthin zu filtern.",
             style: TextStyle(color: Colors.white54, fontSize: 13, height: 1.5),
           ),
           const SizedBox(height: 16),
@@ -2108,4 +2116,188 @@ class _ProgressArcPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _ProgressArcPainter old) =>
       old.progress != progress;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OWN REVIEWS SECTION
+// Zeigt die eigenen empfangenen Bewertungen oder einen Platzhalter.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _OwnReviewsSection extends StatefulWidget {
+  final AppUser user;
+
+  const _OwnReviewsSection({required this.user});
+
+  @override
+  State<_OwnReviewsSection> createState() => _OwnReviewsSectionState();
+}
+
+class _OwnReviewsSectionState extends State<_OwnReviewsSection> {
+  List<Review>? _reviews;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReviews();
+  }
+
+  @override
+  void didUpdateWidget(_OwnReviewsSection old) {
+    super.didUpdateWidget(old);
+    if (old.user.ratingCount != widget.user.ratingCount) {
+      _loadReviews();
+    }
+  }
+
+  Future<void> _loadReviews() async {
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('reviews')
+          .where('reviewedId', isEqualTo: widget.user.userId)
+          .orderBy('createdAt', descending: true)
+          .limit(2)
+          .get();
+      if (mounted) {
+        setState(() => _reviews = snap.docs.map(Review.fromDoc).toList());
+      }
+    } catch (_) {
+      if (mounted) setState(() => _reviews = []);
+    }
+  }
+
+  void _openList() {
+    Navigator.push(
+      context,
+      AppRoute(
+        builder: (_) => ReviewsListPage(
+          userId: widget.user.userId,
+          userName: widget.user.name,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Ladezustand
+    if (_reviews == null) {
+      return const SizedBox(
+        height: 60,
+        child: Center(
+          child: CircularProgressIndicator(color: Colors.white38, strokeWidth: 2),
+        ),
+      );
+    }
+
+    // Leerer Zustand — tappbar damit man trotzdem zur Liste navigieren kann
+    if (_reviews!.isEmpty) {
+      return GestureDetector(
+        onTap: _openList,
+        child: SizedBox(
+          width: double.infinity,
+          child: AppCard(
+            padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.star_border_rounded, color: Colors.white54),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  "Noch keine Bewertungen",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  "Nach deiner ersten Fahrt sichtbar",
+                  style: TextStyle(color: Colors.white38, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Reviews vorhanden
+    final count = _reviews!.length;
+    final avg = widget.user.ratingAvg ??
+        (_reviews!.map((r) => r.rating.toDouble()).reduce((a, b) => a + b) / count);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Zusammenfassung
+        AppCard(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Row(
+            children: [
+              Text(
+                avg.toStringAsFixed(1),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 32,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -1,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: List.generate(5, (i) {
+                      final filled = i < avg.round();
+                      return Icon(
+                        filled ? Icons.star_rounded : Icons.star_outline_rounded,
+                        size: 18,
+                        color: filled ? Colors.amber : Colors.white24,
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${widget.user.ratingCount > 0 ? widget.user.ratingCount : count} ${(widget.user.ratingCount > 0 ? widget.user.ratingCount : count) == 1 ? 'Bewertung' : 'Bewertungen'}',
+                    style: const TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        // Review-Karten (Vorschau: max. 2)
+        for (final review in _reviews!) ...[
+          ReviewCard(review: review),
+          if (review != _reviews!.last) const SizedBox(height: 6),
+        ],
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: _openList,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Alle ${widget.user.ratingCount > 0 ? widget.user.ratingCount : count} ${(widget.user.ratingCount > 0 ? widget.user.ratingCount : count) == 1 ? 'Bewertung' : 'Bewertungen'} ansehen',
+                style: const TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+              const SizedBox(width: 2),
+              const Icon(Icons.chevron_right, color: Colors.white38, size: 14),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 }
