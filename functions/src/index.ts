@@ -473,33 +473,34 @@ export const submitReview = onCall(async (request) => {
   }
 
   // ── Event bereits vorbei + 3h Puffer? ──
+  // Wenn das Fahrt-Dokument nicht mehr existiert (z.B. vom Fahrer gelöscht),
+  // wird der Zeitfenster-Check übersprungen – die akzeptierte Anfrage ist Beweis genug.
   const fahrtDoc = await db.doc(`fahrten/${fahrtId}`).get();
-  if (!fahrtDoc.exists) {
-    throw new HttpsError("not-found", "Fahrt nicht gefunden");
-  }
-  const fahrtData = fahrtDoc.data()!;
-  const eventId = fahrtData["eventId"] as string | undefined;
+  if (fahrtDoc.exists) {
+    const fahrtData = fahrtDoc.data()!;
+    const eventId = fahrtData["eventId"] as string | undefined;
 
-  if (eventId) {
-    const eventDoc = await db.doc(`events/${eventId}`).get();
-    if (eventDoc.exists) {
-      const datum = eventDoc.data()!["datum"] as string | undefined;
-      if (datum) {
-        const eventTime = new Date(datum).getTime();
-        const bufferMs = 3 * 60 * 60 * 1000; // 3 Stunden
-        const reviewWindowMs = 14 * 24 * 60 * 60 * 1000; // 14 Tage
-        const now = Date.now();
-        if (eventTime + bufferMs > now) {
-          throw new HttpsError(
-            "failed-precondition",
-            "Bewertungen sind erst nach der Veranstaltung möglich"
-          );
-        }
-        if (now > eventTime + bufferMs + reviewWindowMs) {
-          throw new HttpsError(
-            "failed-precondition",
-            "Die Bewertungsfrist für diese Fahrt ist abgelaufen (14 Tage nach der Veranstaltung)."
-          );
+    if (eventId) {
+      const eventDoc = await db.doc(`events/${eventId}`).get();
+      if (eventDoc.exists) {
+        const datum = eventDoc.data()!["datum"] as string | undefined;
+        if (datum) {
+          const eventTime = new Date(datum).getTime();
+          const bufferMs = 3 * 60 * 60 * 1000; // 3 Stunden
+          const reviewWindowMs = 14 * 24 * 60 * 60 * 1000; // 14 Tage
+          const now = Date.now();
+          if (eventTime + bufferMs > now) {
+            throw new HttpsError(
+              "failed-precondition",
+              "Bewertungen sind erst nach der Veranstaltung möglich"
+            );
+          }
+          if (now > eventTime + bufferMs + reviewWindowMs) {
+            throw new HttpsError(
+              "failed-precondition",
+              "Die Bewertungsfrist für diese Fahrt ist abgelaufen (14 Tage nach der Veranstaltung)."
+            );
+          }
         }
       }
     }
@@ -552,6 +553,20 @@ export const submitReview = onCall(async (request) => {
       ratingCount: newCount,
     });
   });
+
+  // Notification an den bewerteten User senden
+  const reviewedTokens = await getTokens(reviewedId);
+  if (reviewedTokens.length > 0) {
+    const senderName = reviewerName.trim() || 'Jemand';
+    await sendNotification(reviewedTokens, reviewedId, {
+      title: 'Neue Bewertung ⭐',
+      body: `${senderName} hat dich bewertet`,
+      data: {
+        type: 'review',
+        reviewedId: reviewedId,
+      },
+    });
+  }
 
   return {success: true};
 });

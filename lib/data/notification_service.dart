@@ -25,11 +25,19 @@ class NotificationService {
   /// Wird aufgerufen wenn der User auf eine Anfrage-Notification tippt.
   VoidCallback? onAnfrageTapped;
 
+  /// Wird aufgerufen wenn der User auf eine Bewertungs-Notification tippt.
+  VoidCallback? onReviewTapped;
+
   /// Wird aufgerufen wenn der Admin auf eine Führerschein-Notification tippt.
   VoidCallback? onLicenseReviewTapped;
 
+  /// Wird aufgerufen wenn der Admin auf eine Event-Anfrage-Notification tippt.
+  VoidCallback? onEventRequestTapped;
+
   StreamSubscription<List<ChatConversation>>? _chatSub;
+  StreamSubscription<String>? _tokenRefreshSub;
   final Map<String, DateTime> _knownLastMessageAt = {};
+  bool _initialized = false;
 
   NotificationService({
     required IUserRepository userRepo,
@@ -40,38 +48,66 @@ class NotificationService {
   Future<void> init(String userId) async {
     if (kDebugMode) debugPrint('[FCM] init() für userId=$userId');
 
-    // 1. Berechtigung anfragen
-    final settings = await FirebaseMessaging.instance.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-    if (kDebugMode) debugPrint('[FCM] Berechtigung: ${settings.authorizationStatus}');
+    if (!_initialized) {
+      _initialized = true;
 
-    // 2. Android Notification Channel einrichten (Pflicht ab Android 8)
-    const androidChannel = AndroidNotificationChannel(
-      _channelId,
-      _channelName,
-      importance: Importance.high,
-    );
-    await _localNotifications
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(androidChannel);
+      // 1. Berechtigung anfragen
+      final settings = await FirebaseMessaging.instance.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      if (kDebugMode) debugPrint('[FCM] Berechtigung: ${settings.authorizationStatus}');
 
-    // 3. flutter_local_notifications initialisieren
-    const initSettings = InitializationSettings(
-      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-      iOS: DarwinInitializationSettings(),
-    );
-    await _localNotifications.initialize(
-      initSettings,
-      onDidReceiveNotificationResponse: (details) {
-        _navigateFromPayload(details.payload);
-      },
-    );
+      // 2. Android Notification Channel einrichten (Pflicht ab Android 8)
+      const androidChannel = AndroidNotificationChannel(
+        _channelId,
+        _channelName,
+        importance: Importance.high,
+      );
+      await _localNotifications
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(androidChannel);
 
-    // 4. FCM-Token holen & in Firestore speichern
+      // 3. flutter_local_notifications initialisieren
+      const initSettings = InitializationSettings(
+        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        iOS: DarwinInitializationSettings(),
+      );
+      await _localNotifications.initialize(
+        initSettings,
+        onDidReceiveNotificationResponse: (details) {
+          _navigateFromPayload(details.payload);
+        },
+      );
+
+      // 6. Vordergrund: FCM-Nachrichten als lokale Notification anzeigen.
+      // Chat-Nachrichten werden bereits durch startChatMonitoring angezeigt → überspringen.
+      FirebaseMessaging.onMessage.listen((message) {
+        if (kDebugMode) debugPrint('[FCM] Vordergrund-Nachricht: ${message.notification?.title} / data=${message.data}');
+        if (message.data['type'] == 'chat') return;
+        _showLocalNotification(message);
+      });
+
+      // 7. Hintergrund → Vordergrund
+      FirebaseMessaging.onMessageOpenedApp.listen((message) {
+        if (kDebugMode) debugPrint('[FCM] App durch Notification geöffnet: ${message.data}');
+        _navigateFromData(message.data);
+      });
+
+      // 8. Cold Start – Navigation erst nach dem ersten Frame, damit der
+      // Navigator sicher initialisiert ist.
+      final initial = await FirebaseMessaging.instance.getInitialMessage();
+      if (initial != null) {
+        if (kDebugMode) debugPrint('[FCM] Cold-Start-Notification: ${initial.data}');
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _navigateFromData(initial.data);
+        });
+      }
+    }
+
+    // 4. FCM-Token holen & in Firestore speichern (bei jedem Login)
     final token = await FirebaseMessaging.instance.getToken();
     if (kDebugMode) debugPrint('[FCM] Token: $token');
     if (token != null) {
@@ -81,35 +117,12 @@ class NotificationService {
       if (kDebugMode) debugPrint('[FCM] KEIN TOKEN erhalten – Notifications werden nicht funktionieren');
     }
 
-    // 5. Token-Refresh beobachten
-    FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
+    // 5. Token-Refresh beobachten (alte Subscription ersetzen, damit kein falscher userId bleibt)
+    _tokenRefreshSub?.cancel();
+    _tokenRefreshSub = FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
       if (kDebugMode) debugPrint('[FCM] Token aktualisiert: $newToken');
       _userRepo.saveFcmToken(userId, newToken);
     });
-
-    // 6. Vordergrund: FCM-Nachrichten als lokale Notification anzeigen.
-    // Chat-Nachrichten werden bereits durch startChatMonitoring angezeigt → überspringen.
-    FirebaseMessaging.onMessage.listen((message) {
-      if (kDebugMode) debugPrint('[FCM] Vordergrund-Nachricht: ${message.notification?.title} / data=${message.data}');
-      if (message.data['type'] == 'chat') return;
-      _showLocalNotification(message);
-    });
-
-    // 7. Hintergrund → Vordergrund
-    FirebaseMessaging.onMessageOpenedApp.listen((message) {
-      if (kDebugMode) debugPrint('[FCM] App durch Notification geöffnet: ${message.data}');
-      _navigateFromData(message.data);
-    });
-
-    // 8. Cold Start – Navigation erst nach dem ersten Frame, damit der
-    // Navigator sicher initialisiert ist.
-    final initial = await FirebaseMessaging.instance.getInitialMessage();
-    if (initial != null) {
-      if (kDebugMode) debugPrint('[FCM] Cold-Start-Notification: ${initial.data}');
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _navigateFromData(initial.data);
-      });
-    }
 
     if (kDebugMode) debugPrint('[FCM] init() abgeschlossen');
   }
@@ -248,6 +261,10 @@ class NotificationService {
       onAnfrageTapped?.call();
     } else if (type == 'license_review') {
       onLicenseReviewTapped?.call();
+    } else if (type == 'event_request') {
+      onEventRequestTapped?.call();
+    } else if (type == 'review') {
+      onReviewTapped?.call();
     }
   }
 

@@ -28,6 +28,7 @@ import 'package:my_app/data/interfaces/i_user_repository.dart';
 import 'package:my_app/data/firebase/firebase_auth_repository.dart';
 
 import 'package:my_app/views/auth/auth_gate.dart';
+import 'package:my_app/views/pages/admin_event_requests_page.dart';
 import 'package:my_app/views/pages/admin_license_page.dart';
 import 'package:my_app/views/pages/chat_page.dart';
 import 'package:my_app/data/firebase/firestore_anfrage_repository.dart';
@@ -44,9 +45,33 @@ import 'package:provider/provider.dart';
 //Firebase
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+import 'package:my_app/utils/app_route.dart';
 
 /// Globaler NavigatorKey – wird vom NotificationService für Deep-Links verwendet.
 final navigatorKey = GlobalKey<NavigatorState>();
+
+/// Einheitlicher Fade-Übergang für alle Seiten (220 ms vor / 160 ms zurück via AppRoute).
+class _FadeTransitionsBuilder extends PageTransitionsBuilder {
+  const _FadeTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    return FadeTransition(
+      opacity: CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOut,
+        reverseCurve: Curves.easeIn,
+      ),
+      child: child,
+    );
+  }
+}
 
 /// Top-Level-Handler für FCM-Nachrichten wenn die App beendet ist.
 /// Muss eine Top-Level-Funktion sein (kein Lambda, kein Klassenmember).
@@ -102,11 +127,23 @@ void main() async {
     selectedPageNotifier.value = 1; // Fahrten-Tab
   };
 
+  notificationService.onReviewTapped = () {
+    selectedPageNotifier.value = 2; // Profil-Tab
+  };
+
   notificationService.onLicenseReviewTapped = () {
     final ctx = navigatorKey.currentContext;
     if (ctx == null || !ctx.mounted) return;
-    Navigator.of(ctx).push(MaterialPageRoute(
+    Navigator.of(ctx).push(AppRoute(
       builder: (_) => const AdminLicensePage(),
+    ));
+  };
+
+  notificationService.onEventRequestTapped = () {
+    final ctx = navigatorKey.currentContext;
+    if (ctx == null || !ctx.mounted) return;
+    Navigator.of(ctx).push(AppRoute(
+      builder: (_) => const AdminEventRequestsPage(),
     ));
   };
 
@@ -121,7 +158,7 @@ void main() async {
 
     final ctx = navigatorKey.currentContext;
     if (ctx == null || !ctx.mounted) return;
-    Navigator.of(ctx).push(MaterialPageRoute(
+    Navigator.of(ctx).push(AppRoute(
       builder: (_) => ChatPage(
         conversationId: convId,
         otherUserId: senderId,
@@ -193,33 +230,37 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _authSub = widget.authRepository.authStateChanges.listen((user) async {
-      final newUserId = user?.userId ?? '';
-      if (newUserId.isNotEmpty && _currentUserId.isEmpty) {
-        // Login: Heartbeat + Notifications starten
-        _currentUserId = newUserId;
-        _startHeartbeat();
-        // userId als lokale Variable sichern – _currentUserId könnte sich
-        // durch einen Logout-Event ändern bevor then() ausgeführt wird.
-        final uid = _currentUserId;
-        await widget.notificationService.init(uid);
-        widget.notificationService.startChatMonitoring(
-          userId: uid,
-          conversationsStream: widget.chatService.conversationsStream(uid),
-        );
-      } else if (newUserId.isEmpty && _currentUserId.isNotEmpty) {
-        // Logout: erst Token entfernen (await!), dann aufräumen.
-        // Ohne await bleibt das Token im alten User-Dokument wenn dasselbe
-        // Gerät danach mit einem anderen Account einloggt.
-        final uid = _currentUserId;
-        _currentUserId = '';
-        _stopHeartbeat();
-        widget.notificationService.stopChatMonitoring();
-        await widget.notificationService.removeToken(uid);
-      } else {
-        _currentUserId = newUserId;
-      }
-    });
+    _authSub = widget.authRepository.authStateChanges.listen(
+      (user) async {
+        final newUserId = user?.userId ?? '';
+        if (newUserId.isNotEmpty && _currentUserId.isEmpty) {
+          // Login: Heartbeat + Notifications starten, Streams neu laden.
+          _currentUserId = newUserId;
+          _startHeartbeat();
+          widget.fahrtService.load();
+          // userId als lokale Variable sichern – _currentUserId könnte sich
+          // durch einen Logout-Event ändern bevor then() ausgeführt wird.
+          final uid = _currentUserId;
+          await widget.notificationService.init(uid);
+          widget.notificationService.startChatMonitoring(
+            userId: uid,
+            conversationsStream: widget.chatService.conversationsStream(uid),
+          );
+        } else if (newUserId.isEmpty && _currentUserId.isNotEmpty) {
+          // Logout: erst Token entfernen (await!), dann aufräumen.
+          // Ohne await bleibt das Token im alten User-Dokument wenn dasselbe
+          // Gerät danach mit einem anderen Account einloggt.
+          final uid = _currentUserId;
+          _currentUserId = '';
+          _stopHeartbeat();
+          widget.notificationService.stopChatMonitoring();
+          await widget.notificationService.removeToken(uid);
+        } else {
+          _currentUserId = newUserId;
+        }
+      },
+      onError: (_) {},
+    );
   }
 
   void _startHeartbeat() {
@@ -323,6 +364,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
               colorSchemeSeed: Colors.blueAccent,
               brightness:
                   isDarkMode ? Brightness.dark : Brightness.light,
+              pageTransitionsTheme: const PageTransitionsTheme(
+                builders: {
+                  TargetPlatform.android: _FadeTransitionsBuilder(),
+                  TargetPlatform.iOS: _FadeTransitionsBuilder(),
+                  TargetPlatform.macOS: _FadeTransitionsBuilder(),
+                },
+              ),
             ),
             home: const AuthGate(),
             localizationsDelegates: const [
