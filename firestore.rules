@@ -50,7 +50,7 @@ service cloud.firestore {
     // Löschen:   Nur der Owner
     // ----------------------------------------------------------------
     match /fahrten/{fahrtId} {
-      allow read:   if true;
+      allow read:   if isSignedIn();
       allow create: if isSignedIn()
                     && request.resource.data.ownerId == request.auth.uid
                     && request.resource.data.keys().hasAll([
@@ -68,14 +68,16 @@ service cloud.firestore {
     // ----------------------------------------------------------------
     // anfragen/{anfrageId}
     //
-    // Lesen:    Alle eingeloggten Nutzer
+    // Lesen:    Nur Requester und Fahrer der jeweiligen Anfrage
     // Erstellen: Eingeloggt + requesterId muss eigene UID sein
     //            + Pflichtfelder müssen vorhanden sein
     // Updaten:   Fahrer (fahrtOwnerId) oder Requester (requesterId)
     // Löschen:   Nicht erlaubt (Status wird auf 'abgelehnt' gesetzt)
     // ----------------------------------------------------------------
     match /anfragen/{anfrageId} {
-      allow read:   if isSignedIn();
+      allow read:   if isSignedIn()
+                    && (request.auth.uid == resource.data.requesterId
+                        || request.auth.uid == resource.data.fahrtOwnerId);
       // Mitfahrer erstellt eigene Anfrage ODER Fahrer lädt Interessenten ein
       allow create: if isSignedIn()
                     && (request.resource.data.requesterId == request.auth.uid
@@ -83,9 +85,15 @@ service cloud.firestore {
                     && request.resource.data.keys().hasAll([
                          'id', 'fahrtId', 'requesterId', 'fahrtOwnerId', 'status'
                        ]);
+      // Mitfahrer darf nur ablehnen (2) oder stornieren (3) — NICHT akzeptieren (1)
+      // Fahrer darf alles (inkl. Akzeptieren von Anfragen der Mitfahrer)
+      // status=1 für requesterId ist ausschließlich der Cloud Function vorbehalten
       allow update: if isSignedIn()
-                    && (resource.data.fahrtOwnerId == request.auth.uid
-                        || resource.data.requesterId == request.auth.uid);
+                    && (
+                      (resource.data.requesterId == request.auth.uid
+                        && request.resource.data.status in [2, 3])
+                      || resource.data.fahrtOwnerId == request.auth.uid
+                    );
       allow delete: if false;
     }
 
@@ -106,7 +114,8 @@ service cloud.firestore {
                        ]);
       allow delete: if isSignedIn()
                     && resource.data.userId == request.auth.uid;
-      allow update: if false;
+      allow update: if isSignedIn()
+                    && resource.data.userId == request.auth.uid;
     }
 
     // ----------------------------------------------------------------
@@ -146,7 +155,51 @@ service cloud.firestore {
                         && request.resource.data.uid == request.auth.uid)
                     || isAdmin();
       allow read:   if isSignedIn() && (isOwner(uid) || isAdmin());
+      allow delete: if isSignedIn() && isOwner(uid);
+    }
+
+    // ----------------------------------------------------------------
+    // eventRequests/{requestId}
+    //
+    // Erstellen: Eingeloggt, eigene UID, status='pending'
+    // Lesen:     Eigener Nutzer oder Admin
+    // Updaten:   Nur Admin (approve / discard)
+    // Löschen:   Nie
+    // ----------------------------------------------------------------
+    match /eventRequests/{requestId} {
+      allow create: if isSignedIn()
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.status == 'pending';
+      allow read:   if isSignedIn()
+                    && (request.auth.uid == resource.data.uid || isAdmin());
+      allow update: if isAdmin();
       allow delete: if false;
+    }
+
+    // ----------------------------------------------------------------
+    // reviews/{reviewId}   (ID: {fahrtId}_{reviewedId})
+    //
+    // Lesen:    Alle eingeloggten Nutzer (Anzeige auf Profilseiten)
+    // Update/Delete: verboten für Nutzer — nur Admin darf löschen
+    // ----------------------------------------------------------------
+    match /reviews/{reviewId} {
+      allow read:   if isSignedIn();
+      allow create: if isSignedIn()
+                    && request.auth.uid == request.resource.data.reviewerId;
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    // ----------------------------------------------------------------
+    // review_reports/{docId}
+    //
+    // Erstellen: Eingeloggt + reporterId muss eigene UID sein
+    // Lesen/Updaten/Löschen: Nur Admin (Server-SDK)
+    // ----------------------------------------------------------------
+    match /review_reports/{docId} {
+      allow create: if isSignedIn()
+                    && request.resource.data.reporterId == request.auth.uid;
+      allow read, update, delete: if false;
     }
 
     match /chat_conversations/{conversationId} {

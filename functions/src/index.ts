@@ -442,10 +442,8 @@ export const submitReview = onCall(async (request) => {
     throw new HttpsError("already-exists", "Du hast diese Person für diese Fahrt bereits bewertet");
   }
 
-  // ── Gemeinsame akzeptierte Anfrage vorhanden? ──
-  // Entweder: reviewer = Mitfahrer, reviewed = Fahrer
-  //       oder: reviewer = Fahrer, reviewed = Mitfahrer
-  const anfrageSnap1 = await db
+  // ── Gemeinsame akzeptierte Anfrage vorhanden? (nur Mitfahrer → Fahrer) ──
+  const anfrageSnap = await db
     .collection("anfragen")
     .where("fahrtId", "==", fahrtId)
     .where("requesterId", "==", reviewerId)
@@ -454,18 +452,7 @@ export const submitReview = onCall(async (request) => {
     .limit(1)
     .get();
 
-  const anfrageSnap2 = anfrageSnap1.empty
-    ? await db
-        .collection("anfragen")
-        .where("fahrtId", "==", fahrtId)
-        .where("requesterId", "==", reviewedId)
-        .where("fahrtOwnerId", "==", reviewerId)
-        .where("status", "==", 1)
-        .limit(1)
-        .get()
-    : null;
-
-  if (anfrageSnap1.empty && (anfrageSnap2 === null || anfrageSnap2.empty)) {
+  if (anfrageSnap.empty) {
     throw new HttpsError(
       "failed-precondition",
       "Keine gemeinsame Fahrt gefunden. Bewertungen sind nur nach geteilten Fahrten möglich"
@@ -614,6 +601,35 @@ export const onMessageCreated = onDocumentCreated(
         type: "chat",
         conversationId: event.params["convId"],
         senderId: msg["senderId"] as string,
+      },
+    });
+  }
+);
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Event-Anfrage genehmigt → Nutzer benachrichtigen
+// ──────────────────────────────────────────────────────────────────────────────
+
+export const onEventRequestUpdated = onDocumentUpdated(
+  "eventRequests/{requestId}",
+  async (event) => {
+    const before = event.data.before.data();
+    const after = event.data.after.data();
+
+    if (before["status"] !== "pending" || after["status"] !== "approved") return;
+
+    const uid = after["uid"] as string | undefined;
+    if (!uid) return;
+
+    const tokens = await getTokens(uid);
+    const eventName = (after["eventName"] as string | undefined) ?? "Dein Event";
+
+    await sendNotification(tokens, uid, {
+      title: "Event angenommen 🎉",
+      body: `„${eventName}" wurde von uns veröffentlicht!`,
+      data: {
+        type: "event_request_approved",
+        requestId: event.params["requestId"],
       },
     });
   }
