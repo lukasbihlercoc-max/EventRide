@@ -128,15 +128,19 @@ Achtung: kann fehlschlagen wenn Conversation noch nicht existiert (catch 'not-fo
 
 ## Bekannte Risiken / Noch nicht ausgiebig getestet
 
-### Overbooking (mittleres Risiko)
-- `acceptInvitation` (Cloud Function) prüft Kapazität VOR der Transaction, nicht innerhalb
-- Wenn zwei User gleichzeitig die letzte freie Stelle buchen, können beide akzeptiert werden
-- `freiePlaetze` kann theoretisch negativ werden (parallel `FieldValue.increment(-n)`)
+### Overbooking (nur Einladungs-Flow)
+- Der normale Flow (Fahrer akzeptiert Anfrage manuell) hat **kein** Overbooking-Risiko — läuft seriell
+- Im **Einladungs-Flow** (`acceptInvitation` CF, Mitfahrer akzeptiert selbst): Kapazitätsprüfung liegt VOR der Firestore-Transaction, nicht darin
+- Race Condition: Zwei gleichzeitig eingeladene Mitfahrer akzeptieren beide den letzten Platz → beide kommen durch
+- Tritt nur auf wenn der Fahrer mehrere Leute einlädt und genau zum gleichen Moment beide annehmen
 
-### Review-System
-- Jeder kann jeden bewerten, auch ohne je mitgefahren zu sein (Firestore Rules prüfen keine Fahrt-Teilnahme)
-- Parallele Review-Writes können falschen Durchschnitt erzeugen (Durchschnitt wird vor Transaction gelesen)
-- Noch wenig getestet: Was passiert wenn ein User viele Bewertungen gleichzeitig bekommt?
+### Review-System (gut abgesichert)
+- Cloud Function `submitReview` prüft: akzeptierte Anfrage (status==1) muss existieren, Event muss vorbei sein (+3h Puffer), 14-Tage-Frist, keine Doppelbewertung
+- Parallele Review-Writes können falschen Durchschnitt erzeugen (Durchschnitt wird vor Transaction gelesen) — bei wenigen gleichzeitigen Usern kein Problem
+
+### Chat Notifications (Vordergrund)
+- `_knownLastMessageAt` setzt beim App-Start `DateTime.now()` als Baseline → **kein** Duplicate-Problem nach Neustart
+- Potenzielles Doppel-Feuern: FCM Cloud Function schickt Push Notification + lokaler Stream-Listener zeigt lokale Notification — wenn App im Vordergrund, könnten beide gleichzeitig erscheinen
 
 ### Firestore Batch-Limit
 - `cleanupAbgelaufeneAnfragen` (Cloud Function, täglich): Wenn >500 alte Anfragen gelöscht werden müssen, schlägt der Batch fehl (Firestore-Limit)
