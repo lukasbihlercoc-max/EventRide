@@ -7,6 +7,7 @@ class ChatConversation {
   final DateTime lastUpdated;
   final String? lastMessage;
   final String? lastSenderId;
+  final Map<String, DateTime>? lastRead;
 
   ChatConversation({
     required this.id,
@@ -16,7 +17,16 @@ class ChatConversation {
     required this.lastUpdated,
     this.lastMessage,
     this.lastSenderId,
+    this.lastRead,
   });
+
+  bool isUnreadFor(String userId) {
+    if (lastSenderId == userId || lastSenderId == 'system') return false;
+    if (lastMessage == null || lastMessage!.isEmpty) return false;
+    final readAt = lastRead?[userId];
+    if (readAt == null) return true;
+    return lastUpdated.isAfter(readAt);
+  }
 
   /// Serialisierung für Firestore.
   /// participants = [ownerId, requesterId] für Security Rules und arrayContains-Queries.
@@ -39,14 +49,22 @@ class ChatConversation {
     } else {
       lastUpdated = DateTime.now();
     }
+
+    final rawLastRead = map['lastRead'] as Map<String, dynamic>?;
+    final Map<String, DateTime>? lastRead = rawLastRead?.map((k, v) {
+      final dt = v is DateTime ? v : (v as dynamic).toDate() as DateTime;
+      return MapEntry(k, dt);
+    });
+
     return ChatConversation(
       id: id,
       fahrtId: map['fahrtId'] as String? ?? '',
-      ownerId: map['ownerId'] as String,
-      requesterId: map['requesterId'] as String,
+      ownerId: (map['ownerId'] as String?) ?? '',
+      requesterId: (map['requesterId'] as String?) ?? '',
       lastUpdated: lastUpdated,
       lastMessage: map['lastMessage'] as String?,
       lastSenderId: map['lastSenderId'] as String?,
+      lastRead: lastRead,
     );
   }
 }

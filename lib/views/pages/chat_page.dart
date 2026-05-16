@@ -7,8 +7,11 @@ import 'package:my_app/data/interfaces/i_user_repository.dart';
 
 import 'package:my_app/data/chat_service.dart';
 import 'package:my_app/data/chat_message.dart';
+import 'package:my_app/data/notifiers.dart';
 import 'package:my_app/views/widgets/app_card.dart';
+import 'package:my_app/views/widgets/app_snackbar.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
+import 'package:my_app/views/widgets/user_avatar_widget.dart';
 
 class ChatPage extends StatefulWidget {
   final String conversationId;
@@ -30,7 +33,10 @@ class _ChatPageState extends State<ChatPage> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   late final String _myUserId;
+  late final Stream<List<ChatMessage>> _messagesStream;
+  late final ChatService _chatService;
 
+  bool _isSending = false;
   DateTime? _otherUserLastSeen;
   StreamSubscription<DateTime?>? _lastSeenSub;
   Timer? _statusRefreshTimer;
@@ -45,13 +51,23 @@ class _ChatPageState extends State<ChatPage> {
   void initState() {
     super.initState();
     _myUserId = context.read<IAuthRepository>().currentUser?.userId ?? '';
+    _chatService = context.read<ChatService>();
+    _messagesStream = _chatService.messagesStream(widget.conversationId);
+    activeChatConversationId.value = widget.conversationId;
+
+    if (_myUserId.isNotEmpty) {
+      _chatService.markConversationRead(widget.conversationId, _myUserId);
+    }
 
     _lastSeenSub = context
         .read<IUserRepository>()
         .lastSeenStream(widget.otherUserId)
-        .listen((dt) {
-      if (mounted) setState(() => _otherUserLastSeen = dt);
-    });
+        .listen(
+      (dt) {
+        if (mounted) setState(() => _otherUserLastSeen = dt);
+      },
+      onError: (_) {}, // lastSeen ist optional – Fehler ignorieren
+    );
 
     _statusRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (mounted && _otherUserLastSeen != null) setState(() {});
@@ -88,6 +104,10 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   void dispose() {
+    if (_myUserId.isNotEmpty) {
+      _chatService.markConversationRead(widget.conversationId, _myUserId);
+    }
+    activeChatConversationId.value = null;
     _lastSeenSub?.cancel();
     _statusRefreshTimer?.cancel();
     _scrolledPast.dispose();
@@ -98,25 +118,34 @@ class _ChatPageState extends State<ChatPage> {
 
   Widget _appBarTitle() {
     final subtitle = _lastSeenText(_otherUserLastSeen);
-    if (subtitle == null) return Text(widget.otherUserName);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(widget.otherUserName,
-            style: const TextStyle(fontSize: 16, height: 1.2)),
-        Text(subtitle,
-            style: const TextStyle(fontSize: 11, color: Colors.white60)),
+        UserAvatarById(
+          userId: widget.otherUserId,
+          name: widget.otherUserName,
+          radius: 18,
+        ),
+        const SizedBox(width: 10),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(widget.otherUserName,
+                style: const TextStyle(fontSize: 16, height: 1.2)),
+            if (subtitle != null)
+              Text(subtitle,
+                  style: const TextStyle(fontSize: 11, color: Colors.white60)),
+          ],
+        ),
       ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final chatService = context.read<ChatService>();
-
     return StreamBuilder<List<ChatMessage>>(
-      stream: chatService.messagesStream(widget.conversationId),
+      stream: _messagesStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
@@ -145,6 +174,14 @@ class _ChatPageState extends State<ChatPage> {
         if (userMessages.length != _prevMessageCount) {
           _prevMessageCount = userMessages.length;
           _scrollToBottom();
+          if (_myUserId.isNotEmpty) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                _chatService.markConversationRead(
+                    widget.conversationId, _myUserId);
+              }
+            });
+          }
         }
 
         final chatItems = _buildChatItems(userMessages);
@@ -155,7 +192,7 @@ class _ChatPageState extends State<ChatPage> {
               Scaffold(
                 backgroundColor: Colors.transparent,
                 appBar: AppBar(
-                  backgroundColor: Colors.black.withOpacity(0.18),
+                  backgroundColor: Colors.black.withValues(alpha: 0.18),
                   elevation: 0,
                   surfaceTintColor: Colors.transparent,
                   title: _appBarTitle(),
@@ -483,14 +520,28 @@ class _ChatPageState extends State<ChatPage> {
             const SizedBox(width: 8),
             GestureDetector(
               onTap: () async {
+                if (_isSending) return;
                 final text = _controller.text.trim();
                 if (text.isEmpty) return;
-                await chatService.sendMessage(
-                  conversationId: widget.conversationId,
-                  senderId: _myUserId,
-                  text: text,
-                );
-                _controller.clear();
+                setState(() => _isSending = true);
+                final ctx = context;
+                try {
+                  await chatService.sendMessage(
+                    conversationId: widget.conversationId,
+                    senderId: _myUserId,
+                    text: text,
+                  );
+                  _controller.clear();
+                } catch (_) {
+                  if (!ctx.mounted) return;
+                  AppSnackbar.show(
+                    ctx,
+                    message: 'Nachricht konnte nicht gesendet werden.',
+                    accentColor: Colors.redAccent,
+                  );
+                } finally {
+                  if (mounted) setState(() => _isSending = false);
+                }
               },
               child: Container(
                 width: 38,

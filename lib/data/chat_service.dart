@@ -30,6 +30,15 @@ class ChatService {
   Stream<List<ChatConversation>> conversationsStream(String userId) =>
       _repo.conversationsStream(userId);
 
+  Stream<bool> hasAnyUnreadStream(String userId) =>
+      _repo.hasAnyUnreadStream(userId);
+
+  // ── Gelesen-Markierung ────────────────────────────────────────────────────
+
+  Future<void> markConversationRead(
+          String conversationId, String userId) =>
+      _repo.markConversationRead(conversationId, userId);
+
   // ── Conversation anlegen ──────────────────────────────────────────────────
 
   Future<ChatConversation> ensureConversation({

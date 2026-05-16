@@ -13,4 +13,10 @@ abstract class IChatRepository {
 
   /// Legt eine Conversation an – nur wenn sie noch nicht existiert (idempotent).
   Future<void> ensureConversation(ChatConversation convo);
+
+  /// Setzt lastRead.{userId} = jetzt für die Conversation.
+  Future<void> markConversationRead(String conversationId, String userId);
+
+  /// Emittiert true, wenn der User in irgendeiner Conversation ungelesene Nachrichten hat.
+  Stream<bool> hasAnyUnreadStream(String userId);
 }

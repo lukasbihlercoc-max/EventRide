@@ -21,10 +21,15 @@ class FirestoreChatRepository implements IChatRepository {
         .doc(conversationId)
         .collection('messages')
         .snapshots()
-        .map((snap) => snap.docs
-            .map((d) => ChatMessage.fromMap(d.id, d.data()))
-            .toList()
-          ..sort((a, b) => a.createdAt.compareTo(b.createdAt)));
+        .map((snap) {
+          final result = <ChatMessage>[];
+          for (final d in snap.docs) {
+            try {
+              result.add(ChatMessage.fromMap(d.id, d.data()));
+            } catch (_) {}
+          }
+          return result..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+        });
   }
 
   /// Echtzeit-Conversations des Users, absteigend nach lastMessageAt.
@@ -35,10 +40,15 @@ class FirestoreChatRepository implements IChatRepository {
         .collection(_col)
         .where('participants', arrayContains: userId)
         .snapshots()
-        .map((snap) => snap.docs
-            .map((d) => ChatConversation.fromMap(d.id, d.data()))
-            .toList()
-          ..sort((a, b) => b.lastUpdated.compareTo(a.lastUpdated)));
+        .map((snap) {
+          final result = <ChatConversation>[];
+          for (final d in snap.docs) {
+            try {
+              result.add(ChatConversation.fromMap(d.id, d.data()));
+            } catch (_) {}
+          }
+          return result..sort((a, b) => b.lastUpdated.compareTo(a.lastUpdated));
+        });
   }
 
   // ── Writes ───────────────────────────────────────────────────────────────
@@ -84,5 +94,43 @@ class FirestoreChatRepository implements IChatRepository {
     } on FirebaseException catch (_) {
       rethrow;
     }
+  }
+
+  @override
+  Future<void> markConversationRead(
+      String conversationId, String userId) async {
+    try {
+      await _db.collection(_col).doc(conversationId).update({
+        'lastRead.$userId': FieldValue.serverTimestamp(),
+      });
+    } on FirebaseException catch (e) {
+      // not-found: Conversation existiert noch nicht (Race mit ensureConversation)
+      // permission-denied: Conversation ohne participants-Feld (Altdaten) → nicht kritisch
+      if (e.code != 'not-found' && e.code != 'permission-denied') rethrow;
+    }
+  }
+
+  @override
+  Stream<bool> hasAnyUnreadStream(String userId) {
+    return _db
+        .collection(_col)
+        .where('participants', arrayContains: userId)
+        .snapshots()
+        .map((snap) => snap.docs.any((doc) {
+              final data = doc.data();
+              // Eigene Nachrichten sind nie ungelesen
+              if (data['lastSenderId'] == userId) return false;
+              if (data['lastMessageAt'] == null) return false;
+              final lastMessageAt =
+                  (data['lastMessageAt'] as Timestamp).toDate();
+              final lastReadMap =
+                  data['lastRead'] as Map<String, dynamic>?;
+              if (lastReadMap == null || lastReadMap[userId] == null) {
+                return true;
+              }
+              final lastReadAt =
+                  (lastReadMap[userId] as Timestamp).toDate();
+              return lastMessageAt.isAfter(lastReadAt);
+            }));
   }
 }

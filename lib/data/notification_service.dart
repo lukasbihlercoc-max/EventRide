@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:my_app/data/notifiers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -33,6 +34,9 @@ class NotificationService {
 
   /// Wird aufgerufen wenn der Admin auf eine Event-Anfrage-Notification tippt.
   VoidCallback? onEventRequestTapped;
+
+  /// Wird aufgerufen wenn der Nutzer auf eine "Event angenommen"-Notification tippt.
+  VoidCallback? onUserEventRequestTapped;
 
   StreamSubscription<List<ChatConversation>>? _chatSub;
   StreamSubscription<String>? _tokenRefreshSub;
@@ -108,6 +112,15 @@ class NotificationService {
     }
 
     // 4. FCM-Token holen & in Firestore speichern (bei jedem Login)
+    //    Nur wenn Notifications tatsächlich erlaubt sind.
+    final permStatus = await FirebaseMessaging.instance.getNotificationSettings();
+    final notificationsAllowed =
+        permStatus.authorizationStatus == AuthorizationStatus.authorized ||
+        permStatus.authorizationStatus == AuthorizationStatus.provisional;
+    if (!notificationsAllowed) {
+      if (kDebugMode) debugPrint('[FCM] Notifications verweigert – kein Token gespeichert');
+      return;
+    }
     final token = await FirebaseMessaging.instance.getToken();
     if (kDebugMode) debugPrint('[FCM] Token: $token');
     if (token != null) {
@@ -185,6 +198,7 @@ class NotificationService {
         if (age > const Duration(seconds: 30)) continue;
 
         if (kDebugMode) debugPrint('[FCM] Neue Chat-Nachricht von $senderId in ${conv.id}');
+        if (activeChatConversationId.value == conv.id) continue;
         _showChatLocalNotification(conv);
       }
     });
@@ -263,6 +277,8 @@ class NotificationService {
       onLicenseReviewTapped?.call();
     } else if (type == 'event_request') {
       onEventRequestTapped?.call();
+    } else if (type == 'event_request_approved') {
+      onUserEventRequestTapped?.call();
     } else if (type == 'review') {
       onReviewTapped?.call();
     }
