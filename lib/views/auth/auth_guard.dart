@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
+import 'package:my_app/utils/app_route.dart';
 import 'package:my_app/views/pages/login_page.dart';
 import 'package:provider/provider.dart';
 
@@ -40,7 +41,7 @@ Future<bool> requiresLogin(BuildContext context) async {
 
   await Navigator.push(
     context,
-    MaterialPageRoute(builder: (_) => const LoginPage()),
+    AppRoute(builder: (_) => const LoginPage()),
   );
 
   if (!context.mounted) return false;

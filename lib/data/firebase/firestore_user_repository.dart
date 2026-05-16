@@ -15,6 +15,26 @@ class FirestoreUserRepository implements IUserRepository {
   }
 
   @override
+  Future<int> getTrustLevel(String userId) async {
+    if (userId.isEmpty) return 0;
+    try {
+      final doc = await _db.collection('users').doc(userId).get();
+      final data = doc.data();
+      if (data == null) return 0;
+      final emailVerified = data['emailVerified'] as bool? ?? false;
+      final phoneVerified = data['phoneVerified'] as bool? ?? false;
+      final licenseStatus = data['licenseStatus'] as String? ?? 'none';
+      int count = 0;
+      if (emailVerified) count++;
+      if (phoneVerified) count++;
+      if (licenseStatus == 'verified') count++;
+      return count;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  @override
   Stream<DateTime?> lastSeenStream(String userId) {
     if (userId.isEmpty) return Stream.value(null);
     return _db
@@ -31,25 +51,40 @@ class FirestoreUserRepository implements IUserRepository {
   @override
   Future<void> updateLastSeen(String userId) async {
     if (userId.isEmpty) return;
-    await _db.collection('users').doc(userId).set(
-      {'lastSeen': FieldValue.serverTimestamp()},
-      SetOptions(merge: true),
-    );
+    try {
+      await _db.collection('users').doc(userId).set(
+        {'lastSeen': FieldValue.serverTimestamp()},
+        SetOptions(merge: true),
+      );
+    } on FirebaseException catch (e) {
+      if (e.code == 'permission-denied') return;
+      rethrow;
+    }
   }
 
   @override
   Future<void> saveFcmToken(String userId, String token) async {
     if (userId.isEmpty || token.isEmpty) return;
-    await _db.collection('users').doc(userId).update({
-      'fcmTokens': FieldValue.arrayUnion([token]),
-    });
+    try {
+      await _db.collection('users').doc(userId).update({
+        'fcmTokens': FieldValue.arrayUnion([token]),
+      });
+    } on FirebaseException catch (e) {
+      if (e.code == 'permission-denied') return;
+      rethrow;
+    }
   }
 
   @override
   Future<void> removeFcmToken(String userId, String token) async {
     if (userId.isEmpty || token.isEmpty) return;
-    await _db.collection('users').doc(userId).update({
-      'fcmTokens': FieldValue.arrayRemove([token]),
-    });
+    try {
+      await _db.collection('users').doc(userId).update({
+        'fcmTokens': FieldValue.arrayRemove([token]),
+      });
+    } on FirebaseException catch (e) {
+      if (e.code == 'permission-denied') return;
+      rethrow;
+    }
   }
 }

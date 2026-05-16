@@ -3,6 +3,9 @@ abstract class IUserRepository {
   /// kein Foto gesetzt ist.
   Future<String?> getPhotoUrl(String userId);
 
+  /// Gibt das Trust-Level (0–3) eines beliebigen Nutzers zurück.
+  Future<int> getTrustLevel(String userId);
+
   /// Streams das lastSeen-Datum eines Nutzers aus Firestore.
   Stream<DateTime?> lastSeenStream(String userId);
 

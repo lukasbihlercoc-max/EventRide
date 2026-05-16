@@ -7,6 +7,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:my_app/data/app_user.dart';
+import 'package:my_app/data/event_daten.dart';
+import 'package:my_app/data/event_request.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/data/license_request.dart';
 
@@ -31,6 +33,22 @@ class FirebaseAuthRepository implements IAuthRepository {
   Future<void> _loadAdminStatus(String uid) async {
     final doc = await _firestore.collection('users').doc(uid).get();
     _isAdmin = doc.data()?['isAdmin'] == true;
+  }
+
+  // Setzt createdAt für Altaccounts die vor dem Feld angelegt wurden.
+  // Nutzt Firebase Auth metadata.creationTime als Quelle.
+  Future<void> _backfillCreatedAt(User fbUser) async {
+    try {
+      final doc = await _firestore.collection('users').doc(fbUser.uid).get();
+      if (doc.exists && doc.data()?['createdAt'] == null) {
+        final creationTime = fbUser.metadata.creationTime;
+        if (creationTime != null) {
+          await _firestore.collection('users').doc(fbUser.uid).update({
+            'createdAt': Timestamp.fromDate(creationTime),
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   // Minimales AppUser-Objekt aus Firebase Auth (ohne Firestore-Daten).
@@ -61,6 +79,8 @@ class FirebaseAuthRepository implements IAuthRepository {
       homeTownLng: (data['homeTownLng'] as num?)?.toDouble(),
       car: carData != null ? CarInfo.fromMap(carData) : null,
       licenseRejectReason: data['licenseRejectReason'] as String?,
+      ratingAvg: (data['ratingAvg'] as num?)?.toDouble(),
+      ratingCount: (data['ratingCount'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -93,6 +113,7 @@ class FirebaseAuthRepository implements IAuthRepository {
               controller.add(null);
               return;
             }
+            _backfillCreatedAt(fbUser);
             firestoreSub = _firestore
                 .collection('users')
                 .doc(fbUser.uid)
@@ -102,7 +123,10 @@ class FirebaseAuthRepository implements IAuthRepository {
                     _isAdmin = doc.data()?['isAdmin'] == true;
                     controller.add(_toAppUser(fbUser, doc));
                   },
-                  onError: controller.addError,
+                  onError: (_) {
+                    // Firestore-Fehler (z.B. PERMISSION_DENIED kurz nach Logout)
+                    // nicht an Subscriber propagieren – kein onError-Handler dort.
+                  },
                 );
           },
           onError: controller.addError,
@@ -181,18 +205,133 @@ class FirebaseAuthRepository implements IAuthRepository {
   }
 
   @override
+  Future<void> reauthenticate(String password) async {
+    final user = _auth.currentUser;
+    if (user == null || user.email == null) return;
+    final credential = EmailAuthProvider.credential(
+      email: user.email!,
+      password: password,
+    );
+    await user.reauthenticateWithCredential(credential);
+  }
+
+  @override
   Future<void> deleteAccount() async {
     final user = _auth.currentUser;
     if (user == null) return;
+    final uid = user.uid;
 
+    // Fahrten des Users holen und Anfragen auf fahrtGeloescht setzen
+    final fahrtenSnap = await _firestore
+        .collection('fahrten')
+        .where('ownerId', isEqualTo: uid)
+        .get();
+
+    for (final fahrtDoc in fahrtenSnap.docs) {
+      final anfragenSnap = await _firestore
+          .collection('anfragen')
+          .where('fahrtId', isEqualTo: fahrtDoc.id)
+          .where('status', whereIn: [
+            0, // offen
+            1, // akzeptiert
+          ])
+          .get();
+
+      final batch = _firestore.batch();
+      for (final a in anfragenSnap.docs) {
+        batch.update(a.reference, {
+          'status': 4, // fahrtGeloescht
+          'updatedAt': DateTime.now().millisecondsSinceEpoch,
+        });
+      }
+      batch.delete(fahrtDoc.reference);
+      await batch.commit();
+    }
+
+    // Eigene offene/akzeptierte Anfragen als Mitfahrer auf storniert setzen
+    final myAnfragenSnap = await _firestore
+        .collection('anfragen')
+        .where('requesterId', isEqualTo: uid)
+        .where('status', whereIn: [
+          0, // offen
+          1, // akzeptiert
+        ])
+        .get();
+
+    if (myAnfragenSnap.docs.isNotEmpty) {
+      final batch = _firestore.batch();
+      for (final doc in myAnfragenSnap.docs) {
+        batch.update(doc.reference, {
+          'status': 3, // storniert
+          'updatedAt': DateTime.now().millisecondsSinceEpoch,
+        });
+      }
+      await batch.commit();
+    }
+
+    // Interessenten-Einträge löschen
+    final interessentenSnap = await _firestore
+        .collection('interessenten')
+        .where('userId', isEqualTo: uid)
+        .get();
+
+    if (interessentenSnap.docs.isNotEmpty) {
+      final batch = _firestore.batch();
+      for (final doc in interessentenSnap.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    }
+
+    // Chat-Conversations und deren Messages löschen
+    final chatsSnap = await _firestore
+        .collection('chat_conversations')
+        .where('participants', arrayContains: uid)
+        .get();
+
+    for (final chatDoc in chatsSnap.docs) {
+      final messagesSnap =
+          await chatDoc.reference.collection('messages').get();
+      final batch = _firestore.batch();
+      for (final msg in messagesSnap.docs) {
+        batch.delete(msg.reference);
+      }
+      batch.delete(chatDoc.reference);
+      await batch.commit();
+    }
+
+    // Storage-Dateien löschen
     try {
-      await _storage.ref('users/${user.uid}/profile.jpg').delete();
+      await _storage.ref('users/$uid/profile.jpg').delete();
     } catch (_) {}
     try {
-      await _storage.ref('users/${user.uid}/license.jpg').delete();
+      await _storage.ref('users/$uid/license.jpg').delete();
     } catch (_) {}
 
-    await _firestore.collection('users').doc(user.uid).delete();
+    // Reviews bleiben bewusst erhalten: sie sind historische Vertrauensnachweise
+    // und dürfen nur vom Admin gelöscht werden. Der reviewerName ist ein Snapshot
+    // zum Zeitpunkt der Bewertung; das User-Dokument selbst wird unten gelöscht.
+
+    // Eigene Event-Requests löschen
+    final eventRequestsSnap = await _firestore
+        .collection('eventRequests')
+        .where('uid', isEqualTo: uid)
+        .get();
+    if (eventRequestsSnap.docs.isNotEmpty) {
+      final batch = _firestore.batch();
+      for (final doc in eventRequestsSnap.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    }
+
+    // Firestore-Dokumente des Users löschen (User-Doc enthält auch FCM-Token)
+    final userBatch = _firestore.batch();
+    userBatch.delete(_firestore.collection('users').doc(uid));
+    userBatch.delete(_firestore.collection('licenseRequests').doc(uid));
+    await userBatch.commit();
+
+    // Firebase-Auth-Account löschen
     await user.delete();
   }
 
@@ -254,6 +393,27 @@ class FirebaseAuthRepository implements IAuthRepository {
     final user = _auth.currentUser;
     if (user == null) return;
     await user.sendEmailVerification();
+  }
+
+  @override
+  Future<void> changeEmail(String newEmail, String password) async {
+    final user = _auth.currentUser;
+    if (user == null || user.email == null) return;
+
+    final credential = EmailAuthProvider.credential(
+      email: user.email!,
+      password: password,
+    );
+    await user.reauthenticateWithCredential(credential);
+    await user.verifyBeforeUpdateEmail(newEmail);
+
+    // Nur emailVerified zurücksetzen — das email-Feld darf laut Firestore-Regel
+    // nicht durch den User selbst geändert werden (Schutz vor Manipulation).
+    // Die tatsächliche E-Mail-Adresse in Firebase Auth wird erst aktualisiert,
+    // nachdem der User auf den Link in der neuen Inbox geklickt hat.
+    await _firestore.collection('users').doc(user.uid).update({
+      'emailVerified': false,
+    });
   }
 
   @override
@@ -414,6 +574,113 @@ class FirebaseAuthRepository implements IAuthRepository {
     await _firestore.collection('users').doc(uid).update({
       'car': CarInfo(make: make, model: model, color: color, seats: seats)
           .toMap(),
+    });
+  }
+
+  // ── Event-Anfragen ─────────────────────────────────────────────────────────
+
+  @override
+  Future<void> submitEventRequestManual({
+    required String name,
+    required String standort,
+    required String datum,
+    required String eventTyp,
+    required String beschreibung,
+    required String adresse,
+    double? latitude,
+    double? longitude,
+  }) async {
+    final fbUser = _auth.currentUser;
+    if (fbUser == null) throw Exception('Nicht eingeloggt');
+
+    await _firestore.collection('eventRequests').add({
+      'uid': fbUser.uid,
+      'userName': fbUser.displayName ?? '',
+      'userPhotoUrl': fbUser.photoURL,
+      'submissionType': 'manual',
+      'status': 'pending',
+      'submittedAt': FieldValue.serverTimestamp(),
+      'eventName': name,
+      'standort': standort,
+      'datum': datum,
+      'eventTyp': eventTyp,
+      'beschreibung': beschreibung,
+      'adresse': adresse,
+      'latitude': latitude,
+      'longitude': longitude,
+    });
+  }
+
+  @override
+  Future<void> submitEventRequestFlyer(File flyer, {String? note}) async {
+    final fbUser = _auth.currentUser;
+    if (fbUser == null) throw Exception('Nicht eingeloggt');
+
+    final docRef = _firestore.collection('eventRequests').doc();
+    final path = 'event_requests/${docRef.id}/flyer.jpg';
+
+    await _storage
+        .ref(path)
+        .putFile(flyer, SettableMetadata(contentType: 'image/jpeg'));
+
+    await docRef.set({
+      'uid': fbUser.uid,
+      'userName': fbUser.displayName ?? '',
+      'userPhotoUrl': fbUser.photoURL,
+      'submissionType': 'flyer',
+      'status': 'pending',
+      'submittedAt': FieldValue.serverTimestamp(),
+      'flyerPath': path,
+      'note': note,
+    });
+  }
+
+  @override
+  Stream<List<EventRequest>> get pendingEventRequests => _firestore
+      .collection('eventRequests')
+      .where('status', isEqualTo: 'pending')
+      .snapshots()
+      .map((s) {
+        final list = s.docs.map(EventRequest.fromDoc).toList();
+        list.sort((a, b) => a.submittedAt.compareTo(b.submittedAt));
+        return list;
+      });
+
+  @override
+  Future<void> approveEventRequest(String requestId, Event event) async {
+    final batch = _firestore.batch();
+    batch.set(
+      _firestore.collection('events').doc(event.id),
+      event.toMap(),
+    );
+    batch.update(
+      _firestore.collection('eventRequests').doc(requestId),
+      {
+        'status': 'approved',
+        'reviewedAt': FieldValue.serverTimestamp(),
+      },
+    );
+    await batch.commit();
+  }
+
+  @override
+  Stream<List<EventRequest>> get myEventRequests {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return const Stream.empty();
+    return _firestore
+        .collection('eventRequests')
+        .where('uid', isEqualTo: uid)
+        .orderBy('submittedAt', descending: true)
+        .snapshots()
+        .map((s) => s.docs.map(EventRequest.fromDoc).toList());
+  }
+
+  @override
+  Future<void> discardEventRequest(String requestId, {String? reason}) async {
+    await _firestore.collection('eventRequests').doc(requestId).update({
+      'status': 'discarded',
+      'reviewedAt': FieldValue.serverTimestamp(),
+      if (reason != null && reason.isNotEmpty) 'rejectReason': reason,
     });
   }
 }
