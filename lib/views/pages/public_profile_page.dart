@@ -92,6 +92,7 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
 
   bool _canReview = false;
   bool _hasReviewed = false;
+  String? _sharedFahrtId;
 
   CarInfo? _car;
 
@@ -131,25 +132,17 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
 
       bool canReview = false;
       bool hasReviewed = false;
+      String? sharedFahrtId;
       if (currentUid != null && currentUid != widget.userId) {
-        final sharedResults = await Future.wait<QuerySnapshot>([
-          db
-              .collection('anfragen')
-              .where('fahrtOwnerId', isEqualTo: widget.userId)
-              .where('requesterId', isEqualTo: currentUid)
-              .where('status', isEqualTo: 1)
-              .get(),
-          db
-              .collection('anfragen')
-              .where('fahrtOwnerId', isEqualTo: currentUid)
-              .where('requesterId', isEqualTo: widget.userId)
-              .where('status', isEqualTo: 1)
-              .get(),
-        ]);
+        final sharedSnap = await db
+            .collection('anfragen')
+            .where('fahrtOwnerId', isEqualTo: widget.userId)
+            .where('requesterId', isEqualTo: currentUid)
+            .where('status', isEqualTo: 1)
+            .get();
 
-        final allAnfragen = [...sharedResults[0].docs, ...sharedResults[1].docs];
+        final allAnfragen = sharedSnap.docs;
 
-        bool hasPastEvent = false;
         for (final anfrageDoc in allAnfragen) {
           final fahrtId =
               (anfrageDoc.data() as Map<String, dynamic>)['fahrtId'] as String?;
@@ -170,12 +163,12 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
             eventDatum = rawDatum.toDate();
           }
           if (eventDatum != null && _istVergangen(eventDatum)) {
-            hasPastEvent = true;
+            sharedFahrtId = fahrtId;
             break;
           }
         }
 
-        if (hasPastEvent) {
+        if (sharedFahrtId != null) {
           final alreadyReviewedSnap = await db
               .collection('reviews')
               .where('reviewerId', isEqualTo: currentUid)
@@ -219,6 +212,7 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
           _reviews = allReviews.take(5).toList();
           _canReview = canReview;
           _hasReviewed = hasReviewed;
+          _sharedFahrtId = sharedFahrtId;
           final carMap = d['car'] as Map<String, dynamic>?;
           if (carMap != null) {
             final ci = CarInfo.fromMap(carMap);
@@ -235,6 +229,7 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
           _reviews = allReviews2.take(5).toList();
           _canReview = canReview;
           _hasReviewed = hasReviewed;
+          _sharedFahrtId = sharedFahrtId;
           _loading = false;
         });
       }
@@ -244,6 +239,7 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
   }
 
   void _openReviewSheet() {
+    if (_sharedFahrtId == null) return;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -251,6 +247,7 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
       builder: (_) => _ReviewBottomSheet(
         reviewedId: widget.userId,
         reviewedName: _name,
+        fahrtId: _sharedFahrtId!,
         onSubmitted: _onReviewSubmitted,
       ),
     );
@@ -992,11 +989,13 @@ class _ReviewedHint extends StatelessWidget {
 class _ReviewBottomSheet extends StatefulWidget {
   final String reviewedId;
   final String reviewedName;
+  final String fahrtId;
   final VoidCallback onSubmitted;
 
   const _ReviewBottomSheet({
     required this.reviewedId,
     required this.reviewedName,
+    required this.fahrtId,
     required this.onSubmitted,
   });
 
@@ -1015,33 +1014,6 @@ class _ReviewBottomSheetState extends State<_ReviewBottomSheet> {
     super.dispose();
   }
 
-  Future<String?> _findSharedFahrtId() async {
-    final db = FirebaseFirestore.instance;
-    final currentUid = FirebaseAuth.instance.currentUser?.uid;
-    if (currentUid == null) return null;
-
-    final snap1 = await db
-        .collection('anfragen')
-        .where('fahrtOwnerId', isEqualTo: widget.reviewedId)
-        .where('requesterId', isEqualTo: currentUid)
-        .where('status', isEqualTo: 1)
-        .limit(1)
-        .get();
-
-    if (snap1.docs.isNotEmpty) return snap1.docs.first.data()['fahrtId'] as String?;
-
-    final snap2 = await db
-        .collection('anfragen')
-        .where('fahrtOwnerId', isEqualTo: currentUid)
-        .where('requesterId', isEqualTo: widget.reviewedId)
-        .where('status', isEqualTo: 1)
-        .limit(1)
-        .get();
-
-    if (snap2.docs.isNotEmpty) return snap2.docs.first.data()['fahrtId'] as String?;
-    return null;
-  }
-
   Future<void> _submit() async {
     if (_selectedRating == 0) {
       AppSnackbar.show(
@@ -1055,21 +1027,9 @@ class _ReviewBottomSheetState extends State<_ReviewBottomSheet> {
     setState(() => _loading = true);
 
     try {
-      final fahrtId = await _findSharedFahrtId();
-      if (fahrtId == null) {
-        if (mounted) {
-          AppSnackbar.show(
-            context,
-            message: 'Keine gemeinsame Fahrt gefunden',
-            accentColor: Colors.redAccent,
-          );
-        }
-        return;
-      }
-
       await FirebaseFunctions.instance.httpsCallable('submitReview').call({
         'reviewedId': widget.reviewedId,
-        'fahrtId': fahrtId,
+        'fahrtId': widget.fahrtId,
         'rating': _selectedRating,
         'comment': _commentController.text.trim(),
       });
