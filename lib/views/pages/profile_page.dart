@@ -2,6 +2,7 @@
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:my_app/data/review.dart';
@@ -14,6 +15,7 @@ import 'package:my_app/config/legal_texts.dart';
 import 'package:my_app/utils/app_route.dart';
 import 'package:my_app/data/app_user.dart';
 import 'package:my_app/views/pages/legal_page.dart';
+import 'package:my_app/views/pages/public_profile_page.dart';
 import 'package:my_app/views/pages/reviews_list_page.dart';
 import 'package:my_app/views/widgets/review_card_widget.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
@@ -916,42 +918,30 @@ class _VerifCard extends StatelessWidget {
     this.onTap,
   });
 
-  Color get _bgStart {
+  // Gleiche dunkle Basis wie AppCard-Default, Ende leicht state-getönt
+  List<Color> get _gradientColors {
     switch (state) {
       case VerifState.done:
-        return const Color(0xFF1B4332);
+        return const [Color(0xFF142A47), Color(0xFF1B3A34)];
       case VerifState.pending:
-        return const Color(0xFF3D2B00);
+        return const [Color(0xFF142A47), Color(0xFF2A2318)];
       case VerifState.rejected:
-        return const Color(0xFF3D0A0A);
+        return const [Color(0xFF142A47), Color(0xFF3A1515)];
       case VerifState.open:
-        return const Color(0xFF1A1F2E);
-    }
-  }
-
-  Color get _bgEnd {
-    switch (state) {
-      case VerifState.done:
-        return const Color(0xFF2D6A4F);
-      case VerifState.pending:
-        return const Color(0xFF5C4000);
-      case VerifState.rejected:
-        return const Color(0xFF5C1010);
-      case VerifState.open:
-        return const Color(0xFF232940);
+        return const [Color(0xFF142A47), Color(0xFF264971)];
     }
   }
 
   Color get _borderColor {
     switch (state) {
       case VerifState.done:
-        return const Color(0xFF52B788);
+        return const Color(0xFF4B7A6A).withValues(alpha: 0.40);
       case VerifState.pending:
-        return const Color(0xFFF4A261);
+        return const Color(0xFFB07830).withValues(alpha: 0.40);
       case VerifState.rejected:
-        return const Color(0xFFE63946);
+        return const Color(0xFFE63946).withValues(alpha: 0.35);
       case VerifState.open:
-        return Colors.white12;
+        return Colors.white.withValues(alpha: 0.12);
     }
   }
 
@@ -960,11 +950,11 @@ class _VerifCard extends StatelessWidget {
       case VerifState.done:
         return const Color(0xFF2D6A4F);
       case VerifState.pending:
-        return const Color(0xFFE07B00);
+        return const Color.fromARGB(206, 168, 82, 28);
       case VerifState.rejected:
         return const Color(0xFFE63946);
       case VerifState.open:
-        return const Color(0xFF4A80F0);
+        return const Color.fromARGB(235, 74, 129, 240);
     }
   }
 
@@ -1015,9 +1005,7 @@ class _VerifCard extends StatelessWidget {
         height: 110,
         child: AppCard(
           padding: const EdgeInsets.all(14),
-          gradientColors: state != VerifState.open
-              ? [_bgStart, _bgEnd]
-              : null,
+          gradientColors: _gradientColors,
           borderColor: _borderColor,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1070,8 +1058,8 @@ class _VerifCard extends StatelessWidget {
                         : state == VerifState.rejected
                             ? (cta ?? "Neu hochladen")
                             : (cta ?? "Erforderlich"),
-                style: TextStyle(
-                  color: _iconColor.withValues(alpha: 0.85),
+                style: const TextStyle(
+                  color: Colors.white54,
                   fontSize: 11,
                 ),
               ),
@@ -2151,16 +2139,19 @@ class _OwnReviewsSectionState extends State<_OwnReviewsSection> {
 
   Future<void> _loadReviews() async {
     try {
+      // kein orderBy → kein Composite Index nötig; client-side sortieren
       final snap = await FirebaseFirestore.instance
           .collection('reviews')
           .where('reviewedId', isEqualTo: widget.user.userId)
-          .orderBy('createdAt', descending: true)
-          .limit(2)
+          .limit(20)
           .get();
       if (mounted) {
-        setState(() => _reviews = snap.docs.map(Review.fromDoc).toList());
+        final sorted = snap.docs.map(Review.fromDoc).toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        setState(() => _reviews = sorted.take(2).toList());
       }
-    } catch (_) {
+    } catch (e) {
+      if (kDebugMode) debugPrint('_loadReviews error: $e');
       if (mounted) setState(() => _reviews = []);
     }
   }
@@ -2197,9 +2188,11 @@ class _OwnReviewsSectionState extends State<_OwnReviewsSection> {
           width: double.infinity,
           child: AppCard(
             padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
+            child: SizedBox(
+              width: double.infinity,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
                 Container(
                   width: 42,
                   height: 42,
@@ -2227,11 +2220,13 @@ class _OwnReviewsSectionState extends State<_OwnReviewsSection> {
             ),
           ),
         ),
-      );
+      ),
+    );
     }
 
     // Reviews vorhanden
     final count = _reviews!.length;
+    final totalCount = widget.user.ratingCount > 0 ? widget.user.ratingCount : count;
     final avg = widget.user.ratingAvg ??
         (_reviews!.map((r) => r.rating.toDouble()).reduce((a, b) => a + b) / count);
 
@@ -2268,7 +2263,7 @@ class _OwnReviewsSectionState extends State<_OwnReviewsSection> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${widget.user.ratingCount > 0 ? widget.user.ratingCount : count} ${(widget.user.ratingCount > 0 ? widget.user.ratingCount : count) == 1 ? 'Bewertung' : 'Bewertungen'}',
+                    '$totalCount ${totalCount == 1 ? 'Bewertung' : 'Bewertungen'}',
                     style: const TextStyle(color: Colors.white54, fontSize: 12),
                   ),
                 ],
@@ -2279,24 +2274,48 @@ class _OwnReviewsSectionState extends State<_OwnReviewsSection> {
         const SizedBox(height: 10),
         // Review-Karten (Vorschau: max. 2)
         for (final review in _reviews!) ...[
-          ReviewCard(review: review),
+          ReviewCard(
+            review: review,
+            onReport: () => showReviewReportSheet(context, review),
+            onReviewerTap: () => Navigator.push(
+              context,
+              AppRoute(
+                builder: (_) => PublicProfilePage(
+                  userId: review.reviewerId,
+                  name: review.reviewerName,
+                  photoUrl: review.reviewerPhotoUrl,
+                ),
+              ),
+            ),
+          ),
           if (review != _reviews!.last) const SizedBox(height: 6),
         ],
-        const SizedBox(height: 8),
-        GestureDetector(
-          onTap: _openList,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Alle ${widget.user.ratingCount > 0 ? widget.user.ratingCount : count} ${(widget.user.ratingCount > 0 ? widget.user.ratingCount : count) == 1 ? 'Bewertung' : 'Bewertungen'} ansehen',
-                style: const TextStyle(color: Colors.white54, fontSize: 12),
+        if (totalCount > 2) ...[
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: _openList,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 9),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.04),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
               ),
-              const SizedBox(width: 2),
-              const Icon(Icons.chevron_right, color: Colors.white38, size: 14),
-            ],
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Alle $totalCount Bewertungen ansehen',
+                    style: const TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right, color: Colors.white38, size: 14),
+                ],
+              ),
+            ),
           ),
-        ),
+        ],
       ],
     );
   }

@@ -1,13 +1,14 @@
 // detail_page.dart
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'dart:ui'; // Für ImageFilter.blur
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:my_app/data/anfrage_daten.dart';
 import 'package:my_app/data/anfrage_service.dart';
+import 'package:my_app/utils/app_route.dart';
 import 'package:my_app/data/chat_service.dart';
 import 'package:my_app/data/event_daten.dart';
 import 'package:my_app/data/fahrt_daten.dart';
@@ -21,6 +22,7 @@ import 'package:my_app/views/pages/fahrt_anbieten_page.dart';
 import 'package:my_app/views/pages/chat_page.dart';
 import 'package:my_app/views/pages/fahrt_finden_page.dart';
 import 'package:my_app/views/auth/auth_guard.dart';
+import 'package:my_app/views/auth/verification_guard.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/widgets/fahrtencard_widget/interessenten_bottom_sheet.dart';
@@ -54,12 +56,6 @@ class DetailPage extends StatelessWidget {
 
         // 🔧 Dunkler Overlay gegen Durchscheinen
         Container(color: Colors.black.withValues(alpha: 0.4)),
-
-        // 🔧 Blur-Effekt für weichen Übergang
-        BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-          child: Container(color: Colors.transparent),
-        ),
 
         // 🔧 Eigentlicher Inhalt
         Scaffold(
@@ -240,7 +236,7 @@ class DetailPage extends StatelessWidget {
                                           onPressed: () {
                                             Navigator.push(
                                               context,
-                                              MaterialPageRoute(
+                                              AppRoute(
                                                 builder: (_) =>
                                                     EventsPage(event: event),
                                               ),
@@ -279,7 +275,7 @@ class DetailPage extends StatelessWidget {
                       onPressed: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(
+                          AppRoute(
                             builder: (context) =>
                                 FahrtFindenPage(event: event),
                           ),
@@ -301,9 +297,10 @@ class DetailPage extends StatelessWidget {
                       onPressed: () async {
                         if (!await requiresLogin(context)) return;
                         if (!context.mounted) return;
+                        if (!requireVerified(context)) return;
                         Navigator.push(
                           context,
-                          MaterialPageRoute(
+                          AppRoute(
                             builder: (context) =>
                                 FahrtAnbietenPage(event: event),
                           ),
@@ -509,23 +506,47 @@ class _InteressentenInlineState extends State<_InteressentenInline>
         .firstOrNull;
 
     if (eigeneFahrt != null) {
+      final eventEndOfDay = DateTime(widget.event.datum.year,
+          widget.event.datum.month, widget.event.datum.day + 1);
+      final istVergangen = eventEndOfDay.isBefore(DateTime.now());
+      final akzeptiertCount = istVergangen
+          ? anfrageService.alleAnfragen
+              .where((a) =>
+                  a.fahrtId == eigeneFahrt.id &&
+                  a.status == AnfrageStatus.akzeptiert)
+              .length
+          : 0;
+
       return _shell(
-        onTap: count > 0
-            ? () => showInteressentenSheet(context, eigeneFahrt)
-            : null,
+        onTap: istVergangen
+            ? (akzeptiertCount > 0
+                ? () => showInteressentenSheet(context, eigeneFahrt,
+                    istVergangen: true)
+                : null)
+            : (count > 0
+                ? () => showInteressentenSheet(context, eigeneFahrt)
+                : null),
         bgColor: Colors.white.withValues(alpha: 0.06),
-        borderColor: count > 0
+        borderColor: (istVergangen ? akzeptiertCount > 0 : count > 0)
             ? Colors.amber.withValues(alpha: 0.35)
             : Colors.white.withValues(alpha: 0.08),
         child: _inlineRow(
-          interessenten: interessenten,
-          mainText: count == 0
-              ? 'Noch keiner eingetragen'
-              : count == 1
-                  ? '1 will hin'
-                  : '$count wollen hin',
-          subText: count > 0 ? 'Tippe um einzuladen' : null,
-          right: count > 0
+          interessenten: const [],
+          mainText: istVergangen
+              ? (akzeptiertCount == 0
+                  ? 'Niemand mitgefahren'
+                  : akzeptiertCount == 1
+                      ? '1 mitgefahren'
+                      : '$akzeptiertCount mitgefahren')
+              : (count == 0
+                  ? 'Noch keiner eingetragen'
+                  : count == 1
+                      ? '1 will hin'
+                      : '$count wollen hin'),
+          subText: istVergangen
+              ? (akzeptiertCount > 0 ? 'Tippe zum Ansehen' : null)
+              : (count > 0 ? 'Tippe um einzuladen' : null),
+          right: (istVergangen ? akzeptiertCount > 0 : count > 0)
               ? Icon(Icons.chevron_right,
                   color: Colors.amber.shade300, size: 20)
               : null,
@@ -598,17 +619,11 @@ class _InteressentenInlineState extends State<_InteressentenInline>
   }) {
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: EdgeInsets.symmetric(
-          horizontal: widget.width * 0.04,
-          vertical: widget.height * 0.012,
-        ),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(widget.width * 0.03),
-          border: Border.all(color: borderColor),
-        ),
+      behavior: onTap != null
+          ? HitTestBehavior.opaque
+          : HitTestBehavior.deferToChild,
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: widget.height * 0.006),
         child: child,
       ),
     );
@@ -628,17 +643,16 @@ class _InteressentenInlineState extends State<_InteressentenInline>
       children: [
         if (count > 0)
           SizedBox(
-            height: 26,
-            width: 58,
+            height: 20,
+            width: 46,
             child: Stack(
-              children:
-                  interessenten.take(3).toList().asMap().entries.map((e) {
+              children: interessenten.take(3).toList().asMap().entries.map((e) {
                 final index = e.key;
                 final user = e.value;
                 return Positioned(
-                  left: index * 16.0,
+                  left: index * 13.0,
                   child: CircleAvatar(
-                    radius: 13,
+                    radius: 10,
                     backgroundColor: Colors.white24,
                     backgroundImage: user.userPhotoUrl != null
                         ? NetworkImage(user.userPhotoUrl!)
@@ -648,7 +662,7 @@ class _InteressentenInlineState extends State<_InteressentenInline>
                             user.userName.isNotEmpty
                                 ? user.userName[0].toUpperCase()
                                 : '?',
-                            style: const TextStyle(fontSize: 10),
+                            style: const TextStyle(fontSize: 8),
                           )
                         : null,
                   ),
@@ -657,8 +671,8 @@ class _InteressentenInlineState extends State<_InteressentenInline>
             ),
           )
         else
-          const Icon(Icons.people_outline, size: 18, color: Colors.white38),
-        SizedBox(width: widget.width * 0.035),
+          const Icon(Icons.people_outline, size: 15, color: Colors.white38),
+        SizedBox(width: widget.width * 0.025),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -666,17 +680,17 @@ class _InteressentenInlineState extends State<_InteressentenInline>
               Text(
                 mainText,
                 style: TextStyle(
-                  color: mainTextColor ?? Colors.white,
-                  fontSize: 13.5,
-                  fontWeight: mainTextBold ? FontWeight.bold : FontWeight.w600,
+                  color: mainTextColor ?? Colors.white70,
+                  fontSize: 12,
+                  fontWeight: mainTextBold ? FontWeight.bold : FontWeight.w500,
                 ),
               ),
               if (subText != null)
                 Text(
                   subText,
                   style: TextStyle(
-                    color: subTextColor ?? Colors.white54,
-                    fontSize: 11,
+                    color: subTextColor ?? Colors.white38,
+                    fontSize: 10,
                   ),
                 ),
             ],
@@ -730,9 +744,8 @@ class _InteressentenInlineState extends State<_InteressentenInline>
       userB: einladung.requesterId,
     );
     Navigator.of(context).push(
-      PageRouteBuilder(
-        opaque: true,
-        pageBuilder: (_, __, ___) => ChatPage(
+      AppRoute(
+        builder: (_) => ChatPage(
           conversationId: conversationId,
           otherUserName: einladung.fahrerName,
           otherUserId: einladung.fahrtOwnerId,
@@ -773,21 +786,23 @@ class _InteressentenInlineState extends State<_InteressentenInline>
           ownerName: fahrt.ownerName,
         );
       }
-    });
+    }).catchError((_) {});
   }
 
   Future<void> _toggle(AppUser currentUser) async {
-    final bezirk = await context.read<IAuthRepository>().getHomeTown();
-    if (!context.mounted) return;
+    final authRepo = context.read<IAuthRepository>();
+    final interessentenService = context.read<InteressentenService>();
+    final bezirk = await authRepo.getHomeTown();
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
-      final eingetragen = await context.read<InteressentenService>().toggle(
-            eventId: widget.event.id,
-            userId: currentUser.userId,
-            userName: currentUser.name,
-            userPhotoUrl: currentUser.photoUrl,
-            bezirk: bezirk,
-          );
+      final eingetragen = await interessentenService.toggle(
+        eventId: widget.event.id,
+        userId: currentUser.userId,
+        userName: currentUser.name,
+        userPhotoUrl: currentUser.photoUrl,
+        bezirk: bezirk,
+      );
       if (mounted) {
         AppSnackbar.show(
           context,
@@ -831,40 +846,27 @@ class _EinladungsBottomSheetState extends State<_EinladungsBottomSheet> {
   Future<void> _annehmen() async {
     setState(() => _loading = true);
     final anfrageService = context.read<AnfrageService>();
-    final fahrtService = context.read<FahrtService>();
-    final interessentenService = context.read<InteressentenService>();
-    final currentUser = context.read<IAuthRepository>().currentUser;
-
-    final aktuelleFahrt = fahrtService.alleFahrten
-            .where((f) => f.id == widget.einladung.fahrtId)
-            .firstOrNull ??
-        widget.fahrt;
-
-    if (aktuelleFahrt == null || aktuelleFahrt.freiePlaetze <= 0) {
-      if (mounted) {
-        AppSnackbar.show(context, message: 'Leider keine freien Plätze mehr.');
+    try {
+      final ok = await anfrageService.acceptAnfrageAtomisch(
+        anfrage: widget.einladung,
+        seatsAccepted: 1,
+      );
+      if (!ok || !mounted) {
         setState(() => _loading = false);
+        return;
       }
-      return;
-    }
-
-    final ok = await anfrageService.akzeptiereAnfrage(
-      anfrage: widget.einladung,
-      fahrt: aktuelleFahrt,
-      seatsAccepted: 1,
-    );
-
-    if (!ok || !mounted) {
+      if (mounted) setState(() { _loading = false; _angenommen = true; });
+    } on FirebaseFunctionsException catch (e) {
+      if (!mounted) return;
+      final msg = switch (e.code) {
+        'already-exists' => 'Du hast bereits eine Fahrt für dieses Event.',
+        'failed-precondition' => e.message ?? 'Einladung wurde zurückgezogen.',
+        'not-found' => 'Fahrt oder Einladung nicht mehr vorhanden.',
+        _ => 'Fehler: ${e.message ?? e.code}',
+      };
+      AppSnackbar.show(context, message: msg);
       setState(() => _loading = false);
-      return;
     }
-
-    if (currentUser != null) {
-      await interessentenService.removeForUser(
-          widget.einladung.eventId, currentUser.userId);
-    }
-
-    if (mounted) setState(() { _loading = false; _angenommen = true; });
   }
 
   Future<void> _ablehnen() async {
@@ -1174,40 +1176,27 @@ class _EinladungCardState extends State<_EinladungCard> {
   Future<void> _annehmen() async {
     setState(() => _loading = true);
     final anfrageService = context.read<AnfrageService>();
-    final fahrtService = context.read<FahrtService>();
-    final interessentenService = context.read<InteressentenService>();
-    final currentUser = context.read<IAuthRepository>().currentUser;
-
-    final aktuelleFahrt = fahrtService.alleFahrten
-            .where((f) => f.id == widget.einladung.fahrtId)
-            .firstOrNull ??
-        widget.fahrt;
-
-    if (aktuelleFahrt == null || aktuelleFahrt.freiePlaetze <= 0) {
-      if (mounted) {
-        AppSnackbar.show(context, message: 'Leider keine freien Plätze mehr.');
+    try {
+      final ok = await anfrageService.acceptAnfrageAtomisch(
+        anfrage: widget.einladung,
+        seatsAccepted: 1,
+      );
+      if (!ok || !mounted) {
         setState(() => _loading = false);
+        return;
       }
-      return;
-    }
-
-    final ok = await anfrageService.akzeptiereAnfrage(
-      anfrage: widget.einladung,
-      fahrt: aktuelleFahrt,
-      seatsAccepted: 1,
-    );
-
-    if (!ok || !mounted) {
+      if (mounted) setState(() { _loading = false; _angenommen = true; });
+    } on FirebaseFunctionsException catch (e) {
+      if (!mounted) return;
+      final msg = switch (e.code) {
+        'already-exists' => 'Du hast bereits eine Fahrt für dieses Event.',
+        'failed-precondition' => e.message ?? 'Einladung wurde zurückgezogen.',
+        'not-found' => 'Fahrt oder Einladung nicht mehr vorhanden.',
+        _ => 'Fehler: ${e.message ?? e.code}',
+      };
+      AppSnackbar.show(context, message: msg);
       setState(() => _loading = false);
-      return;
     }
-
-    if (currentUser != null) {
-      await interessentenService.removeForUser(
-          widget.einladung.eventId, currentUser.userId);
-    }
-
-    if (mounted) setState(() { _loading = false; _angenommen = true; });
   }
 
   Future<void> _ablehnen() async {

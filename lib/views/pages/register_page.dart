@@ -3,7 +3,12 @@ import 'package:flutter/material.dart';
 import 'dart:ui'; // Für ImageFilter.blur
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
+import 'package:my_app/utils/app_route.dart';
+import 'package:my_app/views/pages/email_verification_page.dart';
+import 'package:my_app/config/legal_texts.dart';
+import 'package:my_app/views/pages/legal_page.dart';
 import 'package:my_app/views/pages/login_page.dart';
+import 'package:my_app/views/widgets/app_snackbar.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:provider/provider.dart';
 
@@ -165,8 +170,14 @@ class _RegisterPageState extends State<RegisterPage> {
                       if (value == null || value.isEmpty) {
                         return 'Bitte Passwort eingeben';
                       }
-                      if (value.length < 6) {
-                        return 'Mindestens 6 Zeichen';
+                      if (value.length < 8) {
+                        return 'Mindestens 8 Zeichen';
+                      }
+                      if (!RegExp(r'[A-Z]').hasMatch(value)) {
+                        return 'Mindestens ein Großbuchstabe erforderlich';
+                      }
+                      if (!RegExp(r'[0-9]').hasMatch(value)) {
+                        return 'Mindestens eine Zahl erforderlich';
                       }
                       return null;
                     },
@@ -204,6 +215,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                   // AGB Checkbox
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Checkbox(
                         value: _acceptTerms,
@@ -222,13 +234,57 @@ class _RegisterPageState extends State<RegisterPage> {
                         ),
                       ),
                       Expanded(
-                        child: GestureDetector(
-                          onTap: () {
-                            // AGB anzeigen
-                          },
-                          child: const Text(
-                            "Ich akzeptiere die AGB und Datenschutzbestimmungen",
-                            style: TextStyle(color: Colors.white70),
+                        child: Text.rich(
+                          TextSpan(
+                            style: const TextStyle(color: Colors.white70, fontSize: 13),
+                            children: [
+                              const TextSpan(text: 'Ich akzeptiere die '),
+                              WidgetSpan(
+                                alignment: PlaceholderAlignment.middle,
+                                child: GestureDetector(
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    AppRoute(
+                                      builder: (_) => const LegalPage(
+                                        title: 'AGB',
+                                        content: kAgbText,
+                                      ),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'AGB',
+                                    style: TextStyle(
+                                      color: Colors.blueAccent,
+                                      fontSize: 13,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const TextSpan(text: ' und die '),
+                              WidgetSpan(
+                                alignment: PlaceholderAlignment.middle,
+                                child: GestureDetector(
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    AppRoute(
+                                      builder: (_) => const LegalPage(
+                                        title: 'Datenschutzerklärung',
+                                        content: kDatenschutzText,
+                                      ),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Datenschutzerklärung',
+                                    style: TextStyle(
+                                      color: Colors.blueAccent,
+                                      fontSize: 13,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -261,7 +317,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     child: GestureDetector(
                       onTap: () => Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(builder: (_) => const LoginPage()),
+                        AppRoute(builder: (_) => const LoginPage()),
                       ),
                       child: RichText(
                         text: const TextSpan(
@@ -294,23 +350,35 @@ class _RegisterPageState extends State<RegisterPage> {
     setState(() => _isLoading = true);
     try {
       final auth = context.read<IAuthRepository>();
+      final email = _emailController.text.trim();
       await auth.register(
         firstName: _firstNameController.text.trim(),
         lastName: _lastNameController.text.trim(),
-        email: _emailController.text.trim(),
+        email: email,
         password: _passwordController.text,
       );
-      // Zurück zur Root-Route; AuthGate's StreamBuilder zeigt WidgetTree
-      if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+      await auth.sendEmailVerification();
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          AppRoute(
+            builder: (_) => EmailVerificationPage(email: email),
+          ),
+          (route) => route.isFirst,
+        );
+      }
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_authError(e.code))),
+      AppSnackbar.show(
+        context,
+        message: _authError(e.code),
+        accentColor: Colors.redAccent,
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Registrierung fehlgeschlagen')),
+      AppSnackbar.show(
+        context,
+        message: 'Registrierung fehlgeschlagen',
+        accentColor: Colors.redAccent,
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -322,7 +390,7 @@ class _RegisterPageState extends State<RegisterPage> {
       case 'email-already-in-use':
         return 'E-Mail bereits registriert';
       case 'weak-password':
-        return 'Passwort zu schwach (mind. 6 Zeichen)';
+        return 'Passwort zu schwach (mind. 8 Zeichen, Großbuchstabe und Zahl)';
       case 'invalid-email':
         return 'Ungültige E-Mail-Adresse';
       case 'too-many-requests':

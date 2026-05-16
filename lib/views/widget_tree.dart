@@ -1,7 +1,10 @@
 // widget_tree.dart
+import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/data/notifiers.dart';
+import 'package:my_app/utils/app_route.dart';
+import 'package:my_app/views/pages/app_info_page.dart';
 import 'package:my_app/views/pages/events_page.dart';
 import 'package:my_app/views/pages/fahrten_page.dart';
 import 'package:my_app/views/pages/home_page.dart';
@@ -10,6 +13,7 @@ import 'package:my_app/views/pages/settings_page.dart';
 import 'package:my_app/views/widgets/appbar_widget.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/widgets/navbar_widget.dart';
+import 'package:my_app/views/widgets/sizehelper_widget.dart';
 
 import 'package:provider/provider.dart';
 
@@ -43,7 +47,13 @@ class WidgetTree extends StatelessWidget {
         builder: (context) {
           // 🆕 CONTEXT.WATCH FÜR SELECTED PAGE VERWENDEN
           final selectedPage = context.watch<int>();
-          
+
+          final bottomInset = MediaQuery.of(context).padding.bottom;
+          // ── Scrim / Navbar anpassen ──────────────────────────────
+          final navbarBottom = SizeHelper.h(context, 0.006);   // Navbar-Abstand vom Rand
+          final scrimHeight  = SizeHelper.h(context, 0.106) + bottomInset; // Scrim-Höhe
+          // ─────────────────────────────────────────────────────────
+
           return Stack(
             children: [
               AppBackground(
@@ -60,18 +70,28 @@ class WidgetTree extends StatelessWidget {
                 bottom: 0,
                 left: 0,
                 right: 0,
-                height: 130,
+                height: scrimHeight,
                 child: IgnorePointer(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.6),
-                          Colors.black.withValues(alpha: 1.2),
-                        ],
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            stops: const [0.0, 0.35, 0.7, 1.0],
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withValues(alpha: 0.25),
+                              Colors.black.withValues(alpha: 0.60),
+                              Colors.black.withValues(alpha: 0.88),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -84,12 +104,12 @@ class WidgetTree extends StatelessWidget {
                   bottom: 110,
                   right: 24,
                   child: FloatingActionButton(
-                    backgroundColor: const Color.fromARGB(134, 51, 85, 234),
+                    backgroundColor: const Color.fromARGB(193, 51, 85, 234),
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(
-                          builder: (context) => EventsPage(event: null),
+                        AppRoute(
+                          builder: (_) => EventsPage(event: null),
                         ),
                       );
                     },
@@ -99,7 +119,7 @@ class WidgetTree extends StatelessWidget {
 
               // Navigationsleiste - 🟡 UNVERÄNDERT
               Positioned(
-                bottom: 16,
+                bottom: navbarBottom,
                 left: 16,
                 right: 16,
                 child: NavBarWidget(),
@@ -118,6 +138,10 @@ class WidgetTree extends StatelessWidget {
         return AppBarWidget(
           title: pages[selectedPage].title,
           showLogo: true,
+          onLogoTap: () => Navigator.push(
+            context,
+            AppRoute(builder: (_) => const AppInfoPage()),
+          ),
         );
       case 1: // FahrtenPage
         return AppBarWidget(
@@ -142,8 +166,8 @@ class WidgetTree extends StatelessWidget {
       child: GestureDetector(
         onTap: () => Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (context) => SettingsPage(title: "Einstellungen"),
+          AppRoute(
+            builder: (_) => SettingsPage(title: "Einstellungen"),
           ),
         ),
         child: Container(

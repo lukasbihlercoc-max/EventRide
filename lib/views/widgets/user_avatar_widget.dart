@@ -30,24 +30,48 @@ class UserAvatarWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final initialsAvatar = CircleAvatar(
+      radius: radius,
+      backgroundColor: backgroundColor ?? const Color(0xFF2F5ED6),
+      child: Text(
+        _initials(name),
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: radius * 0.65,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+
     final avatar = (photoUrl != null && photoUrl!.isNotEmpty)
-        ? CircleAvatar(
-            radius: radius,
-            backgroundImage: NetworkImage(photoUrl!),
-            backgroundColor: backgroundColor ?? Colors.white24,
-          )
-        : CircleAvatar(
-            radius: radius,
-            backgroundColor: backgroundColor ?? const Color(0xFF2F5ED6),
-            child: Text(
-              _initials(name),
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: radius * 0.65,
-                fontWeight: FontWeight.bold,
-              ),
+        ? SizedBox(
+            width: radius * 2,
+            height: radius * 2,
+            child: Stack(
+              children: [
+                initialsAvatar,
+                ClipOval(
+                  child: Image.network(
+                    photoUrl!,
+                    width: radius * 2,
+                    height: radius * 2,
+                    fit: BoxFit.cover,
+                    frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                      if (wasSynchronouslyLoaded) return child;
+                      return AnimatedOpacity(
+                        opacity: frame == null ? 0.0 : 1.0,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeIn,
+                        child: child,
+                      );
+                    },
+                    errorBuilder: (_, __, ___) => const SizedBox(),
+                  ),
+                ),
+              ],
             ),
-          );
+          )
+        : initialsAvatar;
 
     if (onTap == null) return avatar;
     return GestureDetector(onTap: onTap, child: avatar);
@@ -98,24 +122,32 @@ class UserAvatarById extends StatefulWidget {
 }
 
 class _UserAvatarByIdState extends State<UserAvatarById> {
+  static final _cache = <String, String>{};
   String? _photoUrl;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    final cached = _cache[widget.userId];
+    if (cached != null) {
+      _photoUrl = cached;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) widget.onPhotoLoaded?.call(cached);
+      });
+    } else {
+      _load();
+    }
   }
 
   Future<void> _load() async {
     try {
       final url = await context.read<IUserRepository>().getPhotoUrl(widget.userId);
+      if (url != null) _cache[widget.userId] = url;
       if (mounted && url != null) {
         setState(() => _photoUrl = url);
         widget.onPhotoLoaded?.call(url);
       }
-    } catch (_) {
-      // kein Foto → Initialen bleiben
-    }
+    } catch (_) {}
   }
 
   @override

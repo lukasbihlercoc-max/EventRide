@@ -29,6 +29,7 @@ static const List<Color> _defaultGradient = [
     final border = borderColor ?? Colors.white.withValues(alpha: 0.12);
 
     return Container(
+      clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
         borderRadius: radius,
         gradient: LinearGradient(
@@ -40,22 +41,14 @@ static const List<Color> _defaultGradient = [
         border: Border.all(color: border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.38),
-            blurRadius: 36,
-            spreadRadius: -6,
-            offset: const Offset(0, 16),
-          ),
-          BoxShadow(
-            color: colors.last.withValues(alpha: 0.24),
-            blurRadius: 16,
-            spreadRadius: -4,
-            offset: const Offset(0, 6),
+            color: Colors.black.withValues(alpha: 0.28),
+            blurRadius: 8,
+            spreadRadius: -2,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: radius,
-        child: Stack(
+      child: Stack(
           children: [
             // Top-left Highlight hinter dem Content (nicht darüber)
             Positioned.fill(
@@ -81,7 +74,6 @@ static const List<Color> _defaultGradient = [
             ),
           ],
         ),
-      ),
     );
   }
 }

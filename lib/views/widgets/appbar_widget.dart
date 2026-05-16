@@ -8,12 +8,14 @@ class AppBarWidget extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final Widget? rightWidget;
   final bool showLogo;
+  final VoidCallback? onLogoTap;
 
   const AppBarWidget({
     super.key,
     required this.title,
     this.rightWidget,
     this.showLogo = false,
+    this.onLogoTap,
   });
 
   @override
@@ -32,22 +34,39 @@ class AppBarWidget extends StatelessWidget implements PreferredSizeWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               if (showLogo)
-                RichText(
-                  text: TextSpan(
-                    style: TextStyle(
-                      fontSize: SizeHelper.w(context, 0.055),
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                    ),
-                    children: const [
-                      TextSpan(
-                        text: 'Event',
-                        style: TextStyle(color: Colors.white),
+                GestureDetector(
+                  onTap: onLogoTap,
+                  behavior: HitTestBehavior.opaque,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      RichText(
+                        text: TextSpan(
+                          style: TextStyle(
+                            fontSize: SizeHelper.w(context, 0.055),
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                          children: const [
+                            TextSpan(
+                              text: 'Event',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                            TextSpan(
+                              text: 'Ride',
+                              style: TextStyle(color: Color(0xFFF5A623)),
+                            ),
+                          ],
+                        ),
                       ),
-                      TextSpan(
-                        text: 'Ride',
-                        style: TextStyle(color: Color(0xFFF5A623)),
-                      ),
+                      if (onLogoTap != null) ...[
+                        SizedBox(width: SizeHelper.w(context, 0.015)),
+                        Icon(
+                          Icons.info_outline,
+                          size: SizeHelper.w(context, 0.042),
+                          color: Colors.white.withValues(alpha: 0.70),
+                        ),
+                      ],
                     ],
                   ),
                 )
@@ -71,22 +90,27 @@ class AppBarWidget extends StatelessWidget implements PreferredSizeWidget {
   Widget _buildDefaultCalendarButton(BuildContext context) {
     return GestureDetector(
       onTap: () => showCalendarOverlay(context),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            DateFormat.yMMMd("de_DE").format(DateTime.now()),
-            style: TextStyle(
-              fontSize: SizeHelper.w(context, 0.03),
-              color: Colors.white
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              DateFormat.yMMMd("de_DE").format(DateTime.now()),
+              style: TextStyle(
+                fontSize: SizeHelper.w(context, 0.03),
+                color: Colors.white,
+              ),
             ),
-          ),
-          SizedBox(width: SizeHelper.w(context, 0.02)),
-          Icon(Icons.calendar_today, 
-            size: SizeHelper.w(context, 0.05),
-            color: Colors.white
-          ),
-        ],
+            SizedBox(width: SizeHelper.w(context, 0.02)),
+            Icon(
+              Icons.calendar_today,
+              size: SizeHelper.w(context, 0.05),
+              color: Colors.white,
+            ),
+          ],
+        ),
       ),
     );
   }

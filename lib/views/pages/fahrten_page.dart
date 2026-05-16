@@ -31,134 +31,227 @@ import 'package:my_app/views/auth/verification_guard.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/pages/chat_page.dart';
 import 'package:my_app/views/pages/detail_page.dart';
+import 'package:my_app/data/interessenten_service.dart';
+import 'package:my_app/data/interessenten_daten.dart';
 
 // ---------------------------------------------------------------------------
 // Hilfsfunktion: Event-Detail-Dialog
 // ---------------------------------------------------------------------------
 void _showEventInfoDialog(BuildContext context, Event event) {
+  bool ichWillHinExpanded = false;
   showDialog(
     context: context,
     barrierDismissible: true,
     builder: (ctx) {
       final size = MediaQuery.of(ctx).size;
-      return Dialog(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
-            child: Container(
-              width: size.width * 0.85,
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.35),
-                    blurRadius: 24,
-                    offset: const Offset(0, 12),
+      return StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final interessenten =
+              Provider.of<InteressentenService>(ctx, listen: false)
+                  .getForEvent(event.id);
+          final sorted = [...interessenten]
+            ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+          final extraCount = sorted.length - 1;
+
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            insetPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+                child: Container(
+                  width: size.width * 0.85,
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.35),
+                        blurRadius: 24,
+                        offset: const Offset(0, 12),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.event, color: Colors.white),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          event.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                      Row(
+                        children: [
+                          const Icon(Icons.event, color: Colors.white),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              event.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              Navigator.push(
+                                context,
+                                AppRoute(
+                                  builder: (_) => DetailPage(event: event),
+                                ),
+                              );
+                            },
+                            child: const Icon(
+                              Icons.open_in_full,
+                              color: Colors.white54,
+                              size: 18,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      if (event.datum.year != 2000)
+                        Row(
+                          children: [
+                            const Icon(Icons.calendar_today,
+                                color: Colors.white70, size: 16),
+                            const SizedBox(width: 6),
+                            Text(
+                              DateFormat('dd.MM.yyyy').format(event.datum),
+                              style: const TextStyle(
+                                  color: Colors.white70, fontSize: 14),
+                            ),
+                          ],
+                        ),
+                      const SizedBox(height: 12),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.place,
+                              color: Colors.white70, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              event.adresse,
+                              style: const TextStyle(
+                                  color: Colors.white70, fontSize: 14),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (event.beschreibung.trim().isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        const Divider(color: Colors.white24, thickness: 1),
+                        const SizedBox(height: 12),
+                        Text(
+                          event.beschreibung,
                           style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
+                              color: Colors.white, fontSize: 15),
+                        ),
+                      ],
+                      // ── Ich will hin ──
+                      if (sorted.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        const Divider(color: Colors.white24, thickness: 1),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            const Icon(Icons.people_outline,
+                                size: 14, color: Colors.white54),
+                            const SizedBox(width: 6),
+                            const Text(
+                              'Ich will hin',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '${sorted.length}',
+                              style: const TextStyle(
+                                color: Colors.amber,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        _IchWillHinRow(person: sorted[0]),
+                        if (extraCount > 0) ...[
+                          AnimatedSize(
+                            duration: const Duration(milliseconds: 200),
+                            curve: Curves.easeInOut,
+                            child: ichWillHinExpanded
+                                ? Column(
+                                    children: sorted
+                                        .skip(1)
+                                        .map((p) => _IchWillHinRow(person: p))
+                                        .toList(),
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
+                          GestureDetector(
+                            onTap: () => setDialogState(
+                                () => ichWillHinExpanded = !ichWillHinExpanded),
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 6),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    ichWillHinExpanded
+                                        ? Icons.expand_less
+                                        : Icons.expand_more,
+                                    size: 14,
+                                    color: Colors.white54,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    ichWillHinExpanded
+                                        ? 'Weniger anzeigen'
+                                        : '+ $extraCount weitere anzeigen',
+                                    style: const TextStyle(
+                                      color: Colors.white54,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                      const SizedBox(height: 20),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text(
+                            'Schließen',
+                            style: TextStyle(
+                              color: Colors.lightBlueAccent,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
                           ),
                         ),
                       ),
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.pop(ctx);
-                          Navigator.push(
-                            context,
-                            AppRoute(
-                              builder: (_) => DetailPage(event: event),
-                            ),
-                          );
-                        },
-                        child: const Icon(
-                          Icons.open_in_full,
-                          color: Colors.white54,
-                          size: 18,
-                        ),
-                      ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  if (event.datum.year != 2000)
-                    Row(
-                      children: [
-                        const Icon(Icons.calendar_today,
-                            color: Colors.white70, size: 16),
-                        const SizedBox(width: 6),
-                        Text(
-                          DateFormat('dd.MM.yyyy').format(event.datum),
-                          style: const TextStyle(
-                              color: Colors.white70, fontSize: 14),
-                        ),
-                      ],
-                    ),
-                  const SizedBox(height: 12),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(Icons.place, color: Colors.white70, size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          event.adresse,
-                          style: const TextStyle(
-                              color: Colors.white70, fontSize: 14),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (event.beschreibung.trim().isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    const Divider(color: Colors.white24, thickness: 1),
-                    const SizedBox(height: 12),
-                    Text(
-                      event.beschreibung,
-                      style: const TextStyle(color: Colors.white, fontSize: 15),
-                    ),
-                  ],
-                  const SizedBox(height: 20),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text(
-                        'Schließen',
-                        style: TextStyle(
-                          color: Colors.lightBlueAccent,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
-        ),
+          );
+        },
       );
     },
   );
@@ -529,7 +622,6 @@ class _AngeboteneFahrtenTabState extends State<_AngeboteneFahrtenTab>
     return Consumer<FahrtService>(
       builder: (context, fahrtService, _) {
         final es = context.read<EventService>();
-        final anfrageService = context.watch<AnfrageService>();
         final datumCache = {for (final e in es.events) e.id: e.datum};
         final meineFahrten = List<FahrtDaten>.from(
           fahrtService.getFahrtenByUser(widget.userId),
@@ -549,15 +641,6 @@ class _AngeboteneFahrtenTabState extends State<_AngeboteneFahrtenTab>
           ..sort((a, b) => (datumCache[b.eventId] ?? DateTime(2000))
               .compareTo(datumCache[a.eventId] ?? DateTime(2000)));
 
-        final fahrtById = {for (final f in meineFahrten) f.id: f};
-        final offeneAnfragen = <_AnfrageWithFahrt>[];
-        for (final a in anfrageService.getAnfragenForFahrer(widget.userId)) {
-          if (a.status == AnfrageStatus.offen && !a.vonFahrer) {
-            final f = fahrtById[a.fahrtId];
-            if (f != null) offeneAnfragen.add(_AnfrageWithFahrt(a, f));
-          }
-        }
-
         if (aktiveFahrten.isEmpty && vergangeneFahrten.isEmpty) {
           return const _EmptyState(
             icon: Icons.directions_car_filled_outlined,
@@ -572,10 +655,6 @@ class _AngeboteneFahrtenTabState extends State<_AngeboteneFahrtenTab>
             Expanded(
               child: CustomScrollView(
                 slivers: [
-                  if (offeneAnfragen.isNotEmpty)
-                    SliverToBoxAdapter(
-                      child: _OffeneAnfragenSection(items: offeneAnfragen),
-                    ),
                   SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
@@ -960,202 +1039,6 @@ class _RequestedRideItem {
 }
 
 /// ------------------------------------------------------------
-/// Offene-Anfragen-Sektion (collapsible, oben im Meine-Fahrten-Tab)
-/// ------------------------------------------------------------
-class _AnfrageWithFahrt {
-  final AnfrageDaten anfrage;
-  final FahrtDaten fahrt;
-  const _AnfrageWithFahrt(this.anfrage, this.fahrt);
-}
-
-class _OffeneAnfragenSection extends StatefulWidget {
-  final List<_AnfrageWithFahrt> items;
-  const _OffeneAnfragenSection({required this.items});
-
-  @override
-  State<_OffeneAnfragenSection> createState() => _OffeneAnfragenSectionState();
-}
-
-class _OffeneAnfragenSectionState extends State<_OffeneAnfragenSection> {
-  bool _expanded = false;
-
-  static const _accent = Color(0xFF64B5F6);
-
-  @override
-  Widget build(BuildContext context) {
-    final items = widget.items;
-    final extraCount = items.length - 1;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-          child: Row(
-            children: [
-              Expanded(
-                child: Divider(
-                    color: Colors.white.withValues(alpha: 0.25), thickness: 1),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                child: Row(
-                  children: const [
-                    Icon(Icons.inbox_outlined, size: 13, color: Colors.white),
-                    SizedBox(width: 5),
-                    Text(
-                      'ANFRAGEN',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: Divider(
-                    color: Colors.white.withValues(alpha: 0.25), thickness: 1),
-              ),
-            ],
-          ),
-        ),
-        RepaintBoundary(child: _AnfrageMiniCard(item: items[0])),
-        if (extraCount > 0) ...[
-          AnimatedSize(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeInOut,
-            child: _expanded
-                ? Column(
-                    children: items
-                        .skip(1)
-                        .map((item) =>
-                            RepaintBoundary(child: _AnfrageMiniCard(item: item)))
-                        .toList(),
-                  )
-                : const SizedBox.shrink(),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-            child: GestureDetector(
-              onTap: () => setState(() => _expanded = !_expanded),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: _accent.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: _accent.withValues(alpha: 0.35)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      _expanded ? Icons.expand_less : Icons.expand_more,
-                      size: 16,
-                      color: _accent,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      _expanded
-                          ? 'Weniger anzeigen'
-                          : '+ $extraCount weitere anzeigen',
-                      style: const TextStyle(
-                        color: _accent,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _AnfrageMiniCard extends StatelessWidget {
-  final _AnfrageWithFahrt item;
-  const _AnfrageMiniCard({required this.item});
-
-  @override
-  Widget build(BuildContext context) {
-    final anfrage = item.anfrage;
-    final fahrt = item.fahrt;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: GestureDetector(
-        onTap: () => Navigator.push(
-          context,
-          AppRoute(builder: (_) => FahrtAnfragenPage(fahrt: fahrt)),
-        ),
-        child: AppCard(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Row(
-            children: [
-              UserAvatarById(
-                userId: anfrage.requesterId,
-                name: anfrage.requesterName,
-                radius: 22,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      anfrage.requesterName,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      anfrage.eventName,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.65),
-                        fontSize: 12,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (anfrage.seatsRequested > 1) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        '${anfrage.seatsRequested} Plätze',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.5),
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.chevron_right,
-                color: Colors.white.withValues(alpha: 0.45),
-                size: 20,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// ------------------------------------------------------------
 /// Einladungs-Sektion (collapsible, oben im Mitfahrten-Tab)
 /// ------------------------------------------------------------
 class _EinladungsSection extends StatefulWidget {
@@ -1489,19 +1372,18 @@ class _EinladungsCardState extends State<_EinladungsCard> {
             borderRadius: 22,
             child: cardChild,
           ),
-          if (widget.isUnseen)
-            Positioned(
-              right: 6,
-              top: 6,
-              child: Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: Colors.red,
-                  shape: BoxShape.circle,
-                ),
+          Positioned(
+            right: 6,
+            top: 6,
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: const BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
               ),
             ),
+          ),
         ],
       ),
     );
@@ -1525,7 +1407,7 @@ class _FahrerGlassCard extends StatelessWidget {
         offen: list.where((a) => a.status == AnfrageStatus.offen).length,
         belegt: list
             .where((a) => a.status == AnfrageStatus.akzeptiert)
-            .fold<int>(0, (sum, a) => sum + (a.seatsAccepted ?? 0)),
+            .fold<int>(0, (acc, a) => acc + (a.seatsAccepted ?? 0)),
       );
     });
 
@@ -2827,8 +2709,7 @@ class _InaktivStyles {
   static const double cardOpacity = 0.95;
 
   // ── Link „Andere Fahrt finden" ────────────────────────────────────────────
-  static const Color andereFahrtFarbe    = Color.fromARGB(180, 255, 170, 60);
-  static const Color andereFahrtLupeFarbe = Color.fromARGB(115, 255, 170, 60);
+  static const Color andereFahrtFarbe = Color.fromARGB(180, 255, 170, 60);
 
   // ── Kartenhintergrund ─────────────────────────────────────────────────────
   static BoxDecoration cardDecoration() => BoxDecoration(
@@ -2973,6 +2854,54 @@ class _TimeBadge extends StatelessWidget {
               color: Colors.white,
               fontSize: 12,
               fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// _IchWillHinRow — kompakter Eintrag im Event-Info-Dialog
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _IchWillHinRow extends StatelessWidget {
+  final InteressentenDaten person;
+  const _IchWillHinRow({required this.person});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          UserAvatarWidget(
+            name: person.userName,
+            photoUrl: person.userPhotoUrl,
+            radius: 14,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  person.userName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (person.bezirk != null && person.bezirk!.isNotEmpty)
+                  Text(
+                    person.bezirk!,
+                    style: const TextStyle(
+                        color: Colors.white54, fontSize: 11),
+                  ),
+              ],
             ),
           ),
         ],
@@ -3187,7 +3116,7 @@ class _ReviewPromptState extends State<_ReviewPrompt> {
     if (reviewDeadline.isBefore(DateTime.now())) return const SizedBox.shrink();
 
     return Padding(
-      padding: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.only(top: 8),
       child: GestureDetector(
         onTap: () {
           Navigator.push(
@@ -3202,31 +3131,29 @@ class _ReviewPromptState extends State<_ReviewPrompt> {
           ).then((_) => _check());
         },
         child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: const Color(0xFF2D2000).withValues(alpha: 0.7),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: const Color(0xFFB8860B).withValues(alpha: 0.5),
-            ),
+            color: Colors.amber.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.amber.withValues(alpha: 0.25)),
           ),
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(Icons.star_border_rounded,
-                  color: Colors.amber, size: 16),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Wie war deine Fahrt mit ${widget.reviewedName}?',
-                  style: const TextStyle(
-                    color: Colors.amber,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  color: Colors.amber, size: 14),
+              const SizedBox(width: 6),
+              const Text(
+                'Fahrt bewerten',
+                style: TextStyle(
+                  color: Colors.amber,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-              const Icon(Icons.chevron_right, color: Colors.amber, size: 16),
+              const SizedBox(width: 3),
+              Icon(Icons.chevron_right,
+                  color: Colors.amber.withValues(alpha: 0.5), size: 13),
             ],
           ),
         ),
@@ -3254,18 +3181,48 @@ class _VergangeneAnfragenSection extends StatefulWidget {
 }
 
 class _VergangeneAnfragenSectionState
-    extends State<_VergangeneAnfragenSection> {
-  static const _kInitialCount = 3;
+    extends State<_VergangeneAnfragenSection>
+    with SingleTickerProviderStateMixin {
+  static const _kInitialCount = 2;
   bool _expanded = false;
+  late final AnimationController _controller;
+  late final Animation<double> _sizeFactor;
+  late final Animation<double> _fadeAnim;
+  late final Animation<double> _iconTurns;
 
   static const _grey = Colors.white38;
 
   @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 280),
+      vsync: this,
+    );
+    _sizeFactor =
+        CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
+    _fadeAnim = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
+    _iconTurns = Tween<double>(begin: 0.0, end: 0.5).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _toggle() {
+    setState(() => _expanded = !_expanded);
+    _expanded ? _controller.forward() : _controller.reverse();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final items = widget.items;
-    final visibleCount =
-        _expanded ? items.length : items.length.clamp(0, _kInitialCount);
     final hasMore = items.length > _kInitialCount;
+    final restItems = items.skip(_kInitialCount).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3304,15 +3261,37 @@ class _VergangeneAnfragenSectionState
             ],
           ),
         ),
-        // Karten
-        for (var i = 0; i < visibleCount; i++)
+        // Immer sichtbare Karten
+        for (var i = 0; i < items.length.clamp(0, _kInitialCount); i++)
           RepaintBoundary(
             child: _VergangeneAnfrageCard(
               fahrt: items[i].fahrt!,
-              anfrage: items[i].anfrage,
               eventDatum:
                   widget.eventDatumCache[items[i].fahrt!.eventId] ??
                       DateTime(2000),
+            ),
+          ),
+        // Ausklappbare Karten
+        if (restItems.isNotEmpty)
+          ClipRect(
+            child: SizeTransition(
+              sizeFactor: _sizeFactor,
+              child: FadeTransition(
+                opacity: _fadeAnim,
+                child: Column(
+                  children: [
+                    for (final item in restItems)
+                      RepaintBoundary(
+                        child: _VergangeneAnfrageCard(
+                          fahrt: item.fahrt!,
+                          eventDatum:
+                              widget.eventDatumCache[item.fahrt!.eventId] ??
+                                  DateTime(2000),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
           ),
         // Expand-Button
@@ -3320,7 +3299,7 @@ class _VergangeneAnfragenSectionState
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
             child: GestureDetector(
-              onTap: () => setState(() => _expanded = !_expanded),
+              onTap: _toggle,
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 9),
@@ -3332,20 +3311,27 @@ class _VergangeneAnfragenSectionState
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      _expanded ? Icons.expand_less : Icons.expand_more,
-                      size: 15,
-                      color: _grey,
+                    RotationTransition(
+                      turns: _iconTurns,
+                      child: const Icon(
+                        Icons.expand_more,
+                        size: 15,
+                        color: _grey,
+                      ),
                     ),
                     const SizedBox(width: 5),
-                    Text(
-                      _expanded
-                          ? 'Weniger anzeigen'
-                          : '+ ${items.length - _kInitialCount} weitere',
-                      style: const TextStyle(
-                        color: _grey,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      child: Text(
+                        _expanded
+                            ? 'Weniger anzeigen'
+                            : '+ ${items.length - _kInitialCount} weitere',
+                        key: ValueKey(_expanded),
+                        style: const TextStyle(
+                          color: _grey,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                   ],
@@ -3360,41 +3346,19 @@ class _VergangeneAnfragenSectionState
 
 class _VergangeneAnfrageCard extends StatelessWidget {
   final FahrtDaten fahrt;
-  final AnfrageDaten anfrage;
   final DateTime eventDatum;
 
   const _VergangeneAnfrageCard({
     required this.fahrt,
-    required this.anfrage,
     required this.eventDatum,
   });
 
-  void _openChat(BuildContext context) {
-    final chatService = context.read<ChatService>();
-    final conversationId = chatService.buildConversationId(
-      fahrtId: fahrt.id,
-      userA: fahrt.ownerId,
-      userB: anfrage.requesterId,
-    );
-    Navigator.of(context).push(AppRoute(
-      builder: (_) => ChatPage(
-        conversationId: conversationId,
-        otherUserName: fahrt.ownerName,
-        otherUserId: fahrt.ownerId,
-      ),
-    ));
-  }
-
   @override
   Widget build(BuildContext context) {
-    final rueckuhrzeit = fahrt.rueckuhrzeit?.format(context);
-    final istHinUndZurueck =
-        fahrt.richtung == Fahrtrichtung.hinUndZurueck && rueckuhrzeit != null;
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
       child: Opacity(
-        opacity: 0.82,
+        opacity: 0.88,
         child: Container(
           clipBehavior: Clip.hardEdge,
           decoration: _InaktivStyles.cardDecoration(),
@@ -3403,149 +3367,59 @@ class _VergangeneAnfrageCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                  // Eventname + Vergangen-Badge
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () {
-                            final es = context.read<EventService>();
-                            final event = es.events.firstWhere(
-                              (e) => e.id == fahrt.eventId,
-                              orElse: () => Event(
-                                name: fahrt.eventName,
-                                datum: eventDatum,
-                                standort: fahrt.standort,
-                                beschreibung: '',
-                                typ: '',
-                                adresse: '',
-                              ),
-                            );
-                            _showEventInfoDialog(context, event);
-                          },
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                fahrt.eventName,
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              if (eventDatum.year != 2000) ...[
-                                const SizedBox(height: 1),
-                                Text(
-                                  DateFormat('dd. MMMM yyyy', 'de')
-                                      .format(eventDatum),
-                                  style: const TextStyle(
-                                      color: Colors.white38, fontSize: 11),
-                                ),
-                              ],
-                            ],
+                  // Eventname + Datum
+                  GestureDetector(
+                    onTap: () {
+                      final es = context.read<EventService>();
+                      final event = es.events.firstWhere(
+                        (e) => e.id == fahrt.eventId,
+                        orElse: () => Event(
+                          name: fahrt.eventName,
+                          datum: eventDatum,
+                          standort: fahrt.standort,
+                          beschreibung: '',
+                          typ: '',
+                          adresse: '',
+                        ),
+                      );
+                      _showEventInfoDialog(context, event);
+                    },
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          fahrt.eventName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
                           ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.06),
-                          borderRadius: BorderRadius.circular(7),
-                          border: Border.all(color: Colors.white24),
-                        ),
-                        child: const Text(
-                          'Vergangen',
-                          style: TextStyle(
-                            color: Colors.white38,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w500,
+                        if (eventDatum.year != 2000) ...[
+                          const SizedBox(height: 1),
+                          Text(
+                            DateFormat('dd. MMMM yyyy', 'de')
+                                .format(eventDatum),
+                            style: const TextStyle(
+                                color: Color(0x73FFFFFF), fontSize: 11),
                           ),
-                        ),
-                      ),
-                    ],
+                        ],
+                      ],
+                    ),
                   ),
                   const Divider(
-                      color: _InaktivStyles.dividerFarbe,
+                      color: Color(0x1AFFFFFF),
                       thickness: 1,
-                      height: 14),
+                      height: 12),
                   // Fahrerprofil
                   _FahrerProfilRow(
                     userId: fahrt.ownerId,
                     name: fahrt.ownerName,
-                    nameFarbe: _InaktivStyles.fahrerNameFarbe,
-                    chevronFarbe: _InaktivStyles.fahrerChevronFarbe,
+                    nameFarbe: Colors.white70,
+                    chevronFarbe: Colors.white38,
                     avatarBg: _InaktivStyles.fahrerAvatarBg,
                     avatarRadius: 15,
-                  ),
-                  const SizedBox(height: 6),
-                  // Route
-                  Text(
-                    '${fahrt.abfahrtsortAnzeige}  →  ${fahrt.standort}',
-                    style: const TextStyle(
-                      color: Colors.white54,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  // Zeiten
-                  Wrap(
-                    spacing: 6,
-                    children: [
-                      _TimeBadge(
-                          icon: Icons.schedule,
-                          text: fahrt.uhrzeit.format(context)),
-                      if (istHinUndZurueck)
-                        _TimeBadge(icon: Icons.sync, text: rueckuhrzeit),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  // Aktionszeile: Chat + Profil
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      IconButton(
-                        onPressed: () => _openChat(context),
-                        icon: const Icon(Icons.chat_bubble_outline,
-                            color: Colors.white24, size: 16),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        style: IconButton.styleFrom(
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-                        tooltip: 'Chat öffnen',
-                      ),
-                      GestureDetector(
-                        onTap: () => Navigator.push(
-                          context,
-                          AppRoute(
-                            builder: (_) => PublicProfilePage(
-                              userId: fahrt.ownerId,
-                              name: fahrt.ownerName,
-                              photoUrl: null,
-                            ),
-                          ),
-                        ),
-                        child: const Row(
-                          children: [
-                            Text(
-                              'Profil ansehen',
-                              style: TextStyle(
-                                color: Colors.white30,
-                                fontSize: 12,
-                              ),
-                            ),
-                            SizedBox(width: 2),
-                            Icon(Icons.chevron_right,
-                                color: Colors.white24, size: 14),
-                          ],
-                        ),
-                      ),
-                    ],
                   ),
                   // Bewertungs-CTA
                   _ReviewPrompt(
@@ -3583,18 +3457,48 @@ class _VergangeneGlassSection extends StatefulWidget {
       _VergangeneGlassSectionState();
 }
 
-class _VergangeneGlassSectionState extends State<_VergangeneGlassSection> {
-  static const _kInitialCount = 3;
+class _VergangeneGlassSectionState extends State<_VergangeneGlassSection>
+    with SingleTickerProviderStateMixin {
+  static const _kInitialCount = 2;
   bool _expanded = false;
+  late final AnimationController _controller;
+  late final Animation<double> _sizeFactor;
+  late final Animation<double> _fadeAnim;
+  late final Animation<double> _iconTurns;
 
   static const _grey = Colors.white38;
 
   @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 280),
+      vsync: this,
+    );
+    _sizeFactor =
+        CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
+    _fadeAnim = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
+    _iconTurns = Tween<double>(begin: 0.0, end: 0.5).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _toggle() {
+    setState(() => _expanded = !_expanded);
+    _expanded ? _controller.forward() : _controller.reverse();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final fahrten = widget.fahrten;
-    final visibleCount =
-        _expanded ? fahrten.length : fahrten.length.clamp(0, _kInitialCount);
     final hasMore = fahrten.length > _kInitialCount;
+    final restFahrten = fahrten.skip(_kInitialCount).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3633,12 +3537,34 @@ class _VergangeneGlassSectionState extends State<_VergangeneGlassSection> {
             ],
           ),
         ),
-        // Karten
-        for (var i = 0; i < visibleCount; i++)
+        // Immer sichtbare Karten
+        for (var i = 0; i < fahrten.length.clamp(0, _kInitialCount); i++)
           RepaintBoundary(
             child: _VergangeneGlassCard(
               fahrt: fahrten[i],
               eventDatum: widget.datumCache[fahrten[i].eventId] ?? DateTime(2000),
+            ),
+          ),
+        // Ausklappbare Karten
+        if (restFahrten.isNotEmpty)
+          ClipRect(
+            child: SizeTransition(
+              sizeFactor: _sizeFactor,
+              child: FadeTransition(
+                opacity: _fadeAnim,
+                child: Column(
+                  children: [
+                    for (final fahrt in restFahrten)
+                      RepaintBoundary(
+                        child: _VergangeneGlassCard(
+                          fahrt: fahrt,
+                          eventDatum:
+                              widget.datumCache[fahrt.eventId] ?? DateTime(2000),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
           ),
         // Expand-Button
@@ -3646,7 +3572,7 @@ class _VergangeneGlassSectionState extends State<_VergangeneGlassSection> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
             child: GestureDetector(
-              onTap: () => setState(() => _expanded = !_expanded),
+              onTap: _toggle,
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 9),
@@ -3658,20 +3584,27 @@ class _VergangeneGlassSectionState extends State<_VergangeneGlassSection> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      _expanded ? Icons.expand_less : Icons.expand_more,
-                      size: 15,
-                      color: _grey,
+                    RotationTransition(
+                      turns: _iconTurns,
+                      child: const Icon(
+                        Icons.expand_more,
+                        size: 15,
+                        color: _grey,
+                      ),
                     ),
                     const SizedBox(width: 5),
-                    Text(
-                      _expanded
-                          ? 'Weniger anzeigen'
-                          : '+ ${fahrten.length - _kInitialCount} weitere',
-                      style: const TextStyle(
-                        color: _grey,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      child: Text(
+                        _expanded
+                            ? 'Weniger anzeigen'
+                            : '+ ${fahrten.length - _kInitialCount} weitere',
+                        key: ValueKey(_expanded),
+                        style: const TextStyle(
+                          color: _grey,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                   ],
@@ -3695,15 +3628,10 @@ class _VergangeneGlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final uhrzeit = fahrt.uhrzeit.format(context);
-    final rueckuhrzeit = fahrt.rueckuhrzeit?.format(context);
-    final istHinUndZurueck =
-        fahrt.richtung == Fahrtrichtung.hinUndZurueck && rueckuhrzeit != null;
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
       child: Opacity(
-        opacity: 0.82,
+        opacity: 0.88,
         child: Container(
           clipBehavior: Clip.hardEdge,
           decoration: _InaktivStyles.cardDecoration(),
@@ -3712,96 +3640,51 @@ class _VergangeneGlassCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                  // Eventname + Badge
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () {
-                            final es = context.read<EventService>();
-                            final event = es.events.firstWhere(
-                              (e) => e.id == fahrt.eventId,
-                              orElse: () => Event(
-                                name: fahrt.eventName,
-                                datum: eventDatum,
-                                standort: fahrt.standort,
-                                beschreibung: '',
-                                typ: '',
-                                adresse: '',
-                              ),
-                            );
-                            _showEventInfoDialog(context, event);
-                          },
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                fahrt.eventName,
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              if (eventDatum.year != 2000) ...[
-                                const SizedBox(height: 1),
-                                Text(
-                                  DateFormat('dd. MMMM yyyy', 'de')
-                                      .format(eventDatum),
-                                  style: const TextStyle(
-                                      color: Colors.white38, fontSize: 11),
-                                ),
-                              ],
-                            ],
+                  // Eventname + Datum
+                  GestureDetector(
+                    onTap: () {
+                      final es = context.read<EventService>();
+                      final event = es.events.firstWhere(
+                        (e) => e.id == fahrt.eventId,
+                        orElse: () => Event(
+                          name: fahrt.eventName,
+                          datum: eventDatum,
+                          standort: fahrt.standort,
+                          beschreibung: '',
+                          typ: '',
+                          adresse: '',
+                        ),
+                      );
+                      _showEventInfoDialog(context, event);
+                    },
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          fahrt.eventName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
                           ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.06),
-                          borderRadius: BorderRadius.circular(7),
-                          border: Border.all(color: Colors.white24),
-                        ),
-                        child: const Text(
-                          'Vergangen',
-                          style: TextStyle(
-                            color: Colors.white38,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w500,
+                        if (eventDatum.year != 2000) ...[
+                          const SizedBox(height: 1),
+                          Text(
+                            DateFormat('dd. MMMM yyyy', 'de')
+                                .format(eventDatum),
+                            style: const TextStyle(
+                                color: Color(0x73FFFFFF), fontSize: 11),
                           ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Divider(
-                      color: _InaktivStyles.dividerFarbe,
-                      thickness: 1,
-                      height: 14),
-                  // Route
-                  Text(
-                    '${fahrt.abfahrtsortAnzeige}  →  ${fahrt.standort}',
-                    style: const TextStyle(
-                      color: Colors.white54,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
+                        ],
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 5),
-                  // Zeiten
-                  Wrap(
-                    spacing: 6,
-                    children: [
-                      _TimeBadge(icon: Icons.schedule, text: uhrzeit),
-                      if (istHinUndZurueck)
-                        _TimeBadge(icon: Icons.sync, text: rueckuhrzeit),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
+                  const Divider(
+                      color: Color(0x1AFFFFFF),
+                      thickness: 1,
+                      height: 12),
                   // Anfragen-Link (klein, kein voller Button)
                   Align(
                     alignment: Alignment.centerRight,

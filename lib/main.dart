@@ -30,6 +30,7 @@ import 'package:my_app/data/firebase/firebase_auth_repository.dart';
 import 'package:my_app/views/auth/auth_gate.dart';
 import 'package:my_app/views/pages/admin_event_requests_page.dart';
 import 'package:my_app/views/pages/admin_license_page.dart';
+import 'package:my_app/views/pages/user_event_requests_page.dart';
 import 'package:my_app/views/pages/chat_page.dart';
 import 'package:my_app/data/firebase/firestore_anfrage_repository.dart';
 import 'package:my_app/data/firebase/firestore_interessenten_repository.dart';
@@ -144,6 +145,14 @@ void main() async {
     if (ctx == null || !ctx.mounted) return;
     Navigator.of(ctx).push(AppRoute(
       builder: (_) => const AdminEventRequestsPage(),
+    ));
+  };
+
+  notificationService.onUserEventRequestTapped = () {
+    final ctx = navigatorKey.currentContext;
+    if (ctx == null || !ctx.mounted) return;
+    Navigator.of(ctx).push(AppRoute(
+      builder: (_) => const UserEventRequestsPage(),
     ));
   };
 

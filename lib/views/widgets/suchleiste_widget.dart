@@ -5,11 +5,13 @@ import 'package:my_app/data/notifiers.dart';
 class SearchBarWidget extends StatelessWidget {
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
+  final Widget? trailing;
 
   const SearchBarWidget({
     super.key,
     required this.controller,
     required this.onChanged,
+    this.trailing,
   });
 
   @override
@@ -22,12 +24,12 @@ class SearchBarWidget extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           height: 48,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.35),
+            color: Colors.white.withValues(alpha:0.35),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withOpacity(0.2)),
+            border: Border.all(color: Colors.white.withValues(alpha:0.2)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.3),
+                color: Colors.black.withValues(alpha:0.3),
                 blurRadius: 12,
                 offset: const Offset(0, 2),
               ),
@@ -43,12 +45,29 @@ class SearchBarWidget extends StatelessWidget {
                   onChanged: onChanged,
                   style: const TextStyle(color: Colors.white),
                   decoration: const InputDecoration(
-                    hintText: "Event suchen...",
+                    hintText: "Event oder Ort suchen...",
                     hintStyle: TextStyle(color: Colors.white70),
                     border: InputBorder.none,
                   ),
+                  onTapOutside: (_) =>
+                      FocusManager.instance.primaryFocus?.unfocus(),
                 ),
               ),
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: controller,
+                builder: (context, value, _) {
+                  if (value.text.isEmpty) return const SizedBox.shrink();
+                  return GestureDetector(
+                    onTap: controller.clear,
+                    child: const Icon(Icons.close,
+                        color: Colors.white70, size: 20),
+                  );
+                },
+              ),
+              if (trailing != null) ...[
+                const SizedBox(width: 4),
+                trailing!,
+              ],
             ],
           ),
         ),
@@ -59,8 +78,9 @@ class SearchBarWidget extends StatelessWidget {
 
 class SearchBarDelegate extends SliverPersistentHeaderDelegate {
   final TextEditingController controller;
+  final Widget? trailing;
 
-  SearchBarDelegate({required this.controller});
+  SearchBarDelegate({required this.controller, this.trailing});
 
   @override
   double get minExtent => 64;
@@ -72,6 +92,7 @@ class SearchBarDelegate extends SliverPersistentHeaderDelegate {
     return SearchBarWidget(
       controller: controller,
       onChanged: (text) => searchTextNotifier.value = text,
+      trailing: trailing,
     );
   }
 

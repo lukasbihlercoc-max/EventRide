@@ -109,7 +109,7 @@ class _FahrtAnbietenPageState extends State<FahrtAnbietenPage>
     return Stack(
       children: [
         AppBackground(child: Container()),
-        Container(color: Colors.black.withOpacity(0.4)),
+        Container(color: Colors.black.withValues(alpha: 0.4)),
         BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
           child: Container(color: Colors.transparent),
@@ -143,19 +143,25 @@ class _FahrtAnbietenPageState extends State<FahrtAnbietenPage>
                       style: TextStyle(fontSize: 18, color: Colors.white),
                     ),
 
-                    ...Fahrtrichtung.values.map(
-                      (r) => RadioListTile<Fahrtrichtung>(
-                        value: r,
-                        groupValue: fahrtrichtung,
-                        onChanged: (v) => setState(() => fahrtrichtung = v!),
-                        title: Text(
-                          r == Fahrtrichtung.hinfahrt
-                              ? "Nur Hinfahrt"
-                              : r == Fahrtrichtung.rueckfahrt
-                                  ? "Nur Rückfahrt"
-                                  : "Hin und Zurück",
-                          style: const TextStyle(color: Colors.amber),
-                        ),
+                    RadioGroup<Fahrtrichtung>(
+                      groupValue: fahrtrichtung,
+                      onChanged: (v) {
+                        if (v != null) setState(() => fahrtrichtung = v);
+                      },
+                      child: Column(
+                        children: Fahrtrichtung.values.map(
+                          (r) => RadioListTile<Fahrtrichtung>(
+                            value: r,
+                            title: Text(
+                              r == Fahrtrichtung.hinfahrt
+                                  ? "Nur Hinfahrt"
+                                  : r == Fahrtrichtung.rueckfahrt
+                                      ? "Nur Rückfahrt"
+                                      : "Hin und Zurück",
+                              style: const TextStyle(color: Colors.amber),
+                            ),
+                          ),
+                        ).toList(),
                       ),
                     ),
 
@@ -286,6 +292,13 @@ class _FahrtAnbietenPageState extends State<FahrtAnbietenPage>
                           if (abfahrtsort.isEmpty) {
                             AppSnackbar.show(context,
                                 message: "Bitte einen Abfahrtsort wählen",
+                                accentColor: Colors.redAccent);
+                            return;
+                          }
+
+                          if (_abfahrtsortLat == null || _abfahrtsortLng == null) {
+                            AppSnackbar.show(context,
+                                message: "Bitte einen Ort aus der Liste wählen",
                                 accentColor: Colors.redAccent);
                             return;
                           }

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:my_app/data/event_daten.dart';
 import 'package:my_app/data/interessenten_service.dart';
+import 'package:my_app/utils/app_route.dart';
 import 'package:my_app/views/pages/detail_page.dart';
 import 'package:my_app/data/notifiers.dart';
 
@@ -73,7 +74,7 @@ class EventCard extends StatelessWidget {
     // 2) Halbtransparenter Overlay für Inhalte + ListTile
     Container(
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(hintergrundHelligkeit(event.typ)),
+        color: Colors.black.withValues(alpha: hintergrundHelligkeit(event.typ)),
         borderRadius: BorderRadius.circular(16),
       ),
       child: ListTile(
@@ -160,7 +161,7 @@ class EventCard extends StatelessWidget {
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => DetailPage(event: event)),
+            AppRoute(builder: (_) => DetailPage(event: event)),
           );
         },
       ),

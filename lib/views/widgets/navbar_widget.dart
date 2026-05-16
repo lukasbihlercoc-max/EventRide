@@ -1,6 +1,9 @@
 // navbar_widget.dart
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:my_app/data/app_user.dart';
+import 'package:my_app/data/chat_service.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/data/anfrage_daten.dart';
 import 'package:my_app/data/anfrage_service.dart';
@@ -175,7 +178,7 @@ class _NavItem extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────
-class _NavItemFahrten extends StatelessWidget {
+class _NavItemFahrten extends StatefulWidget {
   final bool isSelected;
   final VoidCallback onTap;
   final BuildContext context;
@@ -187,10 +190,53 @@ class _NavItemFahrten extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext _) {
+  State<_NavItemFahrten> createState() => _NavItemFahrtenState();
+}
+
+class _NavItemFahrtenState extends State<_NavItemFahrten> {
+  bool _hasChatUnread = false;
+  StreamSubscription<bool>? _chatUnreadSub;
+  StreamSubscription<AppUser?>? _authSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _authSub = context.read<IAuthRepository>().authStateChanges.listen(
+      (user) {
+        _chatUnreadSub?.cancel();
+        _chatUnreadSub = null;
+        if (!mounted) return;
+        setState(() => _hasChatUnread = false);
+        if (user != null) {
+          _chatUnreadSub = context
+              .read<ChatService>()
+              .hasAnyUnreadStream(user.userId)
+              .listen(
+                (hasUnread) {
+                  if (mounted) setState(() => _hasChatUnread = hasUnread);
+                },
+                onError: (_) {
+                  if (mounted) setState(() => _hasChatUnread = false);
+                },
+              );
+        }
+      },
+      onError: (_) {},
+    );
+  }
+
+  @override
+  void dispose() {
+    _authSub?.cancel();
+    _chatUnreadSub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Expanded(
       child: GestureDetector(
-        onTap: onTap,
+        onTap: widget.onTap,
         behavior: HitTestBehavior.opaque,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -198,7 +244,7 @@ class _NavItemFahrten extends StatelessWidget {
             Consumer2<AnfrageService, SeenAnfragenService>(
               builder: (context, anfrageService, seenService, _) {
                 final uid = context.read<IAuthRepository>().currentUser?.userId;
-                bool hasUnseen = false;
+                bool hasAnfrageUnseen = false;
                 if (uid != null) {
                   final requesterIds = anfrageService
                       .getAnfragenByRequester(uid)
@@ -207,8 +253,10 @@ class _NavItemFahrten extends StatelessWidget {
                               a.status != AnfrageStatus.storniert) ||
                           a.vonFahrer)
                       .map((a) => a.id);
-                  hasUnseen = seenService.hasUnseenRequester(uid, requesterIds);
+                  hasAnfrageUnseen =
+                      seenService.hasUnseenRequester(uid, requesterIds);
                 }
+                final hasUnseen = hasAnfrageUnseen || _hasChatUnread;
 
                 return Stack(
                   clipBehavior: Clip.none,
@@ -216,25 +264,33 @@ class _NavItemFahrten extends StatelessWidget {
                     AnimatedSwitcher(
                       duration: _kDuration,
                       transitionBuilder: (child, animation) => ScaleTransition(
-                        scale: animation, child: FadeTransition(opacity: animation, child: child),
+                        scale: animation,
+                        child: FadeTransition(opacity: animation, child: child),
                       ),
                       child: Icon(
-                        isSelected ? Icons.directions_car : Icons.directions_car_outlined,
-                        key: ValueKey(isSelected),
-                        color: isSelected ? _kOrange : Colors.white.withValues(alpha: 0.55),
-                        size: SizeHelper.w(context, 0.065),
+                        widget.isSelected
+                            ? Icons.directions_car
+                            : Icons.directions_car_outlined,
+                        key: ValueKey(widget.isSelected),
+                        color: widget.isSelected
+                            ? _kOrange
+                            : Colors.white.withValues(alpha: 0.55),
+                        size: SizeHelper.w(widget.context, 0.065),
                       ),
                     ),
                     if (hasUnseen)
                       Positioned(
-                        right: -4, top: -2,
+                        right: -4,
+                        top: -2,
                         child: Container(
-                          width: 9, height: 9,
+                          width: 9,
+                          height: 9,
                           decoration: BoxDecoration(
                             color: Colors.red,
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.7), width: 1.2,
+                              color: Colors.white.withValues(alpha: 0.7),
+                              width: 1.2,
                             ),
                           ),
                         ),
@@ -247,9 +303,12 @@ class _NavItemFahrten extends StatelessWidget {
             AnimatedDefaultTextStyle(
               duration: _kDuration,
               style: TextStyle(
-                fontSize: SizeHelper.w(context, 0.028),
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                color: isSelected ? _kOrange : Colors.white.withValues(alpha: 0.55),
+                fontSize: SizeHelper.w(widget.context, 0.028),
+                fontWeight:
+                    widget.isSelected ? FontWeight.w600 : FontWeight.w500,
+                color: widget.isSelected
+                    ? _kOrange
+                    : Colors.white.withValues(alpha: 0.55),
               ),
               child: const Text('Fahrten'),
             ),

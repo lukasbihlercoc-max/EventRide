@@ -92,24 +92,24 @@ class _SnackbarOverlayState extends State<_SnackbarOverlay>
               padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
               constraints: const BoxConstraints(minHeight: 64),
               decoration: BoxDecoration(
-                color: const Color.fromARGB(255, 66, 142, 228).withOpacity(0.28),
+                color: const Color.fromARGB(255, 66, 142, 228).withValues(alpha:0.28),
                 borderRadius: BorderRadius.circular(22),
                 border: Border.all(
-                  color: const Color(0xFF5DA9FF).withOpacity(0.6),
+                  color: const Color(0xFF5DA9FF).withValues(alpha:0.6),
                   width: 1.2,
                 ),
 
                 boxShadow: [
                   // Hauptschatten nach unten
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.35),
+                    color: Colors.black.withValues(alpha:0.35),
                     blurRadius: 26,
                     offset: const Offset(0, 12),
                   ),
 
                   // leichter Glow nach oben
                   BoxShadow(
-                    color: const Color(0xFF5DA9FF).withOpacity(0.35),
+                    color: const Color(0xFF5DA9FF).withValues(alpha:0.35),
                     blurRadius: 18,
                     offset: const Offset(0, -2),
                   ),

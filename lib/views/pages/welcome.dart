@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:my_app/utils/app_route.dart';
 import 'package:my_app/views/widget_tree.dart';
 
 class WelcomePage extends StatelessWidget {
@@ -19,13 +20,9 @@ class WelcomePage extends StatelessWidget {
             ),
           FilledButton(
             onPressed: () {
-              Navigator.pushReplacement(           //? legt eine neue Seite über die vorhandene
-                context, 
-                MaterialPageRoute(
-                  builder: (context) {
-                    return WidgetTree();
-                  },
-                ),
+              Navigator.pushReplacement(
+                context,
+                AppRoute(builder: (_) => WidgetTree()),
               );
           }, child: Text("Los gehts"))
           ],

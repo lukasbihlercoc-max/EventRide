@@ -1,9 +1,17 @@
 // settings_page.dart
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'package:my_app/data/app_user.dart';
+import 'package:my_app/data/event_request.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
-import 'package:my_app/data/notifiers.dart';
+import 'package:my_app/data/license_request.dart';
+import 'package:my_app/data/notification_service.dart';
+import 'package:my_app/utils/app_route.dart';
+import 'package:my_app/views/pages/admin_event_requests_page.dart';
+import 'package:my_app/views/pages/admin_license_page.dart';
+import 'package:my_app/config/legal_texts.dart';
+import 'package:my_app/views/pages/legal_page.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:provider/provider.dart';
@@ -17,10 +25,6 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  bool _isDarkMode = true;
-  bool _notificationsEnabled = true;
-  bool _locationEnabled = false;
-  String _selectedLanguage = "Deutsch";
 
   final _townController = TextEditingController();
   bool _isSaving = false;
@@ -31,7 +35,6 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   void initState() {
     super.initState();
-    _isDarkMode = isDarkModeNotifier.value;
     _authStream = context.read<IAuthRepository>().authStateChanges;
     _loadTown();
   }
@@ -97,10 +100,107 @@ class _SettingsPageState extends State<SettingsPage> {
             stream: _authStream,
             builder: (context, snapshot) {
               final user = snapshot.data;
+              final auth = context.read<IAuthRepository>();
               return Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: ListView(
                   children: [
+                    // ── Admin (nur für Admins) ─────────────────────────────
+                    if (user != null && auth.isAdmin) ...[
+                      const Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: Text(
+                          "Admin",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      StreamBuilder<List<LicenseRequest>>(
+                        stream: auth.pendingLicenseRequests,
+                        builder: (context, snap) {
+                          final count = snap.data?.length ?? 0;
+                          return ListTile(
+                            leading: const Icon(
+                              Icons.credit_card_outlined,
+                              color: Color(0xFFE07B00),
+                            ),
+                            title: const Text(
+                              "Führerschein-Prüfungen",
+                              style: TextStyle(color: Colors.white),
+                            ),
+                            trailing: count > 0
+                                ? Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFE07B00),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      '$count',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  )
+                                : const Icon(Icons.chevron_right_rounded,
+                                    color: Colors.white38),
+                            onTap: () => Navigator.push(
+                              context,
+                              AppRoute(
+                                  builder: (_) => const AdminLicensePage()),
+                            ),
+                          );
+                        },
+                      ),
+                      StreamBuilder<List<EventRequest>>(
+                        stream: auth.pendingEventRequests,
+                        builder: (context, snap) {
+                          final count = snap.data?.length ?? 0;
+                          return ListTile(
+                            leading: const Icon(
+                              Icons.event_note_outlined,
+                              color: Color(0xFF5DA9FF),
+                            ),
+                            title: const Text(
+                              'Event-Anfragen',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                            trailing: count > 0
+                                ? Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF5DA9FF),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      '$count',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  )
+                                : const Icon(Icons.chevron_right_rounded,
+                                    color: Colors.white38),
+                            onTap: () => Navigator.push(
+                              context,
+                              AppRoute(
+                                  builder: (_) =>
+                                      const AdminEventRequestsPage()),
+                            ),
+                          );
+                        },
+                      ),
+                      const Divider(color: Colors.white30),
+                    ],
+
                     // ── Meine Daten (nur wenn eingeloggt) ─────────────────
                     if (user != null) ...[
                       const Padding(
@@ -199,78 +299,6 @@ class _SettingsPageState extends State<SettingsPage> {
                       const Divider(color: Colors.white30),
                     ],
 
-                    // ── App-Einstellungen ──────────────────────────────────
-                    const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Text(
-                        "App",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    ListTile(
-                      leading: const Icon(Icons.dark_mode,
-                          color: Colors.blueAccent),
-                      title: const Text("Dark Mode",
-                          style: TextStyle(color: Colors.white)),
-                      trailing: Switch(
-                        value: _isDarkMode,
-                        onChanged: (value) {
-                          setState(() => _isDarkMode = value);
-                          isDarkModeNotifier.value = value;
-                        },
-                      ),
-                    ),
-                    const Divider(color: Colors.white30),
-                    ListTile(
-                      leading: const Icon(Icons.notifications,
-                          color: Colors.orange),
-                      title: const Text("Benachrichtigungen",
-                          style: TextStyle(color: Colors.white)),
-                      trailing: Switch(
-                        value: _notificationsEnabled,
-                        onChanged: (value) =>
-                            setState(() => _notificationsEnabled = value),
-                      ),
-                    ),
-                    const Divider(color: Colors.white30),
-                    ListTile(
-                      leading:
-                          const Icon(Icons.location_on, color: Colors.green),
-                      title: const Text("Standort freigeben",
-                          style: TextStyle(color: Colors.white)),
-                      subtitle: const Text("Für bessere Fahrten-Vorschläge",
-                          style: TextStyle(color: Colors.white70)),
-                      trailing: Switch(
-                        value: _locationEnabled,
-                        onChanged: (value) =>
-                            setState(() => _locationEnabled = value),
-                      ),
-                    ),
-                    const Divider(color: Colors.white30),
-                    ListTile(
-                      leading:
-                          const Icon(Icons.language, color: Colors.purple),
-                      title: const Text("Sprache",
-                          style: TextStyle(color: Colors.white)),
-                      trailing: DropdownButton<String>(
-                        value: _selectedLanguage,
-                        dropdownColor: Colors.grey[900],
-                        style: const TextStyle(color: Colors.white),
-                        items: const [
-                          DropdownMenuItem(
-                              value: "Deutsch", child: Text("Deutsch")),
-                          DropdownMenuItem(
-                              value: "English", child: Text("English")),
-                        ],
-                        onChanged: (value) =>
-                            setState(() => _selectedLanguage = value!),
-                      ),
-                    ),
-                    const Divider(color: Colors.white30),
-
                     // ── Rechtliches ────────────────────────────────────────
                     const Padding(
                       padding: EdgeInsets.all(16.0),
@@ -287,7 +315,17 @@ class _SettingsPageState extends State<SettingsPage> {
                           const Icon(Icons.security, color: Colors.red),
                       title: const Text("Datenschutz",
                           style: TextStyle(color: Colors.white)),
-                      onTap: () {},
+                      trailing: const Icon(Icons.chevron_right_rounded,
+                          color: Colors.white38),
+                      onTap: () => Navigator.push(
+                        context,
+                        AppRoute(
+                          builder: (_) => LegalPage(
+                            title: 'Datenschutzerklärung',
+                            content: kDatenschutzText,
+                          ),
+                        ),
+                      ),
                     ),
                     const Divider(color: Colors.white30),
                     ListTile(
@@ -295,7 +333,17 @@ class _SettingsPageState extends State<SettingsPage> {
                           color: Colors.grey),
                       title: const Text("AGB",
                           style: TextStyle(color: Colors.white)),
-                      onTap: () {},
+                      trailing: const Icon(Icons.chevron_right_rounded,
+                          color: Colors.white38),
+                      onTap: () => Navigator.push(
+                        context,
+                        AppRoute(
+                          builder: (_) => LegalPage(
+                            title: 'AGB',
+                            content: kAgbText,
+                          ),
+                        ),
+                      ),
                     ),
                     const Divider(color: Colors.white30),
 
@@ -358,6 +406,10 @@ class _SettingsPageState extends State<SettingsPage> {
           TextButton(
             onPressed: () async {
               Navigator.pop(dialogContext);
+              final userId = authRepository.currentUser?.userId ?? '';
+              if (userId.isNotEmpty) {
+                await context.read<NotificationService>().removeToken(userId);
+              }
               await authRepository.signOut();
               if (context.mounted) {
                 Navigator.popUntil(context, (route) => route.isFirst);
@@ -372,36 +424,214 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   void _showDeleteAccountDialog(BuildContext context) {
+    bool loading = false;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.grey[900],
-        title: const Text("Account löschen",
-            style: TextStyle(color: Colors.white)),
-        content: const Text(
-          "Diese Aktion kann nicht rückgängig gemacht werden. Alle deine Daten werden gelöscht.",
-          style: TextStyle(color: Colors.white70),
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          backgroundColor: Colors.grey[900],
+          title: const Text("Account löschen",
+              style: TextStyle(color: Colors.white)),
+          content: loading
+              ? const SizedBox(
+                  height: 60,
+                  child: Center(
+                    child: CircularProgressIndicator(color: Colors.redAccent),
+                  ),
+                )
+              : const Text(
+                  "Diese Aktion kann nicht rückgängig gemacht werden. Alle deine Daten, Fahrten und Nachrichten werden dauerhaft gelöscht.",
+                  style: TextStyle(color: Colors.white70),
+                ),
+          actions: loading
+              ? []
+              : [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext),
+                    child: const Text("Abbrechen",
+                        style: TextStyle(color: Colors.blueAccent)),
+                  ),
+                  TextButton(
+                    onPressed: () async {
+                      setDialogState(() => loading = true);
+                      try {
+                        final auth = context.read<IAuthRepository>();
+                        final userId = auth.currentUser?.userId ?? '';
+                        if (userId.isNotEmpty) {
+                          await context
+                              .read<NotificationService>()
+                              .removeToken(userId);
+                        }
+                        await auth.deleteAccount();
+                        if (dialogContext.mounted) Navigator.pop(dialogContext);
+                        if (context.mounted) {
+                          Navigator.popUntil(
+                              context, (route) => route.isFirst);
+                        }
+                      } on FirebaseAuthException catch (e) {
+                        if (!dialogContext.mounted) return;
+                        setDialogState(() => loading = false);
+                        if (e.code == 'requires-recent-login') {
+                          Navigator.pop(dialogContext);
+                          if (context.mounted) {
+                            _showReauthAndDeleteDialog(context);
+                          }
+                        } else {
+                          if (context.mounted) {
+                            AppSnackbar.show(context,
+                                message: 'Account konnte nicht gelöscht werden.');
+                          }
+                        }
+                      } catch (_) {
+                        if (dialogContext.mounted) {
+                          setDialogState(() => loading = false);
+                        }
+                        if (context.mounted) {
+                          AppSnackbar.show(context,
+                              message: 'Account konnte nicht gelöscht werden.');
+                        }
+                      }
+                    },
+                    child: const Text("Endgültig löschen",
+                        style: TextStyle(color: Colors.red)),
+                  ),
+                ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Abbrechen",
-                style: TextStyle(color: Colors.blueAccent)),
+      ),
+    );
+  }
+
+  void _showReauthAndDeleteDialog(BuildContext context) {
+
+    final passwordController = TextEditingController();
+    bool loading = false;
+    bool obscure = true;
+    String? errorText;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          backgroundColor: Colors.grey[900],
+          title: const Text("Passwort bestätigen",
+              style: TextStyle(color: Colors.white)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "Bitte gib dein Passwort ein, um den Account zu löschen.",
+                style: TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: passwordController,
+                obscureText: obscure,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: 'Passwort',
+                  labelStyle: const TextStyle(color: Colors.white70),
+                  errorText: errorText,
+                  prefixIcon:
+                      const Icon(Icons.lock_outline, color: Colors.white54),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      obscure ? Icons.visibility_off : Icons.visibility,
+                      color: Colors.white54,
+                    ),
+                    onPressed: () =>
+                        setDialogState(() => obscure = !obscure),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Colors.white30),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide:
+                        const BorderSide(color: Colors.blueAccent, width: 2),
+                  ),
+                  errorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide:
+                        const BorderSide(color: Colors.redAccent),
+                  ),
+                  focusedErrorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide:
+                        const BorderSide(color: Colors.redAccent, width: 2),
+                  ),
+                ),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              final auth = context.read<IAuthRepository>();
-              await auth.deleteAccount();
-              if (context.mounted) {
-                Navigator.popUntil(context, (route) => route.isFirst);
-              }
-            },
-            child: const Text("Löschen",
-                style: TextStyle(color: Colors.red)),
-          ),
-        ],
+          actions: loading
+              ? [
+                  const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.redAccent),
+                    ),
+                  )
+                ]
+              : [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext),
+                    child: const Text("Abbrechen",
+                        style: TextStyle(color: Colors.blueAccent)),
+                  ),
+                  TextButton(
+                    onPressed: () async {
+                      final password = passwordController.text;
+                      if (password.isEmpty) {
+                        setDialogState(
+                            () => errorText = 'Bitte Passwort eingeben');
+                        return;
+                      }
+                      setDialogState(() {
+                        loading = true;
+                        errorText = null;
+                      });
+                      try {
+                        final auth = context.read<IAuthRepository>();
+                        await auth.reauthenticate(password);
+                        await auth.deleteAccount();
+                        if (dialogContext.mounted) Navigator.pop(dialogContext);
+                        if (context.mounted) {
+                          Navigator.popUntil(
+                              context, (route) => route.isFirst);
+                        }
+                      } on FirebaseAuthException catch (e) {
+                        if (!dialogContext.mounted) return;
+                        final msg = e.code == 'wrong-password' ||
+                                e.code == 'invalid-credential'
+                            ? 'Falsches Passwort'
+                            : 'Fehler beim Löschen';
+                        setDialogState(() {
+                          loading = false;
+                          errorText = msg;
+                        });
+                      } catch (_) {
+                        if (!dialogContext.mounted) return;
+                        setDialogState(() {
+                          loading = false;
+                          errorText = 'Fehler beim Löschen';
+                        });
+                      }
+                    },
+                    child: const Text("Löschen",
+                        style: TextStyle(color: Colors.red)),
+                  ),
+                ],
+        ),
       ),
     );
   }
 }
+

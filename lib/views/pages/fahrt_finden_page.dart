@@ -1,12 +1,14 @@
 // fahrt_finden_page.dart
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:my_app/data/event_daten.dart';
-import 'dart:ui';
+import 'package:my_app/data/fahrt_daten.dart';
+import 'package:my_app/data/fahrt_service.dart';
+import 'package:my_app/data/interfaces/i_auth_repository.dart';
+import 'package:my_app/utils/geo_utils.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/widgets/fahrtencard_widget.dart';
-// 🆕 PROVIDER IMPORT
 import 'package:provider/provider.dart';
-import 'package:my_app/data/fahrt_service.dart';
 
 class FahrtFindenPage extends StatelessWidget {
   final Event event;
@@ -51,7 +53,31 @@ class FahrtFindenPage extends StatelessWidget {
                       fahrt.freiePlaetze > 0)
                   .toList();
 
-              if (fahrtenFuerEvent.isEmpty) {
+              final user = context.read<IAuthRepository>().currentUser;
+              final homeLat = user?.homeTownLat;
+              final homeLng = user?.homeTownLng;
+              final hasHome = homeLat != null && homeLng != null;
+
+              double? distFor(FahrtDaten f) {
+                if (homeLat == null || homeLng == null || f.abfahrtsortLat == null || f.abfahrtsortLng == null) return null;
+                return haversineKm(homeLat, homeLng, f.abfahrtsortLat!, f.abfahrtsortLng!);
+              }
+
+              int minutesOf(FahrtDaten f) => f.uhrzeitHour * 60 + f.uhrzeitMinute;
+
+              // Kopie erstellen – Original-Liste aus Provider NICHT mutieren
+              final sortedFahrten = [...fahrtenFuerEvent];
+              if (hasHome) {
+                sortedFahrten.sort((a, b) {
+                  final distA = distFor(a) ?? double.infinity;
+                  final distB = distFor(b) ?? double.infinity;
+                  return distA != distB
+                      ? distA.compareTo(distB)
+                      : minutesOf(a).compareTo(minutesOf(b));
+                });
+              }
+
+              if (sortedFahrten.isEmpty) {
                 return Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -117,7 +143,7 @@ class FahrtFindenPage extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '${fahrtenFuerEvent.length} Fahrt${fahrtenFuerEvent.length == 1 ? '' : 'en'} verfügbar',
+                            '${sortedFahrten.length} Fahrt${sortedFahrten.length == 1 ? '' : 'en'} verfügbar',
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.5),
                               fontSize: 13,
@@ -132,10 +158,18 @@ class FahrtFindenPage extends StatelessWidget {
                     padding: const EdgeInsets.only(bottom: 32, top: 8),
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
-                        (context, index) => RepaintBoundary(
-                          child: FahrtenCard(fahrt: fahrtenFuerEvent[index]),
-                        ),
-                        childCount: fahrtenFuerEvent.length,
+                        (context, index) {
+                          final fahrt = sortedFahrten[index];
+                          final dist = distFor(fahrt);
+                          return RepaintBoundary(
+                            key: ValueKey(fahrt.id),
+                            child: FahrtenCard(
+                              fahrt: fahrt,
+                              homeTownDistanceKm: dist,
+                            ),
+                          );
+                        },
+                        childCount: sortedFahrten.length,
                       ),
                     ),
                   ),

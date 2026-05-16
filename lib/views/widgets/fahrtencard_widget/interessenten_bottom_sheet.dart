@@ -14,12 +14,12 @@ import 'package:my_app/views/widgets/user_avatar_widget.dart';
 import 'package:my_app/views/pages/public_profile_page.dart';
 
 
-void showInteressentenSheet(BuildContext context, FahrtDaten fahrt) {
+void showInteressentenSheet(BuildContext context, FahrtDaten fahrt, {bool istVergangen = false}) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => _InteressentenSheet(fahrt: fahrt),
+    builder: (_) => _InteressentenSheet(fahrt: fahrt, istVergangen: istVergangen),
   );
 }
 
@@ -27,8 +27,9 @@ void showInteressentenSheet(BuildContext context, FahrtDaten fahrt) {
 // Sheet-Widget
 // ---------------------------------------------------------------------------
 class _InteressentenSheet extends StatefulWidget {
-  const _InteressentenSheet({required this.fahrt});
+  const _InteressentenSheet({required this.fahrt, this.istVergangen = false});
   final FahrtDaten fahrt;
+  final bool istVergangen;
 
   @override
   State<_InteressentenSheet> createState() => _InteressentenSheetState();
@@ -55,13 +56,38 @@ class _InteressentenSheetState extends State<_InteressentenSheet> {
         .firstWhere((f) => f.id == widget.fahrt.id, orElse: () => widget.fahrt);
     final istVoll = liveFahrt.freiePlaetze <= 0;
 
-    // Leute ausblenden, die bereits bei irgendeinem Fahrer dieses Events akzeptiert wurden
-    final filtered = interessenten.where((i) {
-      return !alleAnfragen.any((a) =>
-          a.eventId == widget.fahrt.eventId &&
-          a.requesterId == i.userId &&
-          a.status == AnfrageStatus.akzeptiert);
-    }).toList();
+    // Für vergangene Fahrten: nur akzeptierte Mitfahrer anzeigen, keine Aktionen
+    final List<InteressentenDaten> displayList;
+    final bool showAktionen;
+    if (widget.istVergangen) {
+      final akzeptiert = alleAnfragen
+          .where((a) =>
+              a.fahrtId == widget.fahrt.id &&
+              a.status == AnfrageStatus.akzeptiert)
+          .toList();
+      displayList = akzeptiert.map((a) {
+        return interessenten.firstWhere(
+          (i) => i.userId == a.requesterId,
+          orElse: () => InteressentenDaten(
+            id: '',
+            eventId: widget.fahrt.eventId,
+            userId: a.requesterId,
+            userName: a.requesterName,
+            timestamp: a.createdAt,
+          ),
+        );
+      }).toList();
+      showAktionen = false;
+    } else {
+      // Leute ausblenden, die bereits bei irgendeinem Fahrer dieses Events akzeptiert wurden
+      displayList = interessenten.where((i) {
+        return !alleAnfragen.any((a) =>
+            a.eventId == widget.fahrt.eventId &&
+            a.requesterId == i.userId &&
+            a.status == AnfrageStatus.akzeptiert);
+      }).toList();
+      showAktionen = true;
+    }
 
     return DraggableScrollableSheet(
       initialChildSize: 0.5,
@@ -94,12 +120,17 @@ class _InteressentenSheetState extends State<_InteressentenSheet> {
                 padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
                 child: Row(
                   children: [
-                    const Icon(Icons.people_outline,
-                        color: Colors.amber, size: 22),
+                    Icon(
+                      widget.istVergangen
+                          ? Icons.directions_car_outlined
+                          : Icons.people_outline,
+                      color: Colors.amber,
+                      size: 22,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Interessenten · ${widget.fahrt.eventName}',
+                        '${widget.istVergangen ? 'Mitgefahren' : 'Interessenten'} · ${widget.fahrt.eventName}',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
@@ -116,16 +147,26 @@ class _InteressentenSheetState extends State<_InteressentenSheet> {
 
               // ── Inhalt ──
               Expanded(
-                child: filtered.isEmpty
-                    ? _emptyState()
+                child: displayList.isEmpty
+                    ? (widget.istVergangen ? _emptyStateMitgefahren() : _emptyState())
                     : ListView.separated(
                         controller: scrollController,
                         padding: const EdgeInsets.symmetric(vertical: 8),
-                        itemCount: filtered.length,
+                        itemCount: displayList.length,
                         separatorBuilder: (_, __) =>
                             const Divider(color: Colors.white10, height: 1),
                         itemBuilder: (_, i) {
-                          final person = filtered[i];
+                          final person = displayList[i];
+                          if (!showAktionen) {
+                            return _InteressentTile(
+                              interessent: person,
+                              istEingeladen: false,
+                              isLoading: false,
+                              onEinladen: null,
+                              onBereitsEingeladen: () {},
+                              showAktion: false,
+                            );
+                          }
                           final bereitsEingeladen =
                               _eingeladen.contains(person.userId) ||
                                   alleAnfragen.any((a) =>
@@ -163,6 +204,22 @@ class _InteressentenSheetState extends State<_InteressentenSheet> {
           SizedBox(height: 12),
           Text(
             'Niemand wartet auf eine Mitfahrt',
+            style: TextStyle(color: Colors.white38, fontSize: 15),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _emptyStateMitgefahren() {
+    return const Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.sentiment_neutral, color: Colors.white24, size: 48),
+          SizedBox(height: 12),
+          Text(
+            'Niemand ist mitgefahren',
             style: TextStyle(color: Colors.white38, fontSize: 15),
           ),
         ],
@@ -210,6 +267,7 @@ class _InteressentTile extends StatelessWidget {
     required this.onBereitsEingeladen,
     required this.isLoading,
     required this.onEinladen,
+    this.showAktion = true,
   });
 
   final InteressentenDaten interessent;
@@ -217,6 +275,7 @@ class _InteressentTile extends StatelessWidget {
   final bool isLoading;
   final VoidCallback? onEinladen;
   final VoidCallback onBereitsEingeladen;
+  final bool showAktion;
 
   @override
   Widget build(BuildContext context) {
@@ -261,7 +320,7 @@ class _InteressentTile extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 6),
-                    const TrustShields(filled: 1, size: 13),
+                    TrustShieldsByUserId(userId: interessent.userId, size: 13),
                   ],
                 ),
                 if (interessent.bezirk != null &&
@@ -275,6 +334,7 @@ class _InteressentTile extends StatelessWidget {
             ),
           ),
 
+          if (showAktion) ...[
           const SizedBox(width: 8),
 
           // Button-Bereich
@@ -316,6 +376,7 @@ class _InteressentTile extends StatelessWidget {
               ),
               child: const Text('Einladen', style: TextStyle(fontSize: 13)),
             ),
+          ],
         ],
       ),
     );

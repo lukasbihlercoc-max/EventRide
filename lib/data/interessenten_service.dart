@@ -26,16 +26,19 @@ class InteressentenService extends ChangeNotifier {
   /// Analog zu AnfrageService.init().
   void init(IAuthRepository auth) {
     _authSub?.cancel();
-    _authSub = auth.authStateChanges.listen((user) {
-      if (user == null) {
-        for (final sub in _subs.values) {
-          sub.cancel();
+    _authSub = auth.authStateChanges.listen(
+      (user) {
+        if (user == null) {
+          for (final sub in _subs.values) {
+            sub.cancel();
+          }
+          _subs.clear();
+          _cache.clear();
+          notifyListeners();
         }
-        _subs.clear();
-        _cache.clear();
-        notifyListeners();
-      }
-    });
+      },
+      onError: (_) {},
+    );
   }
 
   /// Gibt die gecachte Interessenten-Liste für ein Event zurück.

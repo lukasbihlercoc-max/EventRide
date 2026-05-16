@@ -1,6 +1,7 @@
 // events_page.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:google_places_flutter/google_places_flutter.dart';
+import 'package:my_app/views/widgets/places_autocomplete_field.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
 import 'package:provider/provider.dart';
 import 'package:my_app/data/event_daten.dart';
@@ -8,7 +9,14 @@ import 'package:my_app/data/event_service.dart';
 import 'package:intl/intl.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 
-InputDecoration getInputStyle(String label) {
+const _kAccent = Color(0xFF5DA9FF);
+const _kGlassAlpha = 0.06;
+const _kGlassBorder = 0.10;
+const _kRadius = 14.0;
+const _kButtonHeight = 46.0;
+const _kPadding = 24.0;
+
+InputDecoration getInputStyle(String label, {Widget? suffixIcon}) {
   return InputDecoration(
     labelText: label,
     labelStyle: const TextStyle(
@@ -25,7 +33,7 @@ InputDecoration getInputStyle(String label) {
     ),
     focusedBorder: const OutlineInputBorder(
       borderSide: BorderSide(
-        color: Colors.deepPurpleAccent,
+        color: _kAccent,
         width: 4,
       ),
       borderRadius: BorderRadius.all(Radius.circular(12)),
@@ -35,6 +43,7 @@ InputDecoration getInputStyle(String label) {
       horizontal: 16,
     ),
     hintStyle: const TextStyle(color: Colors.white38, fontSize: 14),
+    suffixIcon: suffixIcon,
   );
 }
 
@@ -43,6 +52,15 @@ const inputTextStyle = TextStyle(
   fontSize: 20,
   fontWeight: FontWeight.w600,
 );
+
+const _kTypLabels = {
+  'e0': 'Standart',
+  'e1': 'Kirchtag',
+  'e2': 'Feuerwehrfest',
+  'e3': 'Disco',
+  'e4': 'Ball',
+  'e5': 'Krampuslauf',
+};
 
 class EventsPage extends StatefulWidget {
   final Event? event; // optional: edit existing
@@ -53,7 +71,7 @@ class EventsPage extends StatefulWidget {
 }
 
 class _EventsPageState extends State<EventsPage> {
-  final NameController = TextEditingController();
+  final nameController = TextEditingController();
   final standortController = TextEditingController();
   final datumController = TextEditingController();
   String? typ = "e0";
@@ -62,25 +80,32 @@ class _EventsPageState extends State<EventsPage> {
   double? _latitude;
   double? _longitude;
 
+  List<Event> _similarEvents = [];
+  Timer? _debounceTimer;
+
   @override
   void initState() {
     super.initState();
 
     if (widget.event != null) {
-      NameController.text = widget.event!.name;
+      nameController.text = widget.event!.name;
       standortController.text = widget.event!.standort;
-      datumController.text = DateFormat("dd.MM.yyyy").format(widget.event!.datum);
+      datumController.text = DateFormat("dd.MM.yyyy").format(widget.event!.datum.toLocal());
       typ = widget.event!.typ;
       beschreibungController.text = widget.event!.beschreibung;
       adresseController.text = widget.event!.adresse;
       _latitude = widget.event!.latitude;
       _longitude = widget.event!.longitude;
     }
+
+    nameController.addListener(_onTextChanged);
+    adresseController.addListener(_onTextChanged);
   }
 
   @override
   void dispose() {
-    NameController.dispose();
+    _debounceTimer?.cancel();
+    nameController.dispose();
     standortController.dispose();
     datumController.dispose();
     beschreibungController.dispose();
@@ -88,30 +113,96 @@ class _EventsPageState extends State<EventsPage> {
     super.dispose();
   }
 
+  void _onTextChanged() {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(
+      const Duration(milliseconds: 800),
+      _updateSimilarEvents,
+    );
+  }
+
+  double _jaccard(String a, String b) {
+    final tokensA = a
+        .toLowerCase()
+        .split(RegExp(r'\s+'))
+        .where((t) => t.length > 1)
+        .toSet();
+    final tokensB = b
+        .toLowerCase()
+        .split(RegExp(r'\s+'))
+        .where((t) => t.length > 1)
+        .toSet();
+    if (tokensA.isEmpty && tokensB.isEmpty) return 1.0;
+    if (tokensA.isEmpty || tokensB.isEmpty) return 0.0;
+    return tokensA.intersection(tokensB).length /
+        tokensA.union(tokensB).length;
+  }
+
+  bool _sameCalendarDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  void _updateSimilarEvents() {
+    if (!mounted) return;
+
+    final enteredName = nameController.text.trim();
+    if (enteredName.isEmpty) {
+      setState(() => _similarEvents = []);
+      return;
+    }
+
+    DateTime? enteredDate;
+    try {
+      if (datumController.text.trim().isNotEmpty) {
+        enteredDate =
+            DateFormat("dd.MM.yyyy").parseStrict(datumController.text.trim(), true);
+      }
+    } catch (_) {}
+
+    final enteredAdresse = adresseController.text.trim();
+    final allEvents = context.read<EventService>().events;
+
+    final scored = <({Event event, double score})>[];
+
+    for (final candidate in allEvents) {
+      if (widget.event != null && candidate.id == widget.event!.id) continue;
+
+      final nameScore = _jaccard(enteredName, candidate.name);
+      final dateScore = (enteredDate != null &&
+              _sameCalendarDay(enteredDate, candidate.datum.toLocal()))
+          ? 1.0
+          : 0.0;
+      final addrScore = enteredAdresse.isNotEmpty
+          ? _jaccard(enteredAdresse, candidate.adresse)
+          : 0.0;
+
+      final composite = nameScore * 0.5 + dateScore * 0.3 + addrScore * 0.2;
+
+      if (composite >= 0.3 || nameScore >= 0.7) {
+        scored.add((event: candidate, score: composite));
+      }
+    }
+
+    scored.sort((a, b) => b.score.compareTo(a.score));
+    setState(() => _similarEvents = scored.take(5).map((r) => r.event).toList());
+  }
+
   Future<void> _saveEvent() async {
-    // Datum validieren
     if (datumController.text.trim().isEmpty) {
       if (!mounted) return;
-      AppSnackbar.show(
-        context,
-        message: "Bitte ein Datum auswählen",
-      );
+      AppSnackbar.show(context, message: "Bitte ein Datum auswählen");
       return;
     }
 
     try {
       final parsedDate =
-          DateFormat("dd.MM.yyyy").parseStrict(datumController.text);
-
+          DateFormat("dd.MM.yyyy").parseStrict(datumController.text, true);
       final eventService = context.read<EventService>();
 
-
       if (widget.event == null) {
-        // Neues Event erstellen
         final newEvent = Event(
-          name: NameController.text.trim().isEmpty
+          name: nameController.text.trim().isEmpty
               ? "Unbenanntes Event"
-              : NameController.text.trim(),
+              : nameController.text.trim(),
           datum: parsedDate,
           standort: standortController.text.isNotEmpty
               ? standortController.text.trim()
@@ -124,14 +215,12 @@ class _EventsPageState extends State<EventsPage> {
           latitude: _latitude,
           longitude: _longitude,
         );
-
         await eventService.add(newEvent);
       } else {
-        // Bestehendes Event: immutable update via copyWith
         final updatedEvent = widget.event!.copyWith(
-          name: NameController.text.trim().isEmpty
+          name: nameController.text.trim().isEmpty
               ? widget.event!.name
-              : NameController.text.trim(),
+              : nameController.text.trim(),
           datum: parsedDate,
           standort: standortController.text.trim().isNotEmpty
               ? standortController.text.trim()
@@ -144,21 +233,112 @@ class _EventsPageState extends State<EventsPage> {
           latitude: _latitude,
           longitude: _longitude,
         );
-
         await eventService.update(updatedEvent);
-
-
       }
 
       if (!mounted) return;
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
-      AppSnackbar.show(
-        context,
-        message: "Ungültiges Datumformat",
-      );
+      AppSnackbar.show(context, message: "Ungültiges Datumformat");
     }
+  }
+
+  Widget _typBadge(String typKey) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: _kAccent.withValues(alpha: 0.18),
+        border: Border.all(color: _kAccent.withValues(alpha: 0.4)),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        _kTypLabels[typKey] ?? typKey,
+        style: const TextStyle(
+          color: _kAccent,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSimilarEventsSection() {
+    if (_similarEvents.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: _kGlassAlpha),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: _kGlassBorder),
+        ),
+        borderRadius: BorderRadius.circular(_kRadius),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.warning_amber_rounded,
+                  color: Color(0xFFF5A623), size: 18),
+              SizedBox(width: 8),
+              Text(
+                "Ähnliche Events gefunden",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            "Bitte prüfen ob dieses Event bereits existiert.",
+            style: TextStyle(color: Colors.white54, fontSize: 12),
+          ),
+          const SizedBox(height: 12),
+          ...List.generate(_similarEvents.length, (i) {
+            final e = _similarEvents[i];
+            final dateStr =
+                DateFormat('dd.MM.yyyy').format(e.datum.toLocal());
+            return Padding(
+              padding: EdgeInsets.only(top: i == 0 ? 0 : 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          e.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          dateStr,
+                          style: const TextStyle(
+                            color: Colors.white54,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _typBadge(e.typ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
   }
 
   @override
@@ -171,15 +351,17 @@ class _EventsPageState extends State<EventsPage> {
           elevation: 0,
           title: Text(
             widget.event == null ? "Neues Event erstellen" : "Event bearbeiten",
+            style: const TextStyle(color: Colors.white),
           ),
+          iconTheme: const IconThemeData(color: Colors.white),
         ),
         body: SingleChildScrollView(
           child: Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(_kPadding),
             child: Column(
               children: [
                 TextField(
-                  controller: NameController,
+                  controller: nameController,
                   style: inputTextStyle,
                   decoration: getInputStyle("Eventname"),
                 ),
@@ -187,22 +369,29 @@ class _EventsPageState extends State<EventsPage> {
                 TextFormField(
                   controller: datumController,
                   style: inputTextStyle,
-                  decoration: getInputStyle("Datum"),
+                  decoration: getInputStyle(
+                    "Datum",
+                    suffixIcon: const Icon(
+                      Icons.calendar_today_outlined,
+                      color: Colors.white38,
+                      size: 20,
+                    ),
+                  ),
                   readOnly: true,
                   onTap: () async {
                     DateTime? pickedDate = await showDatePicker(
                       context: context,
-                      initialDate: widget.event?.datum ?? DateTime.now(),
+                      initialDate: widget.event?.datum.toLocal() ?? DateTime.now(),
                       firstDate: DateTime(2000),
                       lastDate: DateTime(2100),
                       locale: const Locale('de', 'DE'),
                     );
                     if (pickedDate != null) {
-                      String formattedDate =
-                          DateFormat('dd.MM.yyyy').format(pickedDate);
                       setState(() {
-                        datumController.text = formattedDate;
+                        datumController.text =
+                            DateFormat('dd.MM.yyyy').format(pickedDate);
                       });
+                      _updateSimilarEvents();
                     }
                   },
                   validator: (value) {
@@ -219,78 +408,53 @@ class _EventsPageState extends State<EventsPage> {
                   decoration: getInputStyle("Standort"),
                 ),
                 const SizedBox(height: 16),
-                GooglePlaceAutoCompleteTextField(
-                  textEditingController: adresseController,
-                  googleAPIKey: "AIzaSyB97RZAMf-fmZKhdFFniU20CqK0QWCV3KE",
-                  inputDecoration: getInputStyle("genaue Adresse"),
+                PlacesAutocompleteField(
+                  controller: adresseController,
+                  decoration: getInputStyle("genaue Adresse"),
                   textStyle: inputTextStyle,
-                  boxDecoration: const BoxDecoration(color: Colors.transparent),
-                  debounceTime: 600,
-                  countries: const ["at"],
-                  language: 'de',
-                  isLatLngRequired: true,
-                  itemBuilder: (context, index, prediction) {
-                    return Container(
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF1B3F78),
-                        border: Border(
-                          left: BorderSide(color: Color(0xFF5DA9FF), width: 3),
-                        ),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.location_on_outlined,
-                              color: Color(0xFF5DA9FF), size: 18),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              prediction.description ?? '',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                  seperatedBuilder: const Divider(height: 1, color: Colors.white24),
-                  getPlaceDetailWithLatLng: (prediction) {
+                  onPlaceSelected: (lat, lng) {
                     setState(() {
-                      _latitude = double.tryParse(prediction.lat ?? '');
-                      _longitude = double.tryParse(prediction.lng ?? '');
+                      _latitude = lat;
+                      _longitude = lng;
                     });
-                  },
-                  itemClick: (prediction) {
-                    adresseController.text = prediction.description ?? '';
-                    adresseController.selection = TextSelection.fromPosition(
-                      TextPosition(offset: adresseController.text.length),
-                    );
                   },
                 ),
                 const SizedBox(height: 16),
-                DropdownButton(
-                  dropdownColor: const Color.fromARGB(164, 9, 61, 216),
+                DropdownButtonFormField<String>(
+                  initialValue: typ,
+                  dropdownColor: const Color(0xFF1B3A6B),
                   style: inputTextStyle,
-                  value: typ,
+                  icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                      color: Colors.white54),
+                  decoration: const InputDecoration(
+                    labelText: "Event-Typ",
+                    labelStyle: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.white70, width: 2),
+                      borderRadius: BorderRadius.all(Radius.circular(12)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: _kAccent, width: 4),
+                      borderRadius: BorderRadius.all(Radius.circular(12)),
+                    ),
+                    contentPadding:
+                        EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                  ),
                   items: const [
                     DropdownMenuItem(value: "e0", child: Text("Standart")),
                     DropdownMenuItem(value: "e1", child: Text("Kirchtag")),
-                    DropdownMenuItem(value: "e2", child: Text("Feuerwehrfest")),
+                    DropdownMenuItem(
+                        value: "e2", child: Text("Feuerwehrfest")),
                     DropdownMenuItem(value: "e3", child: Text("Disco")),
                     DropdownMenuItem(value: "e4", child: Text("Ball")),
-                    DropdownMenuItem(value: "e5", child: Text("Krampuslauf")),
+                    DropdownMenuItem(
+                        value: "e5", child: Text("Krampuslauf")),
                   ],
-                  onChanged: (value) {
-                    setState(() {
-                      typ = value;
-                    });
-                  },
+                  onChanged: (value) => setState(() => typ = value),
                 ),
                 const SizedBox(height: 16),
                 TextField(
@@ -301,11 +465,39 @@ class _EventsPageState extends State<EventsPage> {
                   maxLines: null,
                   textInputAction: TextInputAction.newline,
                 ),
-                const SizedBox(height: 20),
-                FilledButton(
-                  onPressed: _saveEvent,
-                  child: Text(widget.event == null ? "Event abspeichern" : "Änderungen speichern"),
+                const SizedBox(height: 24),
+                _buildSimilarEventsSection(),
+                if (_similarEvents.isNotEmpty) const SizedBox(height: 16),
+                GestureDetector(
+                  onTap: _saveEvent,
+                  child: Container(
+                    width: double.infinity,
+                    height: _kButtonHeight,
+                    decoration: BoxDecoration(
+                      color: _kAccent,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.save_outlined,
+                            color: Colors.white, size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          widget.event == null
+                              ? "Event abspeichern"
+                              : "Änderungen speichern",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
+                const SizedBox(height: 24),
               ],
             ),
           ),

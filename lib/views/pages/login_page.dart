@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'dart:ui'; // Für ImageFilter.blur
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
+import 'package:my_app/utils/app_route.dart';
+import 'package:my_app/views/widgets/app_snackbar.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/pages/register_page.dart';
 import 'package:provider/provider.dart';
@@ -26,7 +28,7 @@ class _LoginPageState extends State<LoginPage> {
     return Stack(
       children: [
         AppBackground(child: Container()),
-        Container(color: Colors.black.withOpacity(0.4)),
+        Container(color: Colors.black.withValues(alpha: 0.4)),
         BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
           child: Container(color: Colors.transparent),
@@ -131,9 +133,6 @@ class _LoginPageState extends State<LoginPage> {
                       if (value == null || value.isEmpty) {
                         return 'Bitte Passwort eingeben';
                       }
-                      if (value.length < 6) {
-                        return 'Passwort muss mindestens 6 Zeichen lang sein';
-                      }
                       return null;
                     },
                   ),
@@ -177,7 +176,7 @@ class _LoginPageState extends State<LoginPage> {
                     child: GestureDetector(
                       onTap: () => Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(builder: (_) => const RegisterPage()),
+                        AppRoute(builder: (_) => const RegisterPage()),
                       ),
                       child: RichText(
                         text: TextSpan(
@@ -214,16 +213,22 @@ class _LoginPageState extends State<LoginPage> {
         _emailController.text.trim(),
         _passwordController.text,
       );
+      if (!mounted) return;
+
       if (mounted) Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_authError(e.code))),
+      AppSnackbar.show(
+        context,
+        message: _authError(e.code),
+        accentColor: Colors.redAccent,
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Anmeldung fehlgeschlagen')),
+      AppSnackbar.show(
+        context,
+        message: 'Anmeldung fehlgeschlagen',
+        accentColor: Colors.redAccent,
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -292,16 +297,17 @@ class _LoginPageState extends State<LoginPage> {
                             .resetPassword(email);
                         if (dialogContext.mounted) Navigator.pop(dialogContext);
                         if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('E-Mail zum Zurücksetzen wurde gesendet'),
-                          ),
+                        AppSnackbar.show(
+                          context,
+                          message: 'E-Mail zum Zurücksetzen wurde gesendet',
                         );
                       } on FirebaseAuthException catch (e) {
                         setDialogState(() => loading = false);
                         if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(_resetError(e.code))),
+                        AppSnackbar.show(
+                          context,
+                          message: _resetError(e.code),
+                          accentColor: Colors.redAccent,
                         );
                       }
                     },

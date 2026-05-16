@@ -8,7 +8,6 @@ import 'package:provider/provider.dart';
 import 'package:my_app/data/fahrt_daten.dart';
 import 'package:my_app/data/event_daten.dart';
 import 'package:my_app/utils/app_route.dart';
-import 'package:my_app/data/anfrage_daten.dart';
 import 'package:my_app/views/widgets/trust_shields_widget.dart';
 import 'package:my_app/data/anfrage_service.dart';
 import 'package:my_app/views/pages/fahrt_anbieten_page.dart';
@@ -233,19 +232,18 @@ class _FahrtenCardState extends State<FahrtenCard> {
           child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Container(
+            clipBehavior: Clip.hardEdge,
             decoration: const BoxDecoration(
               borderRadius: BorderRadius.all(Radius.circular(22)),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black26,
-                  blurRadius: 12,
-                  offset: Offset(0, 6),
+                  blurRadius: 4,
+                  offset: Offset(0, 4),
                 ),
               ],
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(22),
-              child: SizedBox(
+            child: SizedBox(
                 height: screenHeight * 0.36 < 260 
                   ? 260 
                   : screenHeight * 0.36,
@@ -353,9 +351,9 @@ class _FahrtenCardState extends State<FahrtenCard> {
   ),
   boxShadow: [
     BoxShadow(
-      color: Colors.black.withValues(alpha: 0.5),
-      blurRadius: 20,
-      offset: Offset(0, 10),
+      color: Colors.black.withValues(alpha: 0.4),
+      blurRadius: 8,
+      offset: Offset(0, 6),
     ),
   ],
 ),
@@ -368,7 +366,6 @@ class _FahrtenCardState extends State<FahrtenCard> {
                   ],
                 ),
               ),
-            ),
           ),
         ),
       ),

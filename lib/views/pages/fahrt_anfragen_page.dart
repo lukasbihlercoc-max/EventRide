@@ -212,41 +212,6 @@ class FahrtAnfragenPage extends StatelessWidget {
                         ),
                       ],
 
-                      // ── Interessenten-Sektion (nur wenn noch Plätze frei) ──
-                      if (!istVoll && interessenten.isNotEmpty) ...[
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.emoji_people,
-                                    color: Colors.amber, size: 20),
-                                const SizedBox(width: 8),
-                                Text(
-                                  '${interessenten.length} Interessent'
-                                  '${interessenten.length == 1 ? '' : 'en'} ohne Fahrt',
-                                  style: const TextStyle(
-                                    color: Colors.amber,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        SliverList(
-                          delegate: SliverChildBuilderDelegate(
-                            (context, index) => _InteressentCard(
-                              interessent: interessenten[index],
-                              fahrt: aktuelleFahrt,
-                              anfrageService: anfrageService,
-                            ),
-                            childCount: interessenten.length,
-                          ),
-                        ),
-                      ],
-
                       // ── Anfragen-Sektion ──
                       if (sortedRest.isNotEmpty) ...[
                         SliverToBoxAdapter(
@@ -283,6 +248,16 @@ class FahrtAnfragenPage extends StatelessWidget {
                         ),
                       ],
 
+                      // ── Interessenten-Sektion (ausklappbar, nach Anfragen) ──
+                      if (!istVoll && interessenten.isNotEmpty)
+                        SliverToBoxAdapter(
+                          child: _KlappbareInteressentenSektion(
+                            interessenten: interessenten,
+                            fahrt: aktuelleFahrt,
+                            anfrageService: anfrageService,
+                          ),
+                        ),
+
                       const SliverToBoxAdapter(child: SizedBox(height: 24)),
                     ],
                   );
@@ -291,6 +266,88 @@ class FahrtAnfragenPage extends StatelessWidget {
             },
           ),
         ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Ausklappbare Interessenten-Sektion
+// ---------------------------------------------------------------------------
+class _KlappbareInteressentenSektion extends StatefulWidget {
+  final List<InteressentenDaten> interessenten;
+  final FahrtDaten fahrt;
+  final AnfrageService anfrageService;
+
+  const _KlappbareInteressentenSektion({
+    required this.interessenten,
+    required this.fahrt,
+    required this.anfrageService,
+  });
+
+  @override
+  State<_KlappbareInteressentenSektion> createState() =>
+      _KlappbareInteressentenSektionState();
+}
+
+class _KlappbareInteressentenSektionState
+    extends State<_KlappbareInteressentenSektion> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Dezenter Trenner
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: Row(
+            children: const [
+              Expanded(child: Divider(color: Colors.white12)),
+            ],
+          ),
+        ),
+
+        // Header (anklickbar)
+        InkWell(
+          onTap: () => setState(() => _expanded = !_expanded),
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: Row(
+              children: [
+                const Icon(Icons.emoji_people, color: Colors.amber, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${widget.interessenten.length} Interessent'
+                    '${widget.interessenten.length == 1 ? '' : 'en'} ohne Fahrt',
+                    style: const TextStyle(
+                      color: Colors.amber,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                Icon(
+                  _expanded
+                      ? Icons.keyboard_arrow_up
+                      : Icons.keyboard_arrow_down,
+                  color: Colors.amber,
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Liste (ausgeklappt)
+        if (_expanded)
+          ...widget.interessenten.map((i) => _InteressentCard(
+                interessent: i,
+                fahrt: widget.fahrt,
+                anfrageService: widget.anfrageService,
+              )),
       ],
     );
   }
