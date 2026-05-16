@@ -503,14 +503,13 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  void _showReauthAndDeleteDialog(BuildContext context) {
-
+  Future<void> _showReauthAndDeleteDialog(BuildContext context) async {
     final passwordController = TextEditingController();
     bool loading = false;
     bool obscure = true;
     String? errorText;
 
-    showDialog(
+    await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
@@ -632,6 +631,7 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
       ),
     );
+    passwordController.dispose();
   }
 }
 

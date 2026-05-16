@@ -235,13 +235,13 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  void _showResetPasswordDialog() {
+  Future<void> _showResetPasswordDialog() async {
     final emailController = TextEditingController(
       text: _emailController.text.trim(),
     );
     bool loading = false;
 
-    showDialog(
+    await showDialog(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
@@ -331,6 +331,7 @@ class _LoginPageState extends State<LoginPage> {
         ),
       ),
     );
+    emailController.dispose();
   }
 
   String _resetError(String code) {

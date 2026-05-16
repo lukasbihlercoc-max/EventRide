@@ -378,10 +378,11 @@ class _ReviewSheetState extends State<_ReviewSheet> {
         ],
       ),
     );
-    if (confirmed != true || !mounted) return;
-
     final reason =
         reasonCtrl.text.trim().isEmpty ? null : reasonCtrl.text.trim();
+    reasonCtrl.dispose();
+    if (confirmed != true || !mounted) return;
+
     setState(() => _actioning = true);
     try {
       await context

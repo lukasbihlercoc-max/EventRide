@@ -50,8 +50,8 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyAjs4VgCkDwQ_GyZntKXTOBmt7Co1sUkC8',
-    appId: '1:686951435694:android:3d4b36a31821b4417e4c3f',
+    apiKey: 'AIzaSyA8x6GUtOH0xD1xhAweUCFxyMijvZkUucA',
+    appId: '1:686951435694:android:6d82e352d09cee3e7e4c3f',
     messagingSenderId: '686951435694',
     projectId: 'eventride-cd0e9',
     storageBucket: 'eventride-cd0e9.firebasestorage.app',

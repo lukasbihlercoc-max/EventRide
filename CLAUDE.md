@@ -189,6 +189,13 @@ ratingAvg?, ratingCount (int)
 - **Telefon-Verifikation aktivieren:** `lib/config/feature_flags.dart` → `kPhoneVerifEnabled = true`.
   Voraussetzung: Phone Auth in Firebase Console aktiviert + SHA-1-Fingerprint für Android.
 - **Firestore Index:** `chat_conversations` — `participants (array-contains)` + `lastMessageAt (desc)` muss angelegt sein.
+- **Google Maps API Key restringieren:** Google Cloud Console → Credentials → Key `AIzaSyAjs4VgCkDwQ_GyZntKXTOBmt7Co1sUkC8` auf Package `at.eventride.app` + Release-SHA-1 einschränken.
+
+## Erledigte Release-Vorbereitungen
+- ✅ Package auf `at.eventride.app` umgestellt (build.gradle, MainActivity, google-services.json)
+- ✅ `firebase_options.dart` Android: appId + apiKey auf `at.eventride.app`-Eintrag aktualisiert
+- ✅ iOS Info.plist: `CFBundleDisplayName` / `CFBundleName` auf "EventRide" gesetzt
+- ✅ Memory Leaks behoben: TextEditingController in Dialogen (login, settings, admin) + home_page disposed
 
 ---
 

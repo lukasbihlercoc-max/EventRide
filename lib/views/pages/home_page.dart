@@ -543,6 +543,12 @@ class _HomePageState extends State<HomePage> {
     controller.addListener(() => searchTextNotifier.value = controller.text);
   }
 
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
   void _precacheImages() {
     const images = [
       'assets/image/kirchtag2.jpg',
