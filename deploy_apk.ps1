@@ -19,7 +19,7 @@ param(
     [switch]$SkipBuild
 )
 
-$FIREBASE_APP_ID = "1:686951435694:android:3d4b36a31821b4417e4c3f"
+$FIREBASE_APP_ID = "1:686951435694:android:6d82e352d09cee3e7e4c3f"
 $PROJECT_ID      = "eventride-cd0e9"
 $GROUP           = "tester"
 $APK_PATH        = "build/app/outputs/flutter-apk/app-release.apk"

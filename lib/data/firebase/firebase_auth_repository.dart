@@ -67,9 +67,14 @@ class FirebaseAuthRepository implements IAuthRepository {
     final carData = data['car'] as Map<String, dynamic>?;
     return AppUser(
       userId: fbUser.uid,
-      name: fbUser.displayName ?? '',
+      name: () {
+        final first = data['firstName'] as String? ?? '';
+        final last  = data['lastName']  as String? ?? '';
+        final fs    = '$first $last'.trim();
+        return fs.isNotEmpty ? fs : (fbUser.displayName ?? '');
+      }(),
       email: fbUser.email ?? '',
-      photoUrl: fbUser.photoURL,
+      photoUrl: data['photoUrl'] as String? ?? fbUser.photoURL,
       emailVerified: data['emailVerified'] as bool? ?? fbUser.emailVerified,
       phone: data['phone'] as String?,
       phoneVerified: data['phoneVerified'] as bool? ?? false,
