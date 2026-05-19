@@ -4,7 +4,7 @@ workflows:
     max_build_duration: 60
     environment:
       flutter: stable
-      xcode: latest
+      xcode: 16
       cocoapods: default
       groups:
         - firebase_ios
