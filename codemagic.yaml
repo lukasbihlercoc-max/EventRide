@@ -38,10 +38,17 @@ workflows:
           flutter pub get
           cd ios && pod install
 
-      - name: Fix -G Flag (GoogleMaps xcconfig / Xcode 16)
+      - name: Fix GCC_WARN_INHIBIT_ALL_WARNINGS (BoringSSL-GRPC / Xcode 26)
         script: |
           find "$CM_BUILD_DIR/ios/Pods" -name "*.xcconfig" -print0 | \
-            xargs -0 sed -i '' 's/ -G[^ ]*//g'
+            xargs -0 sed -i '' \
+              -e 's/GCC_WARN_INHIBIT_ALL_WARNINGS = YES/GCC_WARN_INHIBIT_ALL_WARNINGS = NO/g' \
+              -e 's/ -GCC_WARN_INHIBIT_ALL_WARNINGS//g' \
+              -e 's/ -G[^ ]*//g'
+          sed -i '' \
+            -e 's/GCC_WARN_INHIBIT_ALL_WARNINGS = YES/GCC_WARN_INHIBIT_ALL_WARNINGS = NO/g' \
+            -e 's/-GCC_WARN_INHIBIT_ALL_WARNINGS//g' \
+            "$CM_BUILD_DIR/ios/Pods/Pods.xcodeproj/project.pbxproj" 2>/dev/null || true
 
       - name: Xcode Archive
         script: |

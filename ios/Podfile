@@ -40,22 +40,17 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
-      ['OTHER_CFLAGS', 'OTHER_CPLUSPLUSFLAGS'].each do |key|
-        flags = config.build_settings[key]
-        if flags.is_a?(Array)
-          config.build_settings[key] = flags.reject { |f| f.to_s.start_with?('-G') }
-        elsif flags.is_a?(String)
-          config.build_settings[key] = flags.gsub(/-G\s*\S*/, '').strip
-        end
-      end
+      # Fix: GCC_WARN_INHIBIT_ALL_WARNINGS=YES causes Xcode 26 to pass
+      # -GCC_WARN_INHIBIT_ALL_WARNINGS to Clang, unsupported for arm64-apple-ios
+      config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'NO'
     end
   end
 
-  # Fix: GoogleMaps SDK injects -G into xcconfig files; Xcode 16 Clang rejects this for arm64-apple-ios
   Dir.glob("#{installer.sandbox.root}/**/*.xcconfig").each do |file|
     content = File.read(file)
-    if content.include?('-G')
-      File.write(file, content.gsub(/ -G[^ \n]*/, ''))
-    end
+    new_content = content
+      .gsub('GCC_WARN_INHIBIT_ALL_WARNINGS = YES', 'GCC_WARN_INHIBIT_ALL_WARNINGS = NO')
+      .gsub(/ -G[^ \n]*/, '')
+    File.write(file, new_content) if new_content != content
   end
 end
