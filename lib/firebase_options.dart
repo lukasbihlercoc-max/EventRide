@@ -59,11 +59,11 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyATekeW-v39LMXtMH9ZSJgEDdWGa_IPvdc',
-    appId: '1:686951435694:ios:c75a8596b7a44fa77e4c3f',
+    appId: '1:686951435694:ios:3bae9b8a7f4f264d7e4c3f',
     messagingSenderId: '686951435694',
     projectId: 'eventride-cd0e9',
     storageBucket: 'eventride-cd0e9.firebasestorage.app',
-    iosBundleId: 'com.example.myApp',
+    iosBundleId: 'at.eventride.app',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
@@ -72,7 +72,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '686951435694',
     projectId: 'eventride-cd0e9',
     storageBucket: 'eventride-cd0e9.firebasestorage.app',
-    iosBundleId: 'com.example.myApp',
+    iosBundleId: 'at.eventride.app',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(

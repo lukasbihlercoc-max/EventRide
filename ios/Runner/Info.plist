@@ -50,5 +50,18 @@
 		<string>fetch</string>
 		<string>remote-notification</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>EventRide benötigt Kamerazugriff für dein Profilbild.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>EventRide benötigt Zugriff auf deine Fotos für dein Profilbild.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>EventRide möchte das Profilbild in deiner Fotobibliothek speichern.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>EventRide nutzt deinen Standort um ihn auf der Karte anzuzeigen.</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>comgooglemaps</string>
+		<string>googlemaps</string>
+	</array>
 </dict>
 </plist>

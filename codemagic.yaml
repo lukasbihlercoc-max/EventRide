@@ -1,0 +1,32 @@
+workflows:
+  ios-release:
+    name: iOS Release
+    max_build_duration: 60
+    integrations:
+      app_store_connect: Codemagic
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: at.eventride.app
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      groups:
+        - firebase_ios
+    scripts:
+      - name: GoogleService-Info.plist einspielen
+        script: |
+          echo $GOOGLESERVICE_INFO_PLIST | base64 --decode \
+            > $CM_BUILD_DIR/ios/Runner/GoogleService-Info.plist
+      - name: Flutter packages
+        script: flutter pub get
+      - name: CocoaPods
+        script: find . -name "Podfile" -execdir pod install \;
+      - name: Build IPA
+        script: flutter build ipa --release
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        submit_to_testflight: true
