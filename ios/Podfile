@@ -40,7 +40,6 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
-      # Fix: -G flag is not supported for iOS arm64 targets (google_maps_flutter_ios)
       ['OTHER_CFLAGS', 'OTHER_CPLUSPLUSFLAGS'].each do |key|
         flags = config.build_settings[key]
         if flags.is_a?(Array)
@@ -49,6 +48,14 @@ post_install do |installer|
           config.build_settings[key] = flags.gsub(/-G\s*\S*/, '').strip
         end
       end
+    end
+  end
+
+  # Fix: GoogleMaps SDK injects -G into xcconfig files; Xcode 16 Clang rejects this for arm64-apple-ios
+  Dir.glob("#{installer.sandbox.root}/**/*.xcconfig").each do |file|
+    content = File.read(file)
+    if content.include?('-G')
+      File.write(file, content.gsub(/ -G[^ \n]*/, ''))
     end
   end
 end
