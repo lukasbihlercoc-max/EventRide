@@ -40,9 +40,19 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
-      # Fix: GCC_WARN_INHIBIT_ALL_WARNINGS=YES causes Xcode 26 to pass
-      # -GCC_WARN_INHIBIT_ALL_WARNINGS to Clang, unsupported for arm64-apple-ios
+
+      # Xcode 26 / Clang 19 compatibility fixes for Firebase/gRPC pods:
+      # 1. GCC_WARN_INHIBIT_ALL_WARNINGS=YES causes Xcode 26 to emit -GCC_WARN_INHIBIT_ALL_WARNINGS
+      #    which Clang rejects for arm64-apple-ios (BoringSSL-GRPC)
       config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'NO'
+      # 2. Prevent any pod warnings from being promoted to errors
+      config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
+      config.build_settings['SWIFT_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
+      # 3. Suppress Clang 19 warning: template keyword without arg list (gRPC-Core)
+      existing = config.build_settings['OTHER_CPLUSPLUSFLAGS'] || '$(inherited)'
+      unless existing.include?('-Wno-missing-template-arg-list-after-template-kw')
+        config.build_settings['OTHER_CPLUSPLUSFLAGS'] = "#{existing} -Wno-missing-template-arg-list-after-template-kw"
+      end
     end
   end
 
@@ -50,6 +60,7 @@ post_install do |installer|
     content = File.read(file)
     new_content = content
       .gsub('GCC_WARN_INHIBIT_ALL_WARNINGS = YES', 'GCC_WARN_INHIBIT_ALL_WARNINGS = NO')
+      .gsub('GCC_TREAT_WARNINGS_AS_ERRORS = YES', 'GCC_TREAT_WARNINGS_AS_ERRORS = NO')
       .gsub(/ -G[^ \n]*/, '')
     File.write(file, new_content) if new_content != content
   end
