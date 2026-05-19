@@ -12,6 +12,7 @@ workflows:
       groups:
         - firebase_ios
         - app_store_connect
+        - ios_credentials
     scripts:
       - name: GoogleService-Info.plist einspielen
         script: |
