@@ -55,6 +55,11 @@ dependencies:
   cupertino_icons: ^1.0.8
   intl: 0.20.2
 
+dependency_overrides:
+  # google_maps_flutter_ios 2.7.0+ upgraded GoogleMaps SDK to 9.x which introduces
+  # the -G compiler flag incompatible with arm64-apple-ios targets (Xcode 16)
+  google_maps_flutter_ios: ">=2.5.0 <2.7.0"
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

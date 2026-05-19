@@ -37,13 +37,7 @@ workflows:
         script: flutter pub get
 
       - name: Build IPA
-        script: |
-          # Lauf 1: Flutter setzt Podfile auf und führt pod install aus (kann mit -G scheitern)
-          flutter build ipa --release 2>&1 || true
-          # -G Flag aus allen xcconfig-Dateien entfernen (Google Maps iOS inkompatibel mit arm64)
-          find . -name "*.xcconfig" -exec sed -i '' 's/ -G[0-9]*//g' {} \; 2>/dev/null || true
-          # Lauf 2: Flutter überspringt pod install, xcconfig bleibt gefixt
-          flutter build ipa --release
+        script: flutter build ipa --release
 
     artifacts:
       - build/ios/ipa/*.ipa
