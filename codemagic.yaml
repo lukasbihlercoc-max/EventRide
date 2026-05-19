@@ -40,8 +40,8 @@ workflows:
 
       - name: Fix -G Flag (GoogleMaps xcconfig / Xcode 16)
         script: |
-          find "$CM_BUILD_DIR/ios/Pods" -name "*.xcconfig" | \
-            xargs sed -i '' 's/ -G[^ ]*//g'
+          find "$CM_BUILD_DIR/ios/Pods" -name "*.xcconfig" -print0 | \
+            xargs -0 sed -i '' 's/ -G[^ ]*//g'
 
       - name: Build IPA
         script: flutter build ipa --release --no-pub
