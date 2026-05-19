@@ -144,8 +144,7 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
         final allAnfragen = sharedSnap.docs;
 
         for (final anfrageDoc in allAnfragen) {
-          final fahrtId =
-              (anfrageDoc.data() as Map<String, dynamic>)['fahrtId'] as String?;
+          final fahrtId = anfrageDoc.data()['fahrtId'] as String?;
           if (fahrtId == null) continue;
           final fahrtDoc = await db.collection('fahrten').doc(fahrtId).get();
           if (!fahrtDoc.exists) continue;
