@@ -53,6 +53,8 @@ post_install do |installer|
       unless existing.include?('-Wno-missing-template-arg-list-after-template-kw')
         config.build_settings['OTHER_CPLUSPLUSFLAGS'] = "#{existing} -Wno-missing-template-arg-list-after-template-kw"
       end
+      # 4. Xcode 26 explicit module build rejects Firebase/Firebase.h as non-modular header
+      config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
     end
   end
 
