@@ -11,6 +11,7 @@ workflows:
       cocoapods: default
       groups:
         - firebase_ios
+        - app_store_connect
     scripts:
       - name: GoogleService-Info.plist einspielen
         script: |
