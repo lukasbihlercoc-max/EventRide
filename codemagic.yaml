@@ -40,7 +40,7 @@ workflows:
         script: find . -name "Podfile" -execdir pod install \;
 
       - name: Build IPA
-        script: flutter build ipa --release
+        script: flutter build ipa --release --no-swift-package-manager
 
     artifacts:
       - build/ios/ipa/*.ipa
