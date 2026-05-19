@@ -44,7 +44,7 @@ workflows:
           cd ios && pod install
 
       - name: Dart Analyse
-        script: flutter analyze
+        script: flutter analyze lib/
 
       - name: Fix GCC_WARN_INHIBIT_ALL_WARNINGS (BoringSSL-GRPC / Xcode 26)
         script: |

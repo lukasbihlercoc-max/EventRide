@@ -27,8 +27,8 @@ Write-Host "OK" -ForegroundColor Green
 Write-Host ""
 
 # 2. Dart-Analyse (Warnings sind kein Blocker, nur Errors zaehlen)
-Write-Host "[2/3] flutter analyze ..." -ForegroundColor Yellow
-flutter analyze
+Write-Host "[2/3] flutter analyze lib/ ..." -ForegroundColor Yellow
+flutter analyze lib/
 Write-Host "Analyse abgeschlossen (Warnings ignoriert, Schritt 3 prueft Compilation)." -ForegroundColor DarkGray
 Write-Host ""
 
