@@ -39,8 +39,11 @@ workflows:
       - name: CocoaPods
         script: find . -name "Podfile" -execdir pod install \;
 
+      - name: Swift Package Manager deaktivieren
+        script: flutter config --no-enable-swift-package-manager
+
       - name: Build IPA
-        script: flutter build ipa --release --no-swift-package-manager
+        script: flutter build ipa --release
 
     artifacts:
       - build/ios/ipa/*.ipa
