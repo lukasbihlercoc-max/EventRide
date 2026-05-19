@@ -42,6 +42,7 @@ workflows:
         script: |
           flutter config --no-enable-swift-package-manager
           flutter pub get
+          rm -rf ios/Pods ios/Podfile.lock
           cd ios && pod install
 
       - name: Dart Analyse
