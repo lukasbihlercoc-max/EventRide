@@ -18,7 +18,13 @@ workflows:
       - name: Keychain initialisieren
         script: keychain initialize
 
-      - name: Certificate + Profile automatisch holen
+      - name: Certificate erstellen
+        script: |
+          app-store-connect create-certificate \
+            --type IOS_DISTRIBUTION \
+            --save
+
+      - name: Provisioning Profile holen
         script: |
           app-store-connect fetch-signing-files \
             at.eventride.app \
