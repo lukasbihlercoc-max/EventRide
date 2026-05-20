@@ -71,6 +71,7 @@ workflows:
             -scheme Runner \
             -sdk iphoneos \
             -configuration Release \
+            CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES=YES \
             archive \
             -archivePath "$CM_BUILD_DIR/build/ios/archive/Runner.xcarchive"
 
