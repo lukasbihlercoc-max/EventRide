@@ -1,3 +1,8 @@
+# Lokale Konfiguration (nie committen)
+.env
+dist_key.pem
+dist_key_b64.txt
+
 # Firebase credentials (never commit these)
 ios/Runner/GoogleService-Info.plist
 

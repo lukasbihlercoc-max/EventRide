@@ -1,5 +1,40 @@
 # EventRide
 
+## Automatischer Build-Loop
+
+Wenn der Nutzer "loop", "fix bis es läuft", "auto-build", "baue durch", "nacht-build" oder ähnliches sagt:
+
+**Ablauf (max. 5 Iterationen):**
+
+1. Starte einen neuen Codemagic-Build:
+   ```bash
+   bash scripts/build_loop.sh
+   ```
+
+2. Das Skript triggert den Build, wartet auf das Ergebnis und gibt Fehler aus.
+
+3. Wenn exit-code 1 (Build fehlgeschlagen):
+   - Lese `/tmp/cm_last_errors.txt` (gespeicherte Fehler)
+   - Analysiere den fehlgeschlagenen Schritt und den Fehlertext
+   - Fixe den Dart-/iOS-/YAML-Code direkt (bearbeite die betroffenen Dateien)
+   - Das Skript committe und pushe die Änderungen automatisch beim nächsten Aufruf
+   - Rufe `bash scripts/build_loop.sh` erneut auf
+   - Wiederhole bis exit-code 0 (Erfolg) oder exit-code 2 (Max-Iterationen)
+
+4. Wenn exit-code 0: Gib den Build-Link aus und berichte dem Nutzer.
+
+5. Wenn exit-code 3 (lokale Dart-Analyse fehlgeschlagen):
+   - Lese die Fehlerausgabe direkt aus dem Terminal
+   - Fixe die Dart-Fehler und rufe das Skript erneut auf ohne Build zu triggern.
+
+**Iteration zurücksetzen:**
+```bash
+rm -f /tmp/cm_iteration
+```
+
+**Wichtig:** `.env` muss vorhanden sein (siehe `.env.example`).
+Credentials: CODEMAGIC_API_TOKEN, CODEMAGIC_APP_ID, CODEMAGIC_WORKFLOW_ID=ios-release
+
 ## Was die App macht
 Flutter App für lokale Events (Kirchtage, Bälle, Feste) in Kärnten.
 Nutzer können Mitfahrgelegenheiten anbieten und anfragen.
