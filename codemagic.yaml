@@ -28,6 +28,7 @@ workflows:
           app-store-connect fetch-signing-files \
             at.eventride.app \
             --type IOS_APP_STORE \
+            --certificate-key @file:/tmp/dist_key.pem \
             --create
 
       - name: Certificate zum Keychain hinzufuegen
