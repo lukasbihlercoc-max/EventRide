@@ -9,9 +9,8 @@ workflows:
       groups:
         - firebase_ios
         - app_store_connect
-        - ios_credentials
     scripts:
-      - name: Flutter & Dart Version prüfen
+      - name: Flutter & Dart Version pruefen
         script: |
           flutter --version
           dart --version
@@ -19,16 +18,15 @@ workflows:
       - name: Keychain initialisieren
         script: keychain initialize
 
-      - name: Provisioning Profile installieren
+      - name: Certificate + Profile automatisch holen
         script: |
-          PROFILES_HOME="$HOME/Library/MobileDevice/Provisioning Profiles"
-          mkdir -p "$PROFILES_HOME"
-          echo $CM_PROVISIONING_PROFILE | base64 --decode > "$PROFILES_HOME/eventride.mobileprovision"
+          app-store-connect fetch-signing-files \
+            at.eventride.app \
+            --type IOS_APP_STORE \
+            --create
 
-      - name: Certificate importieren
-        script: |
-          echo $CM_CERTIFICATE | base64 --decode > /tmp/certificate.p12
-          keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password $CM_CERTIFICATE_PASSWORD
+      - name: Certificate zum Keychain hinzufuegen
+        script: keychain add-certificates
 
       - name: Code Signing konfigurieren
         script: xcode-project use-profiles
