@@ -20,11 +20,7 @@ workflows:
 
       - name: Certificate und Profile erstellen
         script: |
-          openssl genrsa -out /tmp/dist_key.pem 2048
-          app-store-connect certificates create \
-            --type IOS_DISTRIBUTION \
-            --certificate-key @file:/tmp/dist_key.pem \
-            --save
+          echo $DIST_CERT_KEY | base64 --decode > /tmp/dist_key.pem
           app-store-connect fetch-signing-files \
             at.eventride.app \
             --type IOS_APP_STORE \
