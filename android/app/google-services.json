@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "686951435694-aksqlcb2u6erc7os1if3mvppgmf98k4p.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "at.eventride.app",
+            "certificate_hash": "5a3810ea170b0ba5684b0a4f56ec3739fd940ba7"
+          }
+        },
+        {
           "client_id": "686951435694-b5a26b2hec40dslvf32u824gfpr3qsbp.apps.googleusercontent.com",
           "client_type": 3
         }
@@ -23,7 +31,7 @@
           "current_key": "AIzaSyA8x6GUtOH0xD1xhAweUCFxyMijvZkUucA"
         },
         {
-          "current_key": "AIzaSyAjs4VgCkDwQ_GyZntKXTOBmt7Co1sUkC8"
+          "current_key": "AIzaSyDQjfVcata6EPra4bnXifbeAVgv88_VD6w"
         }
       ],
       "services": {
@@ -62,7 +70,7 @@
           "current_key": "AIzaSyA8x6GUtOH0xD1xhAweUCFxyMijvZkUucA"
         },
         {
-          "current_key": "AIzaSyAjs4VgCkDwQ_GyZntKXTOBmt7Co1sUkC8"
+          "current_key": "AIzaSyDQjfVcata6EPra4bnXifbeAVgv88_VD6w"
         }
       ],
       "services": {
