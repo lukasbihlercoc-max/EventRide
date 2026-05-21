@@ -33,6 +33,38 @@ workflows:
       - name: Code Signing konfigurieren
         script: xcode-project use-profiles
 
+      - name: ExportOptions mit erkanntem Profil schreiben
+        script: |
+          PROFILE_PATH=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null | head -1)
+          if [ -z "$PROFILE_PATH" ]; then
+            echo "FEHLER: Kein Provisioning Profile installiert!" && exit 1
+          fi
+          PROFILE_NAME=$(security cms -D -i "$PROFILE_PATH" | \
+            grep -A1 '<key>Name</key>' | tail -1 | \
+            sed 's/.*<string>\(.*\)<\/string>.*/\1/')
+          echo "Erkanntes Profil: $PROFILE_NAME"
+          cat > ios/ExportOptions.plist << PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store-connect</string>
+              <key>signingStyle</key>
+              <string>manual</string>
+              <key>compileBitcode</key>
+              <false/>
+              <key>stripSwiftSymbols</key>
+              <true/>
+              <key>provisioningProfiles</key>
+              <dict>
+                  <key>at.eventride.app</key>
+                  <string>$PROFILE_NAME</string>
+              </dict>
+          </dict>
+          </plist>
+          PLIST
+
       - name: GoogleService-Info.plist einspielen
         script: |
           echo $GOOGLESERVICE_INFO_PLIST | base64 --decode \
