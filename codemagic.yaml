@@ -25,7 +25,8 @@ workflows:
             at.eventride.app \
             --type IOS_APP_STORE \
             --certificate-key @file:/tmp/dist_key.pem \
-            --create
+            --create \
+            --save
 
       - name: Certificate zum Keychain hinzufuegen
         script: keychain add-certificates
