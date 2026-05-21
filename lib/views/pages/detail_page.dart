@@ -30,17 +30,22 @@ import 'package:my_app/views/widgets/fahrtencard_widget/interessenten_bottom_she
 
 Future<void> _openEventNavigation(double lat, double lng) async {
   if (Platform.isIOS) {
-    await launchUrl(Uri.parse('maps://?daddr=$lat,$lng'));
+    final googleMapsUri = Uri.parse('comgooglemaps://?daddr=$lat,$lng');
+    if (await canLaunchUrl(googleMapsUri)) {
+      await launchUrl(googleMapsUri);
+    } else {
+      await launchUrl(Uri.parse('maps://?daddr=$lat,$lng'));
+    }
     return;
   }
   final mapsUri = Uri.parse('google.navigation:q=$lat,$lng');
   if (await canLaunchUrl(mapsUri)) {
     await launchUrl(mapsUri);
   } else {
-    final fallback = Uri.parse(
-      'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng',
+    await launchUrl(
+      Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng'),
+      mode: LaunchMode.externalApplication,
     );
-    await launchUrl(fallback, mode: LaunchMode.externalApplication);
   }
 }
 
@@ -185,7 +190,7 @@ class DetailPage extends StatelessWidget {
                                         child: SizedBox(
                                           height: 160,
                                           child: GoogleMap(
-                                            liteModeEnabled: true,
+                                            liteModeEnabled: !Platform.isIOS,
                                             initialCameraPosition:
                                                 CameraPosition(
                                               target: LatLng(event.latitude!,

@@ -74,7 +74,7 @@ class _SlideTransitionsBuilder extends PageTransitionsBuilder {
         ).animate(CurvedAnimation(
           parent: animation,
           curve: Curves.easeOutCubic,
-          reverseCurve: Curves.easeInCubic,
+          reverseCurve: Curves.linear,
         )),
         child: child,
       ),

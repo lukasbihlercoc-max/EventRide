@@ -387,38 +387,54 @@ class _SettingsPageState extends State<SettingsPage> {
 
   void _showLogoutDialog(BuildContext context) {
     final authRepository = context.read<IAuthRepository>();
+    final notifService = context.read<NotificationService>();
+    bool loading = false;
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: Colors.grey[900],
-        title:
-            const Text("Abmelden", style: TextStyle(color: Colors.white)),
-        content: const Text(
-          "Möchtest du dich wirklich abmelden?",
-          style: TextStyle(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text("Abbrechen",
-                style: TextStyle(color: Colors.blueAccent)),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(dialogContext);
-              final userId = authRepository.currentUser?.userId ?? '';
-              if (userId.isNotEmpty) {
-                await context.read<NotificationService>().removeToken(userId);
-              }
-              await authRepository.signOut();
-              if (context.mounted) {
-                Navigator.popUntil(context, (route) => route.isFirst);
-              }
-            },
-            child: const Text("Abmelden",
-                style: TextStyle(color: Colors.red)),
-          ),
-        ],
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          return AlertDialog(
+            backgroundColor: Colors.grey[900],
+            title: const Text("Abmelden", style: TextStyle(color: Colors.white)),
+            content: loading
+                ? const SizedBox(
+                    height: 60,
+                    child: Center(
+                      child: CircularProgressIndicator(color: Colors.amber),
+                    ),
+                  )
+                : const Text(
+                    "Möchtest du dich wirklich abmelden?",
+                    style: TextStyle(color: Colors.white70),
+                  ),
+            actions: loading
+                ? []
+                : [
+                    TextButton(
+                      onPressed: () => Navigator.pop(dialogContext),
+                      child: const Text("Abbrechen",
+                          style: TextStyle(color: Colors.blueAccent)),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        setDialogState(() => loading = true);
+                        final userId = authRepository.currentUser?.userId ?? '';
+                        if (userId.isNotEmpty) {
+                          await notifService.removeToken(userId);
+                        }
+                        await authRepository.signOut();
+                        if (dialogContext.mounted) Navigator.pop(dialogContext);
+                        if (context.mounted) {
+                          Navigator.popUntil(context, (route) => route.isFirst);
+                        }
+                      },
+                      child: const Text("Abmelden",
+                          style: TextStyle(color: Colors.red)),
+                    ),
+                  ],
+          );
+        },
       ),
     );
   }
