@@ -410,6 +410,7 @@ class _LoggedInFahrtenViewState extends State<_LoggedInFahrtenView>
             Expanded(
               child: TabBarView(
                 controller: _tabController,
+                physics: const NeverScrollableScrollPhysics(),
                 children: [
                   _AngefragteFahrtenTab(userId: userId),
                   _AngeboteneFahrtenTab(userId: userId),
