@@ -63,5 +63,7 @@
 		<string>comgooglemaps</string>
 		<string>googlemaps</string>
 	</array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>
