@@ -142,14 +142,16 @@ class NotificationService {
 
   /// FCM-Token beim Logout aus Firestore entfernen.
   Future<void> removeToken(String userId) async {
-    final token = await FirebaseMessaging.instance.getToken();
-    if (token != null) {
-      try {
+    try {
+      final token = await FirebaseMessaging.instance
+          .getToken()
+          .timeout(const Duration(seconds: 5));
+      if (token != null) {
         await _userRepo.removeFcmToken(userId, token);
-      } catch (_) {
-        // Auth-Token kann bereits ungültig sein (z.B. signOut vor diesem Aufruf).
-        // Token wird beim nächsten Login automatisch aktualisiert.
       }
+    } catch (_) {
+      // getToken() kann auf iOS hängen wenn APNs nicht konfiguriert ist.
+      // Token wird beim nächsten Login automatisch aktualisiert.
     }
   }
 

@@ -33,6 +33,23 @@ workflows:
       - name: Code Signing konfigurieren
         script: xcode-project use-profiles
 
+      - name: Push Notifications Entitlements eintragen
+        script: |
+          python3 - << 'EOF'
+          with open('ios/Runner.xcodeproj/project.pbxproj', 'r') as f:
+              content = f.read()
+          if 'CODE_SIGN_ENTITLEMENTS' not in content:
+              content = content.replace(
+                  'PRODUCT_BUNDLE_IDENTIFIER = at.eventride.app;',
+                  'CODE_SIGN_ENTITLEMENTS = "Runner/Runner.entitlements";\n\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = at.eventride.app;'
+              )
+              with open('ios/Runner.xcodeproj/project.pbxproj', 'w') as f:
+                  f.write(content)
+              print("Entitlements eingetragen")
+          else:
+              print("Bereits vorhanden")
+          EOF
+
       - name: ExportOptions mit erkanntem Profil schreiben
         script: |
           echo "=== Suche .mobileprovision (systemweit) ==="

@@ -1,4 +1,5 @@
 // detail_page.dart
+import 'dart:io';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
@@ -28,6 +29,10 @@ import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/widgets/fahrtencard_widget/interessenten_bottom_sheet.dart';
 
 Future<void> _openEventNavigation(double lat, double lng) async {
+  if (Platform.isIOS) {
+    await launchUrl(Uri.parse('maps://?daddr=$lat,$lng'));
+    return;
+  }
   final mapsUri = Uri.parse('google.navigation:q=$lat,$lng');
   if (await canLaunchUrl(mapsUri)) {
     await launchUrl(mapsUri);

@@ -11,6 +11,7 @@ import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
 import 'package:my_app/views/widgets/trust_shields_widget.dart';
 import 'package:my_app/views/widgets/user_avatar_widget.dart';
+import 'package:my_app/utils/app_route.dart';
 import 'package:my_app/views/pages/public_profile_page.dart';
 
 
@@ -290,7 +291,7 @@ class _InteressentTile extends StatelessWidget {
             radius: 20,
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(
+              AppRoute(
                 builder: (_) => PublicProfilePage(
                   userId: interessent.userId,
                   name: interessent.userName,

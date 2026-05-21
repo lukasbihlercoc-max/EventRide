@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:my_app/data/chat_service.dart';
 import 'package:my_app/data/notification_service.dart';
@@ -51,28 +52,6 @@ import 'package:my_app/utils/app_route.dart';
 /// Globaler NavigatorKey – wird vom NotificationService für Deep-Links verwendet.
 final navigatorKey = GlobalKey<NavigatorState>();
 
-/// Einheitlicher Fade-Übergang für alle Seiten (220 ms vor / 160 ms zurück via AppRoute).
-class _FadeTransitionsBuilder extends PageTransitionsBuilder {
-  const _FadeTransitionsBuilder();
-
-  @override
-  Widget buildTransitions<T>(
-    PageRoute<T> route,
-    BuildContext context,
-    Animation<double> animation,
-    Animation<double> secondaryAnimation,
-    Widget child,
-  ) {
-    return FadeTransition(
-      opacity: CurvedAnimation(
-        parent: animation,
-        curve: Curves.easeOut,
-        reverseCurve: Curves.easeIn,
-      ),
-      child: child,
-    );
-  }
-}
 
 /// Top-Level-Handler für FCM-Nachrichten wenn die App beendet ist.
 /// Muss eine Top-Level-Funktion sein (kein Lambda, kein Klassenmember).
@@ -83,6 +62,7 @@ Future<void> _bgHandler(RemoteMessage message) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
@@ -375,9 +355,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                   isDarkMode ? Brightness.dark : Brightness.light,
               pageTransitionsTheme: const PageTransitionsTheme(
                 builders: {
-                  TargetPlatform.android: _FadeTransitionsBuilder(),
-                  TargetPlatform.iOS: _FadeTransitionsBuilder(),
-                  TargetPlatform.macOS: _FadeTransitionsBuilder(),
+                  TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+                  TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+                  TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
                 },
               ),
             ),
