@@ -35,23 +35,21 @@ workflows:
 
       - name: ExportOptions mit erkanntem Profil schreiben
         script: |
-          echo "Suche Provisioning Profile..."
-          find "$HOME/Library/MobileDevice/Provisioning Profiles" \
-            -name "*.mobileprovision" 2>/dev/null || true
-          PROFILE_PATH=$(find "$HOME/Library/MobileDevice/Provisioning Profiles" \
-            -name "*.mobileprovision" 2>/dev/null | head -1)
+          echo "=== Suche .mobileprovision (systemweit) ==="
+          find / -maxdepth 8 -name "*.mobileprovision" 2>/dev/null | head -20 || true
+          PROFILE_PATH=$(find / -maxdepth 8 -name "*.mobileprovision" 2>/dev/null | head -1)
           if [ -z "$PROFILE_PATH" ]; then
             echo "FEHLER: Kein Provisioning Profile gefunden!" && exit 1
           fi
+          echo "Gefunden: $PROFILE_PATH"
           PROFILE_NAME=$(security cms -D -i "$PROFILE_PATH" | \
             grep -A1 '<key>Name</key>' | tail -1 | \
             sed 's/.*<string>\(.*\)<\/string>.*/\1/')
-          echo "Erkanntes Profil: $PROFILE_NAME"
+          echo "Profil-Name: $PROFILE_NAME"
           /usr/libexec/PlistBuddy -c "Add :provisioningProfiles dict" ios/ExportOptions.plist
           /usr/libexec/PlistBuddy \
             -c "Add :provisioningProfiles:at.eventride.app string $PROFILE_NAME" \
             ios/ExportOptions.plist
-          echo "ExportOptions.plist aktualisiert:"
           cat ios/ExportOptions.plist
 
       - name: GoogleService-Info.plist einspielen
