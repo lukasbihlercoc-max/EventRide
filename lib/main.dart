@@ -53,6 +53,33 @@ import 'package:my_app/utils/app_route.dart';
 final navigatorKey = GlobalKey<NavigatorState>();
 
 
+/// Slide-Übergang: neue Seite gleitet von rechts rein, ausgehende Seite bleibt stehen.
+/// Kein Secondary-Animation-Effekt → kein Blur/Skalierung des Hintergrunds.
+class _SlideTransitionsBuilder extends PageTransitionsBuilder {
+  const _SlideTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    return SlideTransition(
+      position: Tween<Offset>(
+        begin: const Offset(1.0, 0.0),
+        end: Offset.zero,
+      ).animate(CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      )),
+      child: child,
+    );
+  }
+}
+
 /// Top-Level-Handler für FCM-Nachrichten wenn die App beendet ist.
 /// Muss eine Top-Level-Funktion sein (kein Lambda, kein Klassenmember).
 @pragma('vm:entry-point')
@@ -355,9 +382,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                   isDarkMode ? Brightness.dark : Brightness.light,
               pageTransitionsTheme: const PageTransitionsTheme(
                 builders: {
-                  TargetPlatform.android: CupertinoPageTransitionsBuilder(),
-                  TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-                  TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+                  TargetPlatform.android: _SlideTransitionsBuilder(),
+                  TargetPlatform.iOS: _SlideTransitionsBuilder(),
+                  TargetPlatform.macOS: _SlideTransitionsBuilder(),
                 },
               ),
             ),
