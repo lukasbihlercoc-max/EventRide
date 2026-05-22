@@ -47,6 +47,7 @@ class _FahrtAnbietenPageState extends State<FahrtAnbietenPage>
   String? _timeError;
 
   Fahrtrichtung fahrtrichtung = Fahrtrichtung.hinfahrt;
+  bool _isSaving = false;
 
   static const int maxPlaetze = 20;
 
@@ -120,8 +121,9 @@ class _FahrtAnbietenPageState extends State<FahrtAnbietenPage>
             backgroundColor: Colors.transparent,
             title: const Text("Fahrt anbieten"),
           ),
-          body: Listener(
-            onPointerDown: (_) => FocusScope.of(context).unfocus(),
+          body: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () => FocusScope.of(context).unfocus(),
             child: SingleChildScrollView(
             controller: _scrollController,
             child: Padding(
@@ -284,133 +286,115 @@ class _FahrtAnbietenPageState extends State<FahrtAnbietenPage>
 
                     Center(
                       child: ElevatedButton.icon(
-                        icon: const Icon(Icons.check),
-                        label: const Text("Fahrt speichern"),
-                        onPressed: () async {
-                          if (!_formKey.currentState!.validate()) return;
+                        icon: _isSaving
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.check),
+                        label: Text(_isSaving ? "Speichern …" : "Fahrt speichern"),
+                        onPressed: _isSaving
+                            ? null
+                            : () async {
+                                if (!_formKey.currentState!.validate()) return;
 
-                          if (abfahrtsort.isEmpty) {
-                            AppSnackbar.show(context,
-                                message: "Bitte einen Abfahrtsort wählen",
-                                accentColor: Colors.redAccent);
-                            return;
-                          }
+                                if (abfahrtsort.isEmpty) {
+                                  AppSnackbar.show(context,
+                                      message: "Bitte einen Abfahrtsort wählen",
+                                      accentColor: Colors.redAccent);
+                                  return;
+                                }
 
-                          if (_abfahrtsortLat == null || _abfahrtsortLng == null) {
-                            AppSnackbar.show(context,
-                                message: "Bitte einen Ort aus der Liste wählen",
-                                accentColor: Colors.redAccent);
-                            return;
-                          }
+                                if (_abfahrtsortLat == null || _abfahrtsortLng == null) {
+                                  AppSnackbar.show(context,
+                                      message: "Bitte einen Ort aus der Liste wählen",
+                                      accentColor: Colors.redAccent);
+                                  return;
+                                }
 
-setState(() {
-  _timeError = null;
-});
+                                setState(() => _timeError = null);
 
-if (uhrzeit == null) {
-  setState(() {
-    _timeError = "Bitte eine Uhrzeit auswählen";
-  });
-  return;
-}
+                                if (uhrzeit == null) {
+                                  setState(() => _timeError = "Bitte eine Uhrzeit auswählen");
+                                  return;
+                                }
 
-if (fahrtrichtung == Fahrtrichtung.hinUndZurueck && rueckuhrzeit == null) {
-  setState(() {
-    _timeError = "Bitte eine Uhrzeit für die Rückfahrt auswählen";
-  });
-  return;
-}
+                                if (fahrtrichtung == Fahrtrichtung.hinUndZurueck && rueckuhrzeit == null) {
+                                  setState(() => _timeError = "Bitte eine Uhrzeit für die Rückfahrt auswählen");
+                                  return;
+                                }
 
+                                final user = context.read<IAuthRepository>().currentUser;
+                                if (user == null) {
+                                  AppSnackbar.show(context, message: "Nicht eingeloggt", accentColor: Colors.redAccent);
+                                  return;
+                                }
 
+                                final fahrt = widget.existingFahrt == null
+                                    ? FahrtDaten.fromTimeOfDay(
+                                        id: null,
+                                        eventId: widget.event.id,
+                                        eventName: widget.event.name,
+                                        standort: widget.event.standort,
+                                        abfahrtsort: abfahrtsort,
+                                        uhrzeit: uhrzeit!,
+                                        rueckuhrzeit: fahrtrichtung == Fahrtrichtung.hinUndZurueck
+                                            ? rueckuhrzeit
+                                            : null,
+                                        freiePlaetze: freiePlaetze,
+                                        richtung: fahrtrichtung,
+                                        ownerId: user.userId,
+                                        ownerName: user.name,
+                                        abfahrtsortLat: _abfahrtsortLat,
+                                        abfahrtsortLng: _abfahrtsortLng,
+                                        abfahrtsortFullAddress: _abfahrtsortFullAddress,
+                                        eventDatum: widget.event.datum,
+                                      )
+                                    : widget.existingFahrt!.copyWith(
+                                        abfahrtsort: abfahrtsort,
+                                        uhrzeitHour: uhrzeit!.hour,
+                                        uhrzeitMinute: uhrzeit!.minute,
+                                        rueckuhrzeitHour: rueckuhrzeit?.hour,
+                                        rueckuhrzeitMinute: rueckuhrzeit?.minute,
+                                        freiePlaetze: freiePlaetze,
+                                        richtung: fahrtrichtung,
+                                        abfahrtsortLat: _abfahrtsortLat,
+                                        abfahrtsortLng: _abfahrtsortLng,
+                                        abfahrtsortFullAddress: _abfahrtsortFullAddress,
+                                        eventDatum: widget.event.datum,
+                                      );
 
-                          final user = context.read<IAuthRepository>().currentUser;
-                          if (user == null) {
-                            if (!context.mounted) return;
-                            AppSnackbar.show(context, message: "Nicht eingeloggt", accentColor: Colors.redAccent);
-                            return;
-                          }
+                                // Navigator vor dem await sichern
+                                final nav = Navigator.of(context);
 
-                          final fahrt = widget.existingFahrt == null
-                              ? FahrtDaten.fromTimeOfDay(
-                                  id: null, // NEU → generiert neue ID
-                                  eventId: widget.event.id,
-                                  eventName: widget.event.name,
-                                  standort: widget.event.standort,
-                                  abfahrtsort: abfahrtsort,
-                                  uhrzeit: uhrzeit!,
-                                  rueckuhrzeit:
-                                      fahrtrichtung ==
-                                          Fahrtrichtung.hinUndZurueck
-                                      ? rueckuhrzeit
-                                      : null,
-                                  freiePlaetze: freiePlaetze,
-                                  richtung: fahrtrichtung,
-                                  ownerId: user.userId,
-                                  ownerName: user.name,
-                                  abfahrtsortLat: _abfahrtsortLat,
-                                  abfahrtsortLng: _abfahrtsortLng,
-                                  abfahrtsortFullAddress: _abfahrtsortFullAddress,
-                                  eventDatum: widget.event.datum,
-                                )
-                              : widget.existingFahrt!.copyWith(
-                                  abfahrtsort: abfahrtsort,
-                                  uhrzeitHour: uhrzeit!.hour,
-                                  uhrzeitMinute: uhrzeit!.minute,
-                                  rueckuhrzeitHour: rueckuhrzeit?.hour,
-                                  rueckuhrzeitMinute: rueckuhrzeit?.minute,
-                                  freiePlaetze: freiePlaetze,
-                                  richtung: fahrtrichtung,
-                                  abfahrtsortLat: _abfahrtsortLat,
-                                  abfahrtsortLng: _abfahrtsortLng,
-                                  abfahrtsortFullAddress: _abfahrtsortFullAddress,
-                                  eventDatum: widget.event.datum,
-                                );
+                                setState(() => _isSaving = true);
+                                try {
+                                  if (widget.existingFahrt == null) {
+                                    await fahrtService.add(fahrt);
+                                    await interessentenService.removeForUser(widget.event.id, fahrt.ownerId);
+                                    await anfrageService.storniereOffeneAnfragenFuerEvent(
+                                      eventId: widget.event.id,
+                                      requesterId: fahrt.ownerId,
+                                    );
+                                  } else {
+                                    await fahrtService.update(fahrt);
+                                  }
+                                } catch (e, st) {
+                                  if (kDebugMode) debugPrint('❌ [Speichern] Fehler: $e\n$st');
+                                  if (!context.mounted) return;
+                                  setState(() => _isSaving = false);
+                                  AppSnackbar.show(context, message: "Fehler: $e", accentColor: Colors.redAccent);
+                                  return;
+                                }
 
-
-                          try {
-                            if (widget.existingFahrt == null) {
-                              await fahrtService.add(fahrt);
-                              await interessentenService
-                                  .removeForUser(widget.event.id, fahrt.ownerId);
-                              // Offene Einladungen/Anfragen stornieren —
-                              // der User braucht keine Mitfahrt mehr
-                              await anfrageService
-                                  .storniereOffeneAnfragenFuerEvent(
-                                eventId: widget.event.id,
-                                requesterId: fahrt.ownerId,
-                              );
-                            } else {
-                              await fahrtService.update(fahrt);
-                            }
-                          } catch (e, st) {
-                            if (kDebugMode) debugPrint('❌ [Speichern] Fehler in fahrtService: $e\n$st');
-                            if (!context.mounted) return;
-                            AppSnackbar.show(
-                              context,
-                              message: "Fehler: $e",
-                              accentColor: Colors.redAccent,
-                            );
-                            return;
-                          }
-
-                          if (!context.mounted) return;
-
-                          // ✅ Snackbar anzeigen
-                          AppSnackbar.show(
-                            context,
-                            message: "Fahrt gespeichert",
-                            accentColor: const Color(0xFF5DA9FF),
-                          );
-
-                          // ⏳ kleine Verzögerung, damit sie sichtbar bleibt
-                          await Future.delayed(
-                            const Duration(milliseconds: 300),
-                          );
-
-                          if (!context.mounted) return;
-                          Navigator.pop(context);
-
-                        },
+                                if (!context.mounted) return;
+                                AppSnackbar.show(context, message: "Fahrt gespeichert", accentColor: const Color(0xFF5DA9FF));
+                                nav.pop();
+                              },
                       ),
                     ),
                   ],
