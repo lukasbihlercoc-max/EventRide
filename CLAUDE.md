@@ -324,12 +324,12 @@ Gefunden beim ersten Zwei-Nutzer-Test auf iOS (2026-05-21). Priorisiert nach Kri
 
 ### Empfohlene Session-Reihenfolge
 
-| Session | Kategorie | Aufwand |
-|---------|-----------|---------|
-| 1 | A – Email-Verification-Bypass | ~1h |
-| 2 | B – iOS Tap-Handler Bug | ~1–2h |
-| 3 | C – Anfrage zurückziehen (inkl. E1) | ~2h |
-| 4 | D1+D2 – Notification-Bugs | ~1h |
-| 5 | D3 – Chat-Notifications clearen | ~1h |
-| 6 | F – Alte Events löschen | ~15min |
-| 7 | E2 – iOS Design-Polishing | eigene Session |
+| Session | Kategorie | Aufwand | Status |
+|---------|-----------|---------|--------|
+| 1 | A – Email-Verification-Bypass | ~1h | ✅ umgesetzt – noch nicht auf Gerät getestet |
+| 2 | B – iOS Tap-Handler Bug | ~1–2h | ✅ umgesetzt – noch nicht auf Gerät getestet |
+| 3 | C – Anfrage zurückziehen (inkl. E1) | ~2h | |
+| 4 | D1+D2 – Notification-Bugs | ~1h | |
+| 5 | D3 – Chat-Notifications clearen | ~1h | |
+| 6 | F – Alte Events löschen | ~15min | |
+| 7 | E2 – iOS Design-Polishing | eigene Session | |
