@@ -240,3 +240,96 @@ ratingAvg?, ratingCount (int)
 - `avoid_types_as_parameter_names` (sum) — lib/views/pages/fahrten_page.dart
 - Radio: `groupValue`/`onChanged` deprecated → RadioGroup — lib/views/pages/fahrt_anbieten_page.dart
 - Warnings in `1_uebungen/` ignorieren — separates Übungsprojekt
+
+---
+
+## Offene Punkte / Release-Fixes
+
+Gefunden beim ersten Zwei-Nutzer-Test auf iOS (2026-05-21). Priorisiert nach Kritikalität.
+
+### 🔴 A – Sicherheit (vor Release zwingend)
+
+**Email-Verification-Bypass im Chat**
+- Nicht verifizierte Nutzer können Chat via Push-Notification-Tap öffnen/verwenden, obwohl sie geblockt sein sollten.
+- `verification_guard.dart` greift nur bei normaler Navigation – Deep-Link via Notification-Tap geht daran vorbei.
+- Fix UI: `chat_page.dart` → in `initState` `requireVerified(context)` aufrufen und bei fail sperren.
+- Fix Server: Firestore Rules `messages` Sub-Collection: `allow write: if request.auth.token.email_verified == true;`
+- Dateien: `lib/views/pages/chat_page.dart`, `lib/views/auth/verification_guard.dart`, Firestore Rules
+
+---
+
+### 🔴 B – iOS-Bugs (Release-kritisch)
+
+**"Fahrt erstellen"-Button: Fahrt wird erstellt, aber kein Feedback auf iOS**
+- Fahrt wird tatsächlich angelegt, aber Nutzer bekommt keine Rückmeldung (kein Snackbar, keine Navigation, kein visueller Hinweis).
+- Mögliche Ursache: Snackbar/Navigation wird nach `pop` nicht angezeigt, oder `Listener`-Widget (Zeile 123) stört den Tap-Flow sodass der Bestätigungsschritt nicht ausgeführt wird.
+- Fix: Fehler-/Erfolgs-Feedback (Snackbar + Navigation) auf iOS sicherstellen; `Listener` auf Hit-Test-Konflikte prüfen.
+- Alle anderen Seiten mit gleichem Pattern ebenfalls prüfen.
+- Datei: `lib/views/pages/fahrt_anbieten_page.dart:123`
+
+---
+
+### 🟠 C – Fehlende Core-Features
+
+**Akzeptierte Mitfahr-Anfrage zurückziehen**
+- Mitfahrer kann akzeptierte Anfrage nicht zurückziehen. Service-Methode `storniereAnfrage()` (`anfrage_service.dart:210`) existiert, aber:
+  1. Kein UI-Button für akzeptierte Anfragen
+  2. `freie_plaetze` in der Fahrt wird nicht wieder erhöht
+  3. Fahrer bekommt keine Notification
+- Fix: Atomische Transaktion: status → `storniert` + `freie_plaetze++`, danach Push an Fahrer.
+- Button prominent einbauen (löst auch E1 – zu dezent sichtbar).
+- Dateien: `lib/data/anfrage_service.dart`, Anfragen-/Fahrt-Detailseite, ggf. Cloud Function
+
+---
+
+### 🟠 D – Notification-Bugs
+
+**D1 – Notification-Logik falsch herum**
+- Jana zieht Anfrage zurück → Jana bekommt Notification „Lukas hat die Fahrt storniert" (Sender/Empfänger vertauscht).
+- Bei Status `storniert` (Mitfahrer zieht zurück) muss Notification **an den Fahrer** gehen, nicht an den Requester.
+- Zu prüfen: Cloud Function `sendNotificationOnAnfrageUpdate`
+
+**D2 – Event-Freigabe Notification fehlt**
+- Admin genehmigt Event → Ersteller bekommt keine Benachrichtigung.
+- Handler `event_request_approved` ist in `notification_service.dart:283` vorbereitet, aber Cloud Function sendet kein FCM an `createdByUserId`.
+- Fix: Cloud Function bei `approved`-Status: FCM-Token des Erstellers aus Firestore lesen + Push senden.
+
+**D3 – Chat-Notifications bleiben im System-Tray hängen**
+- Notification bleibt dauerhaft, wenn Nutzer nicht direkt darauf klickt.
+- Fix: Nach `markConversationRead()` in `chat_page.dart` → `_localNotifications.cancel(notificationId)` aufrufen.
+- Notification-ID beim Erstellen speichern (z.B. Hash aus conversationId → Int).
+- Dateien: `lib/data/notification_service.dart`, `lib/views/pages/chat_page.dart`
+
+---
+
+### 🟡 E – UI/UX
+
+**E1 – "Anfrage zurückziehen" zu dezent sichtbar**
+- Wird zusammen mit C gelöst (prominenter Button).
+
+**E2 – iOS Design-Polishing**
+- Schriftarten, Spacing und generelles Layout stärker an Apple/iOS anpassen (Cupertino-Style).
+- Nicht Release-kritisch; Umfang nach Screen-by-Screen-Sichtung festlegen.
+
+---
+
+### 🟡 F – Daten-Bereinigung (einmalig vor Release)
+
+**Alte Events aus Firestore löschen**
+- Alle Events mit `datum < heute` bereinigen.
+- Einfachste Lösung: Firebase Console → Firestore → Filter → manuell löschen.
+- Langfristig: Cloud Function `cleanupAbgelaufeneEvents` analog zu `cleanupAbgelaufeneAnfragen`.
+
+---
+
+### Empfohlene Session-Reihenfolge
+
+| Session | Kategorie | Aufwand |
+|---------|-----------|---------|
+| 1 | A – Email-Verification-Bypass | ~1h |
+| 2 | B – iOS Tap-Handler Bug | ~1–2h |
+| 3 | C – Anfrage zurückziehen (inkl. E1) | ~2h |
+| 4 | D1+D2 – Notification-Bugs | ~1h |
+| 5 | D3 – Chat-Notifications clearen | ~1h |
+| 6 | F – Alte Events löschen | ~15min |
+| 7 | E2 – iOS Design-Polishing | eigene Session |

@@ -8,6 +8,7 @@ import 'package:my_app/data/interfaces/i_user_repository.dart';
 import 'package:my_app/data/chat_service.dart';
 import 'package:my_app/data/chat_message.dart';
 import 'package:my_app/data/notifiers.dart';
+import 'package:my_app/views/auth/verification_guard.dart';
 import 'package:my_app/views/widgets/app_card.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
@@ -54,6 +55,11 @@ class _ChatPageState extends State<ChatPage> {
     _chatService = context.read<ChatService>();
     _messagesStream = _chatService.messagesStream(widget.conversationId);
     activeChatConversationId.value = widget.conversationId;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!requireVerified(context)) Navigator.of(context).pop();
+    });
 
     if (_myUserId.isNotEmpty) {
       _chatService.markConversationRead(widget.conversationId, _myUserId);

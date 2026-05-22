@@ -215,14 +215,20 @@ service cloud.firestore {
       // ----------------------------------------------------------------
       // messages/{messageId}
       //
-      // Lesen + Schreiben: Nur Teilnehmer der übergeordneten Conversation.
+      // Lesen:    Nur Teilnehmer der übergeordneten Conversation.
+      // Schreiben: Nur Teilnehmer + E-Mail muss verifiziert sein.
       // get() liest das Parent-Dokument für den Participants-Check.
       // ----------------------------------------------------------------
       match /messages/{messageId} {
-        allow read, write: if isSignedIn()
-                           && request.auth.uid in get(
-                                /databases/$(database)/documents/chat_conversations/$(conversationId)
-                              ).data.participants;
+        allow read: if isSignedIn()
+                    && request.auth.uid in get(
+                         /databases/$(database)/documents/chat_conversations/$(conversationId)
+                       ).data.participants;
+        allow write: if isSignedIn()
+                     && request.auth.token.email_verified == true
+                     && request.auth.uid in get(
+                          /databases/$(database)/documents/chat_conversations/$(conversationId)
+                        ).data.participants;
       }
     }
 
