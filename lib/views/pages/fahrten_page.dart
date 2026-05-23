@@ -1805,6 +1805,7 @@ class _RequestedRideCardState extends State<_RequestedRideCard> {
             onInteracted: widget.onInteracted,
           )
         : _MitfahrerAktionen(
+            fahrt: fahrt,
             anfrage: anfrage,
             event: event,
             openChat: () => _openChat(context),
@@ -2315,12 +2316,14 @@ class _EinladungButtonsState extends State<_EinladungButtons> {
 /// Status-abhängige Aktionen (Mitfahrer-Sicht)
 /// ------------------------------------------------------------
 class _MitfahrerAktionen extends StatefulWidget {
+  final FahrtDaten fahrt;
   final AnfrageDaten anfrage;
   final Event event;
   final VoidCallback openChat;
   final VoidCallback? onInteracted;
 
   const _MitfahrerAktionen({
+    required this.fahrt,
     required this.anfrage,
     required this.event,
     required this.openChat,
@@ -2334,9 +2337,22 @@ class _MitfahrerAktionen extends StatefulWidget {
 class _MitfahrerAktionenState extends State<_MitfahrerAktionen> {
   bool _loading = false;
 
-  Future<void> _stornieren() async {
+  Future<void> _stornieren({bool sendChatMessage = false}) async {
     setState(() => _loading = true);
-    await context.read<AnfrageService>().storniereAnfrage(widget.anfrage);
+    final ok =
+        await context.read<AnfrageService>().storniereAnfrage(widget.anfrage);
+    if (ok && sendChatMessage && mounted) {
+      await context.read<ChatService>().sendStatusNotification(
+            fahrtId: widget.fahrt.id,
+            ownerId: widget.fahrt.ownerId,
+            requesterId: widget.anfrage.requesterId,
+            text: 'Mitfahrer hat die akzeptierte Anfrage zurückgezogen.',
+            eventName: widget.fahrt.eventName,
+            startOrt: widget.fahrt.abfahrtsort,
+            zielOrt: widget.fahrt.standort,
+            seatsRequested: widget.anfrage.seatsRequested,
+          );
+    }
     widget.onInteracted?.call();
     if (mounted) setState(() => _loading = false);
   }
@@ -2369,7 +2385,7 @@ class _MitfahrerAktionenState extends State<_MitfahrerAktionen> {
               ),
               tooltip: 'Chat öffnen',
             ),
-            TextButton(
+            TextButton.icon(
               onPressed: () async {
                 final confirmed = await showDialog<bool>(
                   context: context,
@@ -2402,45 +2418,94 @@ class _MitfahrerAktionenState extends State<_MitfahrerAktionen> {
                 if (confirmed == true) _stornieren();
               },
               style: TextButton.styleFrom(
-                foregroundColor: Colors.white38,
+                foregroundColor: Colors.redAccent,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 minimumSize: Size.zero,
               ),
-              child: const Text(
+              icon: const Icon(Icons.cancel_outlined, size: 14),
+              label: const Text(
                 'Anfrage zurückziehen',
-                style: TextStyle(
-                  fontSize: 12,
-                  decoration: TextDecoration.underline,
-                  decorationColor: Colors.white24,
-                ),
+                style: TextStyle(fontSize: 12),
               ),
             ),
           ],
         );
 
-      // ── AKZEPTIERT: mit Fahrer chatten ────────────────────────
+      // ── AKZEPTIERT: mit Fahrer chatten + zurückziehen ────────
       case AnfrageStatus.akzeptiert:
-        return SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blueAccent,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 7),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blueAccent,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 7),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              icon: const Icon(Icons.chat_bubble_outline, size: 14),
+              label: const Text(
+                'Mit Fahrer chatten',
+                style: TextStyle(fontSize: 12),
+              ),
+              onPressed: widget.openChat,
             ),
-            icon: const Icon(Icons.chat_bubble_outline, size: 14),
-            label: const Text(
-              'Mit Fahrer chatten',
-              style: TextStyle(fontSize: 12),
+            const SizedBox(height: 6),
+            OutlinedButton.icon(
+              onPressed: () async {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    backgroundColor: const Color(0xFF1A1F2E),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                    title: const Text('Anfrage zurückziehen?',
+                        style:
+                            TextStyle(color: Colors.white, fontSize: 16)),
+                    content: const Text(
+                      'Möchtest du deine akzeptierte Anfrage wirklich zurückziehen? Der Fahrer wird benachrichtigt und dein Platz wird wieder freigegeben.',
+                      style:
+                          TextStyle(color: Colors.white70, fontSize: 14),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Abbrechen',
+                            style: TextStyle(color: Colors.white54)),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('Zurückziehen',
+                            style: TextStyle(
+                                color: Colors.redAccent,
+                                fontWeight: FontWeight.w600)),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed == true && mounted) {
+                  _stornieren(sendChatMessage: true);
+                }
+              },
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.redAccent,
+                side: const BorderSide(color: Colors.redAccent, width: 1),
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              icon: const Icon(Icons.cancel_outlined, size: 14),
+              label: const Text('Anfrage zurückziehen',
+                  style: TextStyle(fontSize: 12)),
             ),
-            onPressed: widget.openChat,
-          ),
+          ],
         );
 
       // ── ABGELEHNT: andere Fahrt finden ────────────────────────
