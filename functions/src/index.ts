@@ -102,17 +102,24 @@ export const onAnfrageUpdated = onDocumentUpdated(
     if (!statusText) return;
 
     const vonFahrer = after["vonFahrer"] === true;
-    const targetUserId = vonFahrer
+    // D1-Fix: Mitfahrer storniert eigene Anfrage → Fahrer benachrichtigen, nicht Mitfahrer
+    const isMitfahrerStorniert = !vonFahrer && statusAfter === 3;
+    const targetUserId = (vonFahrer || statusAfter === 3)
       ? (after["fahrtOwnerId"] as string | undefined)
       : (after["requesterId"] as string | undefined);
     if (!targetUserId) return;
 
-    const title = vonFahrer
-      ? `Einladung ${statusText}`
-      : `Anfrage ${statusText}`;
-    const body = vonFahrer
-      ? `${after["requesterName"] ?? "Ein Nutzer"} hat deine Einladung ${statusText}`
-      : `${after["fahrerName"] ?? "Der Fahrer"} hat deine Anfrage ${statusText}`;
+    let title: string;
+    let body: string;
+    if (isMitfahrerStorniert) {
+      title = "Anfrage zurückgezogen";
+      body = `${after["requesterName"] ?? "Ein Mitfahrer"} hat die Anfrage zurückgezogen`;
+    } else {
+      title = vonFahrer ? `Einladung ${statusText}` : `Anfrage ${statusText}`;
+      body = vonFahrer
+        ? `${after["requesterName"] ?? "Ein Nutzer"} hat deine Einladung ${statusText}`
+        : `${after["fahrerName"] ?? "Der Fahrer"} hat deine Anfrage ${statusText}`;
+    }
 
     const tokens = await getTokens(targetUserId);
     if (!tokens.length) return;
@@ -613,8 +620,9 @@ export const onMessageCreated = onDocumentCreated(
 export const onEventRequestUpdated = onDocumentUpdated(
   "eventRequests/{requestId}",
   async (event) => {
-    const before = event.data.before.data();
-    const after = event.data.after.data();
+    const before = event.data?.before?.data();
+    const after = event.data?.after?.data();
+    if (!before || !after) return;
 
     if (before["status"] !== "pending" || after["status"] !== "approved") return;
 
