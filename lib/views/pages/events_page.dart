@@ -1,6 +1,7 @@
 // events_page.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:my_app/utils/platform_pickers.dart';
 import 'package:my_app/views/widgets/places_autocomplete_field.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
 import 'package:provider/provider.dart';
@@ -379,12 +380,11 @@ class _EventsPageState extends State<EventsPage> {
                   ),
                   readOnly: true,
                   onTap: () async {
-                    DateTime? pickedDate = await showDatePicker(
-                      context: context,
+                    DateTime? pickedDate = await showPlatformDatePicker(
+                      context,
                       initialDate: widget.event?.datum.toLocal() ?? DateTime.now(),
                       firstDate: DateTime(2000),
                       lastDate: DateTime(2100),
-                      locale: const Locale('de', 'DE'),
                     );
                     if (pickedDate != null) {
                       setState(() {

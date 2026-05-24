@@ -101,7 +101,10 @@ class _SettingsPageState extends State<SettingsPage> {
             builder: (context, snapshot) {
               final user = snapshot.data;
               final auth = context.read<IAuthRepository>();
-              return Padding(
+              return GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: () => FocusScope.of(context).unfocus(),
+                child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: ListView(
                   children: [
@@ -376,6 +379,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       ),
                     ],
                   ],
+                ),
                 ),
               );
             },

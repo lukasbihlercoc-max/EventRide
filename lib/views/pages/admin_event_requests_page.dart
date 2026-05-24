@@ -1,6 +1,7 @@
 // admin_event_requests_page.dart
 import 'dart:typed_data';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:my_app/utils/platform_pickers.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:my_app/views/widgets/places_autocomplete_field.dart';
@@ -484,12 +485,11 @@ class _ReviewSheetState extends State<_ReviewSheet> {
                     .parseStrict(_datumCtrl.text.trim(), true);
               } catch (_) {}
             }
-            final picked = await showDatePicker(
-              context: context,
+            final picked = await showPlatformDatePicker(
+              context,
               initialDate: initial,
               firstDate: DateTime(2000),
               lastDate: DateTime(2100),
-              locale: const Locale('de', 'DE'),
             );
             if (picked != null) {
               setState(() {

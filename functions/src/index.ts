@@ -124,10 +124,27 @@ export const onAnfrageUpdated = onDocumentUpdated(
     const tokens = await getTokens(targetUserId);
     if (!tokens.length) return;
 
+    let notifData: Record<string, string>;
+    if (isMitfahrerStorniert) {
+      const ownerId = after["fahrtOwnerId"] as string | undefined;
+      const requesterId = after["requesterId"] as string | undefined;
+      const conversationId =
+        fahrtId && ownerId && requesterId
+          ? `${fahrtId}_${[ownerId, requesterId].sort().join("_")}`
+          : "";
+      notifData = {
+        type: "storno_chat",
+        conversationId,
+        senderId: requesterId ?? "",
+      };
+    } else {
+      notifData = {type: "anfrage", anfrageId: event.params["anfrageId"]};
+    }
+
     await sendNotification(tokens, targetUserId, {
       title,
       body,
-      data: {type: "anfrage", anfrageId: event.params["anfrageId"]},
+      data: notifData,
     });
   }
 );
@@ -664,5 +681,58 @@ export const cleanupAbgelaufeneAnfragen = onSchedule(
     await batch.commit();
 
     console.log(`Cleanup: ${snapshot.size} abgelaufene Anfragen gelöscht`);
+  }
+);
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Täglicher Cleanup: abgelaufene Events + verknüpfte Daten löschen
+// Reihenfolge: anfragen → fahrten → interessenten → event
+// anfragen zuerst, damit onFahrtDeleted keine Spurious-Notifications schickt
+// ──────────────────────────────────────────────────────────────────────────────
+
+export const cleanupAbgelaufeneEvents = onSchedule(
+  {schedule: "every day 04:00", timeZone: "Europe/Vienna"},
+  async () => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 1);
+    cutoff.setUTCHours(0, 0, 0, 0);
+    const cutoffStr = cutoff.toISOString();
+
+    const eventsSnap = await db.collection("events")
+      .where("datum", "<", cutoffStr)
+      .get();
+    if (eventsSnap.empty) return;
+
+    for (const eventDoc of eventsSnap.docs) {
+      const eventId = eventDoc.id;
+
+      const anfragenSnap = await db.collection("anfragen")
+        .where("eventId", "==", eventId).get();
+      if (!anfragenSnap.empty) {
+        const batch = db.batch();
+        anfragenSnap.docs.forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+      }
+
+      const fahrtenSnap = await db.collection("fahrten")
+        .where("eventId", "==", eventId).get();
+      if (!fahrtenSnap.empty) {
+        const batch = db.batch();
+        fahrtenSnap.docs.forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+      }
+
+      const interessentenSnap = await db.collection("interessenten")
+        .where("eventId", "==", eventId).get();
+      if (!interessentenSnap.empty) {
+        const batch = db.batch();
+        interessentenSnap.docs.forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+      }
+
+      await eventDoc.ref.delete();
+    }
+
+    console.log(`[cleanupAbgelaufeneEvents] ${eventsSnap.size} Events + verknüpfte Daten gelöscht`);
   }
 );

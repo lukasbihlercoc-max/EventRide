@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +7,7 @@ import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/data/interfaces/i_user_repository.dart';
 
 import 'package:my_app/data/chat_service.dart';
+import 'package:my_app/data/notification_service.dart';
 import 'package:my_app/data/chat_message.dart';
 import 'package:my_app/data/notifiers.dart';
 import 'package:my_app/views/auth/verification_guard.dart';
@@ -30,7 +32,7 @@ class ChatPage extends StatefulWidget {
   State<ChatPage> createState() => _ChatPageState();
 }
 
-class _ChatPageState extends State<ChatPage> {
+class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   late final String _myUserId;
@@ -38,7 +40,8 @@ class _ChatPageState extends State<ChatPage> {
   late final ChatService _chatService;
 
   bool _isSending = false;
-  DateTime? _otherUserLastSeen;
+  final _lastSeenNotifier = ValueNotifier<DateTime?>(null);
+  final _tickNotifier = ValueNotifier<int>(0);
   StreamSubscription<DateTime?>? _lastSeenSub;
   Timer? _statusRefreshTimer;
   final _scrolledPast = ValueNotifier<bool>(false);
@@ -51,10 +54,12 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _myUserId = context.read<IAuthRepository>().currentUser?.userId ?? '';
     _chatService = context.read<ChatService>();
     _messagesStream = _chatService.messagesStream(widget.conversationId);
     activeChatConversationId.value = widget.conversationId;
+    context.read<NotificationService>().cancelChatNotification(widget.conversationId);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -69,14 +74,12 @@ class _ChatPageState extends State<ChatPage> {
         .read<IUserRepository>()
         .lastSeenStream(widget.otherUserId)
         .listen(
-      (dt) {
-        if (mounted) setState(() => _otherUserLastSeen = dt);
-      },
+      (dt) => _lastSeenNotifier.value = dt,
       onError: (_) {}, // lastSeen ist optional – Fehler ignorieren
     );
 
     _statusRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (mounted && _otherUserLastSeen != null) setState(() {});
+      if (mounted && _lastSeenNotifier.value != null) _tickNotifier.value++;
     });
 
     _scrollController.addListener(() {
@@ -110,41 +113,63 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (_myUserId.isNotEmpty) {
       _chatService.markConversationRead(widget.conversationId, _myUserId);
     }
     activeChatConversationId.value = null;
     _lastSeenSub?.cancel();
     _statusRefreshTimer?.cancel();
+    _lastSeenNotifier.dispose();
+    _tickNotifier.dispose();
     _scrolledPast.dispose();
     _scrollController.dispose();
     _controller.dispose();
     super.dispose();
   }
 
+  @override
+  void didChangeMetrics() {
+    final bottom = View.of(context).viewInsets.bottom;
+    if (bottom > 100) _scrollToBottom();
+  }
+
+  bool get _isNearBottom {
+    if (!_scrollController.hasClients) return true;
+    return _scrollController.position.maxScrollExtent -
+            _scrollController.offset <
+        250;
+  }
+
   Widget _appBarTitle() {
-    final subtitle = _lastSeenText(_otherUserLastSeen);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        UserAvatarById(
-          userId: widget.otherUserId,
-          name: widget.otherUserName,
-          radius: 18,
-        ),
-        const SizedBox(width: 10),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return ListenableBuilder(
+      listenable: Listenable.merge([_lastSeenNotifier, _tickNotifier]),
+      builder: (context, _) {
+        final subtitle = _lastSeenText(_lastSeenNotifier.value);
+        return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(widget.otherUserName,
-                style: const TextStyle(fontSize: 16, height: 1.2)),
-            if (subtitle != null)
-              Text(subtitle,
-                  style: const TextStyle(fontSize: 11, color: Colors.white60)),
+            UserAvatarById(
+              userId: widget.otherUserId,
+              name: widget.otherUserName,
+              radius: 18,
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(widget.otherUserName,
+                    style: const TextStyle(fontSize: 16, height: 1.2)),
+                if (subtitle != null)
+                  Text(subtitle,
+                      style:
+                          const TextStyle(fontSize: 11, color: Colors.white60)),
+              ],
+            ),
           ],
-        ),
-      ],
+        );
+      },
     );
   }
 
@@ -179,7 +204,9 @@ class _ChatPageState extends State<ChatPage> {
 
         if (userMessages.length != _prevMessageCount) {
           _prevMessageCount = userMessages.length;
-          _scrollToBottom();
+          final isOwnMessage = userMessages.isNotEmpty &&
+              userMessages.last.senderId == _myUserId;
+          if (isOwnMessage || _isNearBottom) _scrollToBottom();
           if (_myUserId.isNotEmpty) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted) {
@@ -211,6 +238,10 @@ class _ChatPageState extends State<ChatPage> {
                     Expanded(
                       child: ListView.builder(
                         controller: _scrollController,
+                        physics: Platform.isIOS
+                            ? const BouncingScrollPhysics(
+                                parent: AlwaysScrollableScrollPhysics())
+                            : const ClampingScrollPhysics(),
                         padding: EdgeInsets.fromLTRB(
                           16,
                           16 +
@@ -877,14 +908,14 @@ Widget _buildMessageBubble(ChatMessage msg, String myUserId, {bool isLastInGroup
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.08),
+            color: Colors.redAccent.withValues(alpha: 0.10),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Text(
             msg.text,
             style: const TextStyle(
               fontSize: 12,
-              color: Colors.white54,
+              color: Colors.redAccent,
               fontStyle: FontStyle.italic,
             ),
             textAlign: TextAlign.center,

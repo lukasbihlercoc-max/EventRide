@@ -212,6 +212,10 @@ class NotificationService {
     _knownLastMessageAt.clear();
   }
 
+  Future<void> cancelChatNotification(String conversationId) async {
+    await _localNotifications.cancel(conversationId.hashCode);
+  }
+
   void _showChatLocalNotification(ChatConversation conv) {
     final preview = conv.lastMessage ?? 'Neue Nachricht';
     _localNotifications.show(
@@ -268,6 +272,12 @@ class NotificationService {
     }
     final type = data['type'] as String?;
     if (type == 'chat') {
+      final convId = data['conversationId'] as String?;
+      final senderId = data['senderId'] as String?;
+      if (convId != null && senderId != null && senderId.isNotEmpty) {
+        onChatTapped?.call(convId, senderId);
+      }
+    } else if (type == 'storno_chat') {
       final convId = data['conversationId'] as String?;
       final senderId = data['senderId'] as String?;
       if (convId != null && senderId != null && senderId.isNotEmpty) {

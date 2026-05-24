@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
+import 'package:my_app/utils/platform_pickers.dart';
 import 'package:flutter/material.dart';
 import 'package:google_places_flutter/google_places_flutter.dart';
 import 'package:google_places_flutter/model/place_type.dart';
@@ -422,8 +423,8 @@ class _FahrtAnbietenPageState extends State<FahrtAnbietenPage>
         ),
         TextButton(
           onPressed: () async {
-            final picked = await showTimePicker(
-              context: context,
+            final picked = await showPlatformTimePicker(
+              context,
               initialTime: TimeOfDay.now(),
             );
 

@@ -40,7 +40,10 @@ class _LoginPageState extends State<LoginPage> {
             elevation: 0,
             automaticallyImplyLeading: Navigator.canPop(context),
           ),
-          body: SingleChildScrollView(
+          body: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () => FocusScope.of(context).unfocus(),
+            child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Form(
               key: _formKey,
@@ -198,6 +201,7 @@ class _LoginPageState extends State<LoginPage> {
                 ],
               ),
             ),
+          ),
           ),
         ),
       ],

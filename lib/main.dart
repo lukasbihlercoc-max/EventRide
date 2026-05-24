@@ -1,5 +1,6 @@
 // lib/main.dart
 import 'dart:async';
+import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -376,16 +377,18 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             navigatorKey: navigatorKey,
             debugShowCheckedModeBanner: false,
             theme: ThemeData(
-              textTheme: GoogleFonts.poppinsTextTheme(
-                Theme.of(context).textTheme,
-              ),
+              textTheme: Platform.isIOS
+                  ? _buildIosTextTheme(Theme.of(context).textTheme)
+                  : GoogleFonts.poppinsTextTheme(
+                      Theme.of(context).textTheme,
+                    ),
               colorSchemeSeed: Colors.blueAccent,
               brightness:
                   isDarkMode ? Brightness.dark : Brightness.light,
               pageTransitionsTheme: const PageTransitionsTheme(
                 builders: {
                   TargetPlatform.android: _SlideTransitionsBuilder(),
-                  TargetPlatform.iOS: _SlideTransitionsBuilder(),
+                  TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
                   TargetPlatform.macOS: _SlideTransitionsBuilder(),
                 },
               ),
@@ -405,3 +408,19 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     );
   }
 }
+
+TextTheme _buildIosTextTheme(TextTheme base) => base.copyWith(
+      displayLarge: base.displayLarge?.copyWith(fontWeight: FontWeight.w600),
+      displayMedium: base.displayMedium?.copyWith(fontWeight: FontWeight.w600),
+      displaySmall: base.displaySmall?.copyWith(fontWeight: FontWeight.w600),
+      headlineLarge: base.headlineLarge?.copyWith(fontWeight: FontWeight.w600),
+      headlineMedium:
+          base.headlineMedium?.copyWith(fontWeight: FontWeight.w600),
+      headlineSmall: base.headlineSmall?.copyWith(fontWeight: FontWeight.w500),
+      titleLarge: base.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+      titleMedium: base.titleMedium?.copyWith(fontWeight: FontWeight.w500),
+      titleSmall: base.titleSmall?.copyWith(fontWeight: FontWeight.w500),
+      labelLarge: base.labelLarge?.copyWith(fontWeight: FontWeight.w500),
+      bodyLarge: base.bodyLarge?.copyWith(fontWeight: FontWeight.w400),
+      bodyMedium: base.bodyMedium?.copyWith(fontWeight: FontWeight.w400),
+    );

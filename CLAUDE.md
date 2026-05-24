@@ -330,6 +330,6 @@ Gefunden beim ersten Zwei-Nutzer-Test auf iOS (2026-05-21). Priorisiert nach Kri
 | 2 | B – iOS Tap-Handler Bug | ~1–2h | ✅ umgesetzt – noch nicht auf Gerät getestet |
 | 3 | C – Anfrage zurückziehen (inkl. E1) | ~2h | ✅ umgesetzt – noch nicht auf Gerät getestet |
 | 4 | D1+D2 – Notification-Bugs | ~1h | ✅ umgesetzt – noch nicht auf Gerät getestet |
-| 5 | D3 – Chat-Notifications clearen | ~1h | |
-| 6 | F – Alte Events löschen | ~15min | |
-| 7 | E2 – iOS Design-Polishing | eigene Session | |
+| 5 | D3 – Chat-Notifications clearen | ~1h | ✅ umgesetzt – noch nicht auf Gerät getestet |
+| 6 | F – Alte Events löschen | ~15min | ✅ umgesetzt – noch nicht auf Gerät getestet |
+| 7 | E2 – iOS Design-Polishing | eigene Session | ✅ umgesetzt – noch nicht auf Gerät getestet |

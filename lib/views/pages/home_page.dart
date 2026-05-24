@@ -1,6 +1,8 @@
 // home_page.dart
+import 'dart:io';
 import 'dart:ui';
 import 'package:my_app/utils/app_route.dart';
+import 'package:my_app/utils/platform_pickers.dart';
 import 'package:my_app/utils/geo_utils.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -524,8 +526,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
+    final picked = await showPlatformDatePicker(
+      context,
       initialDate: selectedDatumNotifier.value ?? DateTime.now(),
       firstDate: DateTime.now().subtract(const Duration(days: 1)),
       lastDate: DateTime.now().add(const Duration(days: 365)),
@@ -883,7 +885,10 @@ class _HomePageState extends State<HomePage> {
               }).toList();
 
               return CustomScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
+                physics: Platform.isIOS
+                    ? const BouncingScrollPhysics(
+                        parent: AlwaysScrollableScrollPhysics())
+                    : const AlwaysScrollableScrollPhysics(),
                 keyboardDismissBehavior:
                     ScrollViewKeyboardDismissBehavior.onDrag,
                 slivers: [

@@ -1,6 +1,7 @@
 // event_submit_page.dart
 import 'dart:io';
 import 'dart:async';
+import 'package:my_app/utils/platform_pickers.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:my_app/views/widgets/places_autocomplete_field.dart';
@@ -376,12 +377,11 @@ class _EventSubmitPageState extends State<EventSubmitPage> {
           ),
           readOnly: true,
           onTap: () async {
-            final picked = await showDatePicker(
-              context: context,
+            final picked = await showPlatformDatePicker(
+              context,
               initialDate: DateTime.now(),
               firstDate: DateTime(2000),
               lastDate: DateTime(2100),
-              locale: const Locale('de', 'DE'),
             );
             if (picked != null) {
               setState(() {

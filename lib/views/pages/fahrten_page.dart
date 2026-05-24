@@ -2346,7 +2346,7 @@ class _MitfahrerAktionenState extends State<_MitfahrerAktionen> {
             fahrtId: widget.fahrt.id,
             ownerId: widget.fahrt.ownerId,
             requesterId: widget.anfrage.requesterId,
-            text: 'Mitfahrer hat die akzeptierte Anfrage zurückgezogen.',
+            text: 'Anfrage zurückgezogen – Platz wurde wieder freigegeben.',
             eventName: widget.fahrt.eventName,
             startOrt: widget.fahrt.abfahrtsort,
             zielOrt: widget.fahrt.standort,
@@ -2385,7 +2385,7 @@ class _MitfahrerAktionenState extends State<_MitfahrerAktionen> {
               ),
               tooltip: 'Chat öffnen',
             ),
-            TextButton.icon(
+            TextButton(
               onPressed: () async {
                 final confirmed = await showDialog<bool>(
                   context: context,
@@ -2418,16 +2418,19 @@ class _MitfahrerAktionenState extends State<_MitfahrerAktionen> {
                 if (confirmed == true) _stornieren();
               },
               style: TextButton.styleFrom(
-                foregroundColor: Colors.redAccent,
+                foregroundColor: Colors.white38,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 minimumSize: Size.zero,
               ),
-              icon: const Icon(Icons.cancel_outlined, size: 14),
-              label: const Text(
+              child: const Text(
                 'Anfrage zurückziehen',
-                style: TextStyle(fontSize: 12),
+                style: TextStyle(
+                  fontSize: 12,
+                  decoration: TextDecoration.underline,
+                  decorationColor: Colors.white24,
+                ),
               ),
             ),
           ],
@@ -2457,7 +2460,7 @@ class _MitfahrerAktionenState extends State<_MitfahrerAktionen> {
               onPressed: widget.openChat,
             ),
             const SizedBox(height: 6),
-            OutlinedButton.icon(
+            TextButton(
               onPressed: () async {
                 final confirmed = await showDialog<bool>(
                   context: context,
@@ -2466,12 +2469,11 @@ class _MitfahrerAktionenState extends State<_MitfahrerAktionen> {
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16)),
                     title: const Text('Anfrage zurückziehen?',
-                        style:
-                            TextStyle(color: Colors.white, fontSize: 16)),
+                        style: TextStyle(color: Colors.white, fontSize: 16)),
                     content: const Text(
-                      'Möchtest du deine akzeptierte Anfrage wirklich zurückziehen? Der Fahrer wird benachrichtigt und dein Platz wird wieder freigegeben.',
-                      style:
-                          TextStyle(color: Colors.white70, fontSize: 14),
+                      'Möchtest du deine akzeptierte Anfrage wirklich zurückziehen?\n\n'
+                      'Der Fahrer wird benachrichtigt und dein Platz wird wieder freigegeben.',
+                      style: TextStyle(color: Colors.white70, fontSize: 14),
                     ),
                     actions: [
                       TextButton(
@@ -2493,17 +2495,21 @@ class _MitfahrerAktionenState extends State<_MitfahrerAktionen> {
                   _stornieren(sendChatMessage: true);
                 }
               },
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.redAccent,
-                side: const BorderSide(color: Colors.redAccent, width: 1),
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.redAccent.withValues(alpha: 0.7),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                minimumSize: Size.zero,
               ),
-              icon: const Icon(Icons.cancel_outlined, size: 14),
-              label: const Text('Anfrage zurückziehen',
-                  style: TextStyle(fontSize: 12)),
+              child: const Text(
+                'Anfrage zurückziehen',
+                style: TextStyle(
+                  fontSize: 12,
+                  decoration: TextDecoration.underline,
+                  decorationColor: Colors.redAccent,
+                ),
+              ),
             ),
           ],
         );

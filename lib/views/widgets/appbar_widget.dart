@@ -1,4 +1,6 @@
 // appbar_widget.dart
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:my_app/views/widgets/calendar_widget.dart';
@@ -44,7 +46,9 @@ class AppBarWidget extends StatelessWidget implements PreferredSizeWidget {
                         text: TextSpan(
                           style: TextStyle(
                             fontSize: SizeHelper.w(context, 0.055),
-                            fontWeight: FontWeight.bold,
+                            fontWeight: Platform.isIOS
+                                ? FontWeight.w600
+                                : FontWeight.bold,
                             letterSpacing: 0.5,
                           ),
                           children: const [
@@ -74,7 +78,8 @@ class AppBarWidget extends StatelessWidget implements PreferredSizeWidget {
                 Text(
                   title,
                   style: TextStyle(
-                    fontWeight: FontWeight.bold,
+                    fontWeight:
+                        Platform.isIOS ? FontWeight.w600 : FontWeight.bold,
                     fontSize: SizeHelper.w(context, 0.045),
                     color: Colors.white,
                   ),
