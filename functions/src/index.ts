@@ -76,9 +76,12 @@ export const onAnfrageUpdated = onDocumentUpdated(
 
     // ── freiePlaetze atomisch anpassen ──────────────────────────────────────
     const fahrtId = after["fahrtId"] as string | undefined;
+    const vonFahrer = after["vonFahrer"] === true;
     if (fahrtId) {
-      if (statusAfter === 1) {
-        // akzeptiert: Platz(e) belegen
+      if (statusAfter === 1 && !vonFahrer) {
+        // Normale Anfrage akzeptiert (Mitfahrer hat angefragt, Fahrer akzeptiert):
+        // Platz(e) belegen. Bei vonFahrer=true übernimmt acceptInvitation die
+        // atomare Dekrement innerhalb der Transaction.
         const seats = (after["seatsAccepted"] as number | undefined) ?? 1;
         await db.doc(`fahrten/${fahrtId}`).update({
           freiePlaetze: admin.firestore.FieldValue.increment(-seats),
@@ -372,20 +375,11 @@ export const acceptInvitation = onCall(async (request) => {
     .filter((d) => d.id !== anfrageId)
     .map((d) => d.id);
 
-  // (3) Kapazitäts-Check
-  const fahrtDoc = await db.doc(`fahrten/${fahrtId}`).get();
-  if (!fahrtDoc.exists) {
-    throw new HttpsError("not-found", "Fahrt nicht gefunden");
-  }
-  const freiePlaetze = (fahrtDoc.data()!["freiePlaetze"] as number | undefined) ?? 0;
-  if (freiePlaetze < seatsAccepted) {
-    throw new HttpsError("failed-precondition", "Keine freien Plätze mehr");
-  }
-
-  // (4) Atomare Transaction
+  // (3) Atomare Transaction — Kapazitätsprüfung + Dekrement darin (Race-Condition-Schutz)
+  const fahrtRef = db.doc(`fahrten/${fahrtId}`);
   const now = Date.now();
   await db.runTransaction(async (txn) => {
-    // Status nochmals prüfen (Race-Condition-Schutz)
+    // Anfrage-Status prüfen
     const latest = await txn.get(anfrageRef);
     if (!latest.exists || latest.data()!["status"] !== 0) {
       throw new HttpsError(
@@ -394,8 +388,19 @@ export const acceptInvitation = onCall(async (request) => {
       );
     }
 
-    // Annehmen
+    // Kapazität atomar prüfen und belegen
+    const fahrtSnap = await txn.get(fahrtRef);
+    if (!fahrtSnap.exists) {
+      throw new HttpsError("not-found", "Fahrt nicht gefunden");
+    }
+    const aktuellFreiePlaetze = (fahrtSnap.data()!["freiePlaetze"] as number | undefined) ?? 0;
+    if (aktuellFreiePlaetze < seatsAccepted) {
+      throw new HttpsError("failed-precondition", "Keine freien Plätze mehr");
+    }
+
+    // Annehmen + Platz belegen
     txn.update(anfrageRef, {status: 1, seatsAccepted, updatedAt: now});
+    txn.update(fahrtRef, {freiePlaetze: admin.firestore.FieldValue.increment(-seatsAccepted)});
 
     // Andere offene Einladungen stornieren
     for (const id of otherOpenIds) {

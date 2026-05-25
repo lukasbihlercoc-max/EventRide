@@ -15,7 +15,8 @@ class RideRequestService {
     required String userName,
     String? message,
   }) async {
-    // Schutz vor Mehrfachanfrage
+    // Schutz vor Selbst-Anfrage und Mehrfachanfrage
+    if (userId == fahrt.ownerId) return false;
     final existing = _anfrageService
         .getAnfragenForFahrt(fahrt.id)
         .any((a) => a.requesterId == userId);

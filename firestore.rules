@@ -79,9 +79,11 @@ service cloud.firestore {
                     && (request.auth.uid == resource.data.requesterId
                         || request.auth.uid == resource.data.fahrtOwnerId);
       // Mitfahrer erstellt eigene Anfrage ODER Fahrer lädt Interessenten ein
+      // Selbst-Anfragen (requesterId == fahrtOwnerId) sind nicht erlaubt
       allow create: if isSignedIn()
                     && (request.resource.data.requesterId == request.auth.uid
                         || request.resource.data.fahrtOwnerId == request.auth.uid)
+                    && request.resource.data.requesterId != request.resource.data.fahrtOwnerId
                     && request.resource.data.keys().hasAll([
                          'id', 'fahrtId', 'requesterId', 'fahrtOwnerId', 'status'
                        ]);
