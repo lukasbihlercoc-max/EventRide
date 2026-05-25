@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
@@ -561,6 +562,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 final text = _controller.text.trim();
                 if (text.isEmpty) return;
                 setState(() => _isSending = true);
+                _controller.clear();
                 final ctx = context;
                 try {
                   await chatService.sendMessage(
@@ -568,14 +570,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     senderId: _myUserId,
                     text: text,
                   );
-                  _controller.clear();
-                } catch (_) {
-                  if (!ctx.mounted) return;
-                  AppSnackbar.show(
-                    ctx,
-                    message: 'Nachricht konnte nicht gesendet werden.',
-                    accentColor: Colors.redAccent,
+                } catch (e) {
+                  _controller.text = text;
+                  _controller.selection = TextSelection.fromPosition(
+                    TextPosition(offset: text.length),
                   );
+                  if (!ctx.mounted) return;
+                  final msg = e is FirebaseException
+                      ? (e.message ?? e.toString())
+                      : e.toString();
+                  AppSnackbar.show(ctx, message: msg, accentColor: Colors.redAccent);
                 } finally {
                   if (mounted) setState(() => _isSending = false);
                 }
