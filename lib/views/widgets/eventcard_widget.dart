@@ -111,7 +111,7 @@ class EventCard extends StatelessWidget {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    DateFormat('E dd.MM.yyyy', 'de_DE').format(event.datum),
+                    _eventDatumLabel(event.datum),
                     style: const TextStyle(
                       color: Color.fromARGB(232, 255, 255, 255),
                       fontSize: 16,
@@ -202,4 +202,17 @@ class EventCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String _eventDatumLabel(DateTime datum) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final d = DateTime(datum.year, datum.month, datum.day);
+  final diff = d.difference(today).inDays;
+  final ds = DateFormat('dd.MM.', 'de_DE').format(datum);
+  if (diff == 0) return 'Heute, $ds';
+  if (diff == 1) return 'Morgen, $ds';
+  if (diff == 2) return 'Übermorgen, $ds';
+  if (diff > 2 && diff <= 6) return DateFormat('E, dd.MM.', 'de_DE').format(datum);
+  return DateFormat('E dd.MM.yy', 'de_DE').format(datum);
 }

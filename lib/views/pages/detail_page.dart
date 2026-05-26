@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
@@ -800,6 +801,7 @@ class _InteressentenInlineState extends State<_InteressentenInline>
   }
 
   Future<void> _toggle(AppUser currentUser) async {
+    HapticFeedback.lightImpact();
     final authRepo = context.read<IAuthRepository>();
     final interessentenService = context.read<InteressentenService>();
     final bezirk = await authRepo.getHomeTown();
@@ -854,6 +856,7 @@ class _EinladungsBottomSheetState extends State<_EinladungsBottomSheet> {
   bool _angenommen = false;
 
   Future<void> _annehmen() async {
+    HapticFeedback.mediumImpact();
     setState(() => _loading = true);
     final anfrageService = context.read<AnfrageService>();
     try {
@@ -880,6 +883,7 @@ class _EinladungsBottomSheetState extends State<_EinladungsBottomSheet> {
   }
 
   Future<void> _ablehnen() async {
+    HapticFeedback.mediumImpact();
     setState(() => _loading = true);
     final chatService = context.read<ChatService>();
     await context.read<AnfrageService>().ablehnenAnfrage(widget.einladung);
@@ -1184,6 +1188,7 @@ class _EinladungCardState extends State<_EinladungCard> {
   bool _abgelehnt = false;
 
   Future<void> _annehmen() async {
+    HapticFeedback.mediumImpact();
     setState(() => _loading = true);
     final anfrageService = context.read<AnfrageService>();
     try {
@@ -1210,6 +1215,7 @@ class _EinladungCardState extends State<_EinladungCard> {
   }
 
   Future<void> _ablehnen() async {
+    HapticFeedback.mediumImpact();
     setState(() => _loading = true);
     await context.read<AnfrageService>().ablehnenAnfrage(widget.einladung);
     if (mounted) setState(() { _loading = false; _abgelehnt = true; });

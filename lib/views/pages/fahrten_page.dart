@@ -404,20 +404,24 @@ class _LoggedInFahrtenViewState extends State<_LoggedInFahrtenView>
     return AppBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        body: Column(
-          children: [
-            _FahrtenTabBar(userId: userId, tabController: _tabController),
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                physics: const NeverScrollableScrollPhysics(),
-                children: [
-                  _AngefragteFahrtenTab(userId: userId),
-                  _AngeboteneFahrtenTab(userId: userId),
-                ],
+        body: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: Column(
+            children: [
+              _FahrtenTabBar(userId: userId, tabController: _tabController),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: [
+                    _AngefragteFahrtenTab(userId: userId),
+                    _AngeboteneFahrtenTab(userId: userId),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

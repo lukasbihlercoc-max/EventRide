@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/data/interfaces/i_user_repository.dart';
@@ -239,6 +240,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     Expanded(
                       child: ListView.builder(
                         controller: _scrollController,
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
                         physics: Platform.isIOS
                             ? const BouncingScrollPhysics(
                                 parent: AlwaysScrollableScrollPhysics())
@@ -561,6 +564,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 if (_isSending) return;
                 final text = _controller.text.trim();
                 if (text.isEmpty) return;
+                HapticFeedback.mediumImpact();
                 setState(() => _isSending = true);
                 _controller.clear();
                 final ctx = context;
