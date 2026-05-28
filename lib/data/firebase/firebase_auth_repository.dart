@@ -675,9 +675,12 @@ class FirebaseAuthRepository implements IAuthRepository {
     return _firestore
         .collection('eventRequests')
         .where('uid', isEqualTo: uid)
-        .orderBy('submittedAt', descending: true)
         .snapshots()
-        .map((s) => s.docs.map(EventRequest.fromDoc).toList());
+        .map((s) {
+      final list = s.docs.map(EventRequest.fromDoc).toList();
+      list.sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
+      return list;
+    });
   }
 
   @override

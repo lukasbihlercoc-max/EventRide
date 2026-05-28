@@ -1,4 +1,5 @@
 // admin_event_requests_page.dart
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:my_app/utils/platform_pickers.dart';
@@ -7,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:my_app/views/widgets/places_autocomplete_field.dart';
 import 'package:my_app/data/event_daten.dart';
 import 'package:my_app/data/event_request.dart';
+import 'package:my_app/data/event_service.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
@@ -16,6 +18,15 @@ const _kAccent = Color(0xFF5DA9FF);
 const _kOrange = Color(0xFFF5A04A);
 const _kGreen = Color(0xFF2D6A4F);
 const _kRed = Color(0xFFE63946);
+
+const _kTypLabels = {
+  'e0': 'Standart',
+  'e1': 'Kirchtag',
+  'e2': 'Feuerwehrfest',
+  'e3': 'Disco',
+  'e4': 'Ball',
+  'e5': 'Krampuslauf',
+};
 
 InputDecoration _inputStyle(String label, {Widget? suffixIcon}) {
   return InputDecoration(
@@ -251,6 +262,9 @@ class _ReviewSheetState extends State<_ReviewSheet> {
   bool _loadingFlyer = false;
   String? _flyerError;
 
+  // Ähnliche Events
+  List<Event> _similarEvents = [];
+  Timer? _debounceTimer;
 
   bool _actioning = false;
 
@@ -270,16 +284,143 @@ class _ReviewSheetState extends State<_ReviewSheet> {
     if (req.submissionType == 'flyer' && req.flyerPath != null) {
       _loadFlyer(req.flyerPath!);
     }
+
+    _nameCtrl.addListener(_onTextChanged);
+    _adresseCtrl.addListener(_onTextChanged);
   }
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _nameCtrl.dispose();
     _standortCtrl.dispose();
     _datumCtrl.dispose();
     _adresseCtrl.dispose();
     _beschreibungCtrl.dispose();
     super.dispose();
+  }
+
+  void _onTextChanged() {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(
+      const Duration(milliseconds: 800),
+      _updateSimilarEvents,
+    );
+  }
+
+  double _jaccard(String a, String b) {
+    final tokensA = a.toLowerCase().split(RegExp(r'\s+')).where((t) => t.length > 1).toSet();
+    final tokensB = b.toLowerCase().split(RegExp(r'\s+')).where((t) => t.length > 1).toSet();
+    if (tokensA.isEmpty && tokensB.isEmpty) return 1.0;
+    if (tokensA.isEmpty || tokensB.isEmpty) return 0.0;
+    return tokensA.intersection(tokensB).length / tokensA.union(tokensB).length;
+  }
+
+  bool _sameCalendarDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  void _updateSimilarEvents() {
+    if (!mounted) return;
+    final enteredName = _nameCtrl.text.trim();
+    if (enteredName.isEmpty) {
+      setState(() => _similarEvents = []);
+      return;
+    }
+    DateTime? enteredDate;
+    try {
+      if (_datumCtrl.text.trim().isNotEmpty) {
+        enteredDate = DateFormat('dd.MM.yyyy').parseStrict(_datumCtrl.text.trim(), true);
+      }
+    } catch (_) {}
+    final enteredAdresse = _adresseCtrl.text.trim();
+    final allEvents = context.read<EventService>().events;
+    final scored = <({Event event, double score})>[];
+    for (final candidate in allEvents) {
+      final nameScore = _jaccard(enteredName, candidate.name);
+      final dateScore = (enteredDate != null && _sameCalendarDay(enteredDate, candidate.datum.toLocal())) ? 1.0 : 0.0;
+      final addrScore = enteredAdresse.isNotEmpty ? _jaccard(enteredAdresse, candidate.adresse) : 0.0;
+      final composite = nameScore * 0.5 + dateScore * 0.3 + addrScore * 0.2;
+      if (composite >= 0.3 || nameScore >= 0.7) {
+        scored.add((event: candidate, score: composite));
+      }
+    }
+    scored.sort((a, b) => b.score.compareTo(a.score));
+    setState(() => _similarEvents = scored.take(5).map((r) => r.event).toList());
+  }
+
+  Widget _typBadge(String typKey) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: _kAccent.withValues(alpha: 0.18),
+        border: Border.all(color: _kAccent.withValues(alpha: 0.4)),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        _kTypLabels[typKey] ?? typKey,
+        style: const TextStyle(color: _kAccent, fontSize: 11, fontWeight: FontWeight.w500),
+      ),
+    );
+  }
+
+  Widget _buildSimilarEventsSection() {
+    if (_similarEvents.isEmpty) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.06),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.warning_amber_rounded, color: Color(0xFFF5A623), size: 18),
+              SizedBox(width: 8),
+              Text(
+                'Ähnliche Events gefunden',
+                style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Prüfe ob dieses Event bereits existiert.',
+            style: TextStyle(color: Colors.white54, fontSize: 12),
+          ),
+          const SizedBox(height: 12),
+          ...List.generate(_similarEvents.length, (i) {
+            final e = _similarEvents[i];
+            return Padding(
+              padding: EdgeInsets.only(top: i == 0 ? 0 : 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(e.name,
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
+                        const SizedBox(height: 2),
+                        Text(
+                          DateFormat('dd.MM.yyyy').format(e.datum.toLocal()),
+                          style: const TextStyle(color: Colors.white54, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _typBadge(e.typ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
   }
 
   Future<void> _loadFlyer(String path) async {
@@ -495,6 +636,7 @@ class _ReviewSheetState extends State<_ReviewSheet> {
               setState(() {
                 _datumCtrl.text = DateFormat('dd.MM.yyyy').format(picked);
               });
+              _updateSimilarEvents();
             }
           },
         ),
@@ -645,6 +787,8 @@ class _ReviewSheetState extends State<_ReviewSheet> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildFlyerSection(),
+                  _buildSimilarEventsSection(),
+                  if (_similarEvents.isNotEmpty) const SizedBox(height: 12),
                   _buildForm(),
                   const SizedBox(height: 20),
                 ],
