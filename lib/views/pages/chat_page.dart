@@ -580,9 +580,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     TextPosition(offset: text.length),
                   );
                   if (!ctx.mounted) return;
-                  final msg = e is FirebaseException
-                      ? (e.message ?? e.toString())
-                      : e.toString();
+                  final String msg;
+                  if (e is FirebaseException && e.code == 'permission-denied') {
+                    msg = 'E-Mail-Adresse bestätigen, um Nachrichten zu senden.';
+                  } else {
+                    msg = e is FirebaseException
+                        ? (e.message ?? e.toString())
+                        : e.toString();
+                  }
                   AppSnackbar.show(ctx, message: msg, accentColor: Colors.redAccent);
                 } finally {
                   if (mounted) setState(() => _isSending = false);

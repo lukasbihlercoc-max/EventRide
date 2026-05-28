@@ -11,6 +11,7 @@ import 'package:my_app/views/widgets/app_card.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/widgets/trust_shields_widget.dart';
+import 'package:my_app/views/widgets/app_bottom_sheet.dart';
 import 'package:my_app/views/widgets/review_card_widget.dart';
 import 'package:my_app/views/widgets/user_avatar_widget.dart';
 
@@ -409,44 +410,48 @@ class _ProfileHeader extends StatelessWidget {
       if (licenseVerified) 'Führerschein verifiziert',
     ];
 
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: Colors.transparent,
-        child: AppCard(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Verifikationen',
-                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 14),
-              if (verified.isEmpty)
-                const Text('Noch keine Verifikationen vorhanden.', style: TextStyle(color: Colors.white70))
-              else
-                ...verified.map((label) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.verified, size: 16, color: Color(0xFF4A80F0)),
-                          const SizedBox(width: 8),
-                          Text(label, style: const TextStyle(color: Colors.white70)),
-                        ],
-                      ),
-                    )),
-              const SizedBox(height: 16),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  child: const Text('OK', style: TextStyle(color: Colors.blueAccent)),
+    showAppSheet<void>(
+      context,
+      (ctx) => AppSheetShell(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppSheetHeader(
+              icon: Icons.verified_user_outlined,
+              iconColor: const Color(0xFF4A80F0),
+              title: 'Verifikationen',
+            ),
+            const SizedBox(height: 14),
+            if (verified.isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(left: 48),
+                child: Text(
+                  'Noch keine Verifikationen vorhanden.',
+                  style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.65),
+                      fontSize: 13.5),
                 ),
-              ),
-            ],
-          ),
+              )
+            else
+              ...verified.map((label) => Padding(
+                    padding: const EdgeInsets.only(left: 48, bottom: 8),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.check_circle_outline,
+                            size: 16, color: Color(0xFF4A80F0)),
+                        const SizedBox(width: 8),
+                        Text(label,
+                            style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.80),
+                                fontSize: 14)),
+                      ],
+                    ),
+                  )),
+            const SizedBox(height: 20),
+            AppSheetGhostButton(
+                label: 'Schließen', onTap: () => Navigator.pop(ctx)),
+          ],
         ),
       ),
     );

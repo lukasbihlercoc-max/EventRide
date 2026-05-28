@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/utils/app_route.dart';
 import 'package:my_app/views/pages/login_page.dart';
+import 'package:my_app/views/widgets/app_bottom_sheet.dart';
 import 'package:provider/provider.dart';
 
 /// Prüft ob der Nutzer angemeldet ist.
@@ -11,28 +12,19 @@ Future<bool> requiresLogin(BuildContext context) async {
   final auth = context.read<IAuthRepository>();
   if (auth.currentUser != null) return true;
 
-  final shouldLogin = await showDialog<bool>(
+  final shouldLogin = await showModalBottomSheet<bool>(
     context: context,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: Colors.grey[900],
-      title: const Text(
-        'Anmeldung erforderlich',
-        style: TextStyle(color: Colors.white),
-      ),
-      content: const Text(
-        'Für diese Aktion musst du angemeldet sein.',
-        style: TextStyle(color: Colors.white70),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: const Text('Abbrechen', style: TextStyle(color: Colors.white70)),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, true),
-          child: const Text('Anmelden', style: TextStyle(color: Colors.blueAccent)),
-        ),
-      ],
+    backgroundColor: Colors.transparent,
+    barrierColor: const Color(0x73080C16),
+    builder: (ctx) => AppBottomSheet(
+      icon: Icons.key_outlined,
+      iconColor: const Color(0xFFF5A04A),
+      title: 'Anmeldung erforderlich',
+      body: 'Für diese Aktion musst du angemeldet sein.',
+      primaryLabel: 'Anmelden',
+      onPrimary: () => Navigator.pop(ctx, true),
+      secondaryLabel: 'Abbrechen',
+      onSecondary: () => Navigator.pop(ctx, false),
     ),
   );
 

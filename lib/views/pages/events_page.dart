@@ -412,7 +412,7 @@ class _EventsPageState extends State<EventsPage> {
                   controller: adresseController,
                   decoration: getInputStyle("genaue Adresse"),
                   textStyle: inputTextStyle,
-                  onPlaceSelected: (lat, lng) {
+                  onPlaceSelected: (_, __, lat, lng) {
                     setState(() {
                       _latitude = lat;
                       _longitude = lng;

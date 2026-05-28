@@ -945,23 +945,29 @@ class _AnfrageCardState extends State<_AnfrageCard> {
                                 seatsRequested: a.seatsRequested,
                               );
 
-                              await chatService.updateSystemMessage(
-                                conversationId: convo.id,
-                                eventName: widget.fahrt.eventName,
-                                startOrt: widget.fahrt.abfahrtsort,
-                                zielOrt: widget.fahrt.standort,
-                                seatsRequested: a.seatsRequested,
-                                seatsAccepted: _acceptedSeats,
-                                uhrzeit:
-                                    '${widget.fahrt.uhrzeitHour.toString().padLeft(2, '0')}:${widget.fahrt.uhrzeitMinute.toString().padLeft(2, '0')}',
-                                richtung: switch (widget.fahrt.richtung) {
-                                  Fahrtrichtung.hinfahrt => 'Hinfahrt',
-                                  Fahrtrichtung.rueckfahrt => 'Rückfahrt',
-                                  Fahrtrichtung.hinUndZurueck =>
-                                    'Hin und Zurück',
-                                },
-                                ownerName: widget.fahrt.ownerName,
-                              );
+                              try {
+                                await chatService.updateSystemMessage(
+                                  conversationId: convo.id,
+                                  eventName: widget.fahrt.eventName,
+                                  startOrt: widget.fahrt.abfahrtsort,
+                                  zielOrt: widget.fahrt.standort,
+                                  seatsRequested: a.seatsRequested,
+                                  seatsAccepted: _acceptedSeats,
+                                  uhrzeit:
+                                      '${widget.fahrt.uhrzeitHour.toString().padLeft(2, '0')}:${widget.fahrt.uhrzeitMinute.toString().padLeft(2, '0')}',
+                                  richtung: switch (widget.fahrt.richtung) {
+                                    Fahrtrichtung.hinfahrt => 'Hinfahrt',
+                                    Fahrtrichtung.rueckfahrt => 'Rückfahrt',
+                                    Fahrtrichtung.hinUndZurueck =>
+                                      'Hin und Zurück',
+                                  },
+                                  ownerName: widget.fahrt.ownerName,
+                                );
+                              } catch (_) {
+                                // System-Nachricht ist nicht kritisch – die Anfrage wurde bereits
+                                // erfolgreich angenommen. Fehler (z.B. permission-denied bei
+                                // abgelaufenem JWT) werden ignoriert.
+                              }
 
                               if (!context.mounted) return;
                               AppSnackbar.show(context,

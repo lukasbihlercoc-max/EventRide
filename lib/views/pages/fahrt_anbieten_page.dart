@@ -3,8 +3,7 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:my_app/utils/platform_pickers.dart';
 import 'package:flutter/material.dart';
-import 'package:google_places_flutter/google_places_flutter.dart';
-import 'package:google_places_flutter/model/place_type.dart';
+import 'package:my_app/views/widgets/places_autocomplete_field.dart';
 import 'package:provider/provider.dart';
 
 import 'package:my_app/data/event_daten.dart';
@@ -170,83 +169,24 @@ class _FahrtAnbietenPageState extends State<FahrtAnbietenPage>
 
                     const SizedBox(height: 24),
 
-                    Container(
+                    PlacesAutocompleteField(
                       key: _abfahrtsortFieldKey,
-                      child: GooglePlaceAutoCompleteTextField(
-                      textEditingController: _abfahrtsortController,
-                      googleAPIKey:
-                          "AIzaSyB97RZAMf-fmZKhdFFniU20CqK0QWCV3KE",
-                      inputDecoration: InputDecoration(
+                      controller: _abfahrtsortController,
+                      decoration: InputDecoration(
                         labelText: fahrtrichtung == Fahrtrichtung.rueckfahrt
                             ? "Zielort"
                             : "Abfahrtsort",
-                        labelStyle:
-                            const TextStyle(color: Colors.white70),
+                        labelStyle: const TextStyle(color: Colors.white70),
                       ),
                       textStyle: const TextStyle(color: Colors.amber),
-                      boxDecoration: const BoxDecoration(
-                        color: Colors.transparent,
-                      ),
-                      debounceTime: 600,
-                      countries: const ["at"],
-                      placeType: PlaceType.cities,
-                      language: 'de',
-                      isLatLngRequired: true,
-                      itemBuilder: (context, index, prediction) {
-                        return Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1B3F78),
-                            border: Border(
-                              left: BorderSide(
-                                color: const Color(0xFF5DA9FF).withValues(alpha: 0.6),
-                                width: 3,
-                              ),
-                            ),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 14),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.location_on_outlined,
-                                  color: Color(0xFF5DA9FF), size: 18),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  prediction.description ?? '',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w400,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                      seperatedBuilder: Divider(
-                        height: 1,
-                        color: Colors.white.withValues(alpha: 0.12),
-                      ),
-                      getPlaceDetailWithLatLng: (prediction) {
+                      onPlaceSelected: (name, fullAddress, lat, lng) {
                         setState(() {
-                          abfahrtsort = prediction.structuredFormatting?.mainText ?? prediction.description ?? '';
-                          _abfahrtsortFullAddress = prediction.description;
-                          _abfahrtsortLat =
-                              double.tryParse(prediction.lat ?? '');
-                          _abfahrtsortLng =
-                              double.tryParse(prediction.lng ?? '');
+                          abfahrtsort = name;
+                          _abfahrtsortFullAddress = fullAddress;
+                          _abfahrtsortLat = lat;
+                          _abfahrtsortLng = lng;
                         });
                       },
-                      itemClick: (prediction) {
-                        _abfahrtsortController.text =
-                            prediction.structuredFormatting?.mainText ?? prediction.description ?? '';
-                        _abfahrtsortController.selection =
-                            TextSelection.fromPosition(TextPosition(
-                                offset:
-                                    _abfahrtsortController.text.length));
-                      },
-                    ),
                     ),
 
                     const SizedBox(height: 24),

@@ -4,6 +4,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/data/license_request.dart';
+import 'package:my_app/views/widgets/app_bottom_sheet.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
 import 'package:provider/provider.dart';
@@ -257,9 +258,9 @@ class _ReviewSheetState extends State<_ReviewSheet> {
   }
 
   void _showRejectDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => _RejectDialog(
+    showAppSheet<void>(
+      context,
+      (ctx) => _RejectDialog(
         onConfirm: (reason) async {
           Navigator.pop(ctx);
           setState(() => _actioning = true);
@@ -438,89 +439,85 @@ class _RejectDialogState extends State<_RejectDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: const Color(0xFF1A1F2E),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: const Text('Ablehnungsgrund',
-          style: TextStyle(color: Colors.white, fontSize: 16)),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ...[..._suggestions, 'Anderes'].map((s) => GestureDetector(
-                onTap: () => setState(() => _selected = s),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 18,
-                        height: 18,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: _selected == s
-                                ? const Color(0xFF4A80F0)
-                                : Colors.white38,
-                            width: 2,
+    final canConfirm = _selected != null &&
+        !(_selected == 'Anderes' && _customCtrl.text.trim().isEmpty);
+
+    return Padding(
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: AppSheetShell(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppSheetHeader(
+              icon: Icons.block,
+              iconColor: const Color(0xFFE63946),
+              title: 'Ablehnungsgrund',
+            ),
+            const SizedBox(height: 16),
+            ...[..._suggestions, 'Anderes'].map((s) => GestureDetector(
+                  onTap: () => setState(() => _selected = s),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 18,
+                          height: 18,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: _selected == s
+                                  ? const Color(0xFFF5A04A)
+                                  : Colors.white.withValues(alpha: 0.30),
+                              width: 2,
+                            ),
                           ),
-                        ),
-                        child: _selected == s
-                            ? Center(
-                                child: Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: const BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Color(0xFF4A80F0),
+                          child: _selected == s
+                              ? Center(
+                                  child: Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: const BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Color(0xFFF5A04A),
+                                    ),
                                   ),
-                                ),
-                              )
-                            : null,
-                      ),
-                      const SizedBox(width: 10),
-                      Text(s,
-                          style: const TextStyle(
-                              color: Colors.white70, fontSize: 14)),
-                    ],
+                                )
+                              : null,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(s,
+                            style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.80),
+                                fontSize: 14)),
+                      ],
+                    ),
                   ),
-                ),
-              )),
-          if (_selected == 'Anderes') ...[
-            const SizedBox(height: 8),
-            TextField(
-              controller: _customCtrl,
-              autofocus: true,
-              style: const TextStyle(color: Colors.white, fontSize: 14),
-              decoration: InputDecoration(
-                hintText: 'Begründung eingeben',
-                hintStyle: const TextStyle(color: Colors.white38),
-                filled: true,
-                fillColor: Colors.white.withValues(alpha: 0.06),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
+                )),
+            if (_selected == 'Anderes') ...[
+              const SizedBox(height: 8),
+              TextField(
+                controller: _customCtrl,
+                autofocus: true,
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+                onChanged: (_) => setState(() {}),
+                decoration: sheetInputDecoration(label: 'Begründung eingeben'),
               ),
+            ],
+            const SizedBox(height: 22),
+            canConfirm
+                ? AppSheetDangerButton(label: 'Ablehnen', onTap: _confirm)
+                : _DisabledButton(label: 'Ablehnen'),
+            const SizedBox(height: 10),
+            AppSheetGhostButton(
+              label: 'Abbrechen',
+              onTap: () => Navigator.pop(context),
             ),
           ],
-        ],
+        ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Abbrechen',
-              style: TextStyle(color: Colors.white38)),
-        ),
-        TextButton(
-          onPressed: _selected == null
-              ? null
-              : (_selected == 'Anderes' && _customCtrl.text.trim().isEmpty)
-                  ? null
-                  : _confirm,
-          child: const Text('Ablehnen',
-              style: TextStyle(color: Color(0xFFE63946))),
-        ),
-      ],
     );
   }
 }
@@ -557,6 +554,35 @@ class _ActionButton extends StatelessWidget {
                 color: Colors.white,
                 fontSize: 14,
                 fontWeight: FontWeight.w600),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DisabledButton extends StatelessWidget {
+  final String label;
+  const _DisabledButton({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 48,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.30),
+              fontSize: 14.5,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ),

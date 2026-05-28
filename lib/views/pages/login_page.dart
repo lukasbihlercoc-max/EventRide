@@ -4,6 +4,7 @@ import 'dart:ui'; // Für ImageFilter.blur
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/utils/app_route.dart';
+import 'package:my_app/views/widgets/app_bottom_sheet.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/pages/register_page.dart';
@@ -245,93 +246,84 @@ class _LoginPageState extends State<LoginPage> {
     );
     bool loading = false;
 
-    await showDialog(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          backgroundColor: const Color(0xFF1A1F2E),
-          title: const Text(
-            'Passwort zurücksetzen',
-            style: TextStyle(color: Colors.white),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Gib deine E-Mail-Adresse ein. Wir senden dir einen Link zum Zurücksetzen.',
-                style: TextStyle(color: Colors.white70, fontSize: 14),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: emailController,
-                style: const TextStyle(color: Colors.white),
-                keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(
-                  labelText: 'E-Mail',
-                  labelStyle: const TextStyle(color: Colors.white70),
-                  prefixIcon: const Icon(Icons.email, color: Colors.white70),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Colors.white70),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Colors.blueAccent, width: 2),
+    await showAppSheet<void>(
+      context,
+      (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: AppSheetShell(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppSheetHeader(
+                  icon: Icons.lock_reset,
+                  iconColor: const Color(0xFFF5A04A),
+                  title: 'Passwort zurücksetzen',
+                ),
+                const SizedBox(height: 6),
+                Padding(
+                  padding: const EdgeInsets.only(left: 48),
+                  child: Text(
+                    'Gib deine E-Mail-Adresse ein. Wir senden dir einen Link zum Zurücksetzen.',
+                    style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.65),
+                        fontSize: 13.5,
+                        height: 1.5),
                   ),
                 ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: loading ? null : () => Navigator.pop(dialogContext),
-              child: const Text('Abbrechen',
-                  style: TextStyle(color: Colors.white54)),
-            ),
-            ElevatedButton(
-              onPressed: loading
-                  ? null
-                  : () async {
+                const SizedBox(height: 16),
+                TextField(
+                  controller: emailController,
+                  style: const TextStyle(color: Colors.white),
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: sheetInputDecoration(
+                    label: 'E-Mail',
+                    prefixIcon: Icons.email_outlined,
+                  ),
+                ),
+                const SizedBox(height: 22),
+                if (loading)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(10),
+                      child: CircularProgressIndicator(
+                          color: Color(0xFFF5A04A), strokeWidth: 2),
+                    ),
+                  )
+                else ...[
+                  AppSheetPrimaryButton(
+                    label: 'Senden',
+                    onTap: () async {
                       final email = emailController.text.trim();
                       if (email.isEmpty) return;
-                      setDialogState(() => loading = true);
+                      setSheetState(() => loading = true);
                       try {
                         await context
                             .read<IAuthRepository>()
                             .resetPassword(email);
-                        if (dialogContext.mounted) Navigator.pop(dialogContext);
+                        if (ctx.mounted) Navigator.pop(ctx);
                         if (!mounted) return;
-                        AppSnackbar.show(
-                          context,
-                          message: 'E-Mail zum Zurücksetzen wurde gesendet',
-                        );
+                        AppSnackbar.show(context,
+                            message: 'E-Mail zum Zurücksetzen wurde gesendet');
                       } on FirebaseAuthException catch (e) {
-                        setDialogState(() => loading = false);
+                        setSheetState(() => loading = false);
                         if (!mounted) return;
-                        AppSnackbar.show(
-                          context,
-                          message: _resetError(e.code),
-                          accentColor: Colors.redAccent,
-                        );
+                        AppSnackbar.show(context,
+                            message: _resetError(e.code),
+                            accentColor: Colors.redAccent);
                       }
                     },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blueAccent,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: loading
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Text('Senden'),
+                  ),
+                  const SizedBox(height: 10),
+                  AppSheetGhostButton(
+                    label: 'Abbrechen',
+                    onTap: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

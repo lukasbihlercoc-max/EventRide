@@ -428,6 +428,10 @@ class FirebaseAuthRepository implements IAuthRepository {
     await user.reload();
     final verified = _auth.currentUser?.emailVerified ?? false;
     if (verified) {
+      // Erzwinge Token-Refresh damit request.auth.token.email_verified in Firestore-Rules
+      // sofort true ist – ohne diesen Force-Refresh bleibt das alte JWT noch bis zu
+      // 60 Minuten gültig und würde die messages-Schreibregel blockieren.
+      await _auth.currentUser!.getIdToken(true);
       await _firestore
           .collection('users')
           .doc(user.uid)
@@ -490,6 +494,19 @@ class FirebaseAuthRepository implements IAuthRepository {
     await savePhone(phone);
   }
 
+  // Liest Name und Foto immer aus Firestore, nicht aus Firebase Auth.
+  // Firebase Auth's displayName/photoURL sind bei älteren Accounts oder nach
+  // Profil-Updates in der App veraltet.
+  Future<({String name, String? photoUrl})> _firestoreUserInfo(String uid) async {
+    final doc = await _firestore.collection('users').doc(uid).get();
+    final data = doc.data() ?? {};
+    final first = data['firstName'] as String? ?? '';
+    final last = data['lastName'] as String? ?? '';
+    final name = '$first $last'.trim();
+    final photo = data['photoUrl'] as String?;
+    return (name: name.isNotEmpty ? name : (_auth.currentUser?.displayName ?? ''), photoUrl: photo);
+  }
+
   // ── Führerschein ───────────────────────────────────────────────────────────
 
   @override
@@ -503,6 +520,7 @@ class FirebaseAuthRepository implements IAuthRepository {
     await ref.putFile(image, SettableMetadata(contentType: 'image/jpeg'));
     // Kein getDownloadURL() – nur der Pfad wird gespeichert
 
+    final userInfo = await _firestoreUserInfo(uid);
     final batch = _firestore.batch();
     batch.update(_firestore.collection('users').doc(uid), {
       'licenseStatus': 'pending',
@@ -510,8 +528,8 @@ class FirebaseAuthRepository implements IAuthRepository {
     });
     batch.set(_firestore.collection('licenseRequests').doc(uid), {
       'uid': uid,
-      'userName': fbUser.displayName ?? '',
-      'userPhotoUrl': fbUser.photoURL,
+      'userName': userInfo.name,
+      'userPhotoUrl': userInfo.photoUrl,
       'licensePath': path,
       'status': 'pending',
       'submittedAt': FieldValue.serverTimestamp(),
@@ -598,10 +616,11 @@ class FirebaseAuthRepository implements IAuthRepository {
     final fbUser = _auth.currentUser;
     if (fbUser == null) throw Exception('Nicht eingeloggt');
 
+    final userInfo = await _firestoreUserInfo(fbUser.uid);
     await _firestore.collection('eventRequests').add({
       'uid': fbUser.uid,
-      'userName': fbUser.displayName ?? '',
-      'userPhotoUrl': fbUser.photoURL,
+      'userName': userInfo.name,
+      'userPhotoUrl': userInfo.photoUrl,
       'submissionType': 'manual',
       'status': 'pending',
       'submittedAt': FieldValue.serverTimestamp(),
@@ -624,14 +643,15 @@ class FirebaseAuthRepository implements IAuthRepository {
     final docRef = _firestore.collection('eventRequests').doc();
     final path = 'event_requests/${docRef.id}/flyer.jpg';
 
+    final userInfo = await _firestoreUserInfo(fbUser.uid);
     await _storage
         .ref(path)
         .putFile(flyer, SettableMetadata(contentType: 'image/jpeg'));
 
     await docRef.set({
       'uid': fbUser.uid,
-      'userName': fbUser.displayName ?? '',
-      'userPhotoUrl': fbUser.photoURL,
+      'userName': userInfo.name,
+      'userPhotoUrl': userInfo.photoUrl,
       'submissionType': 'flyer',
       'status': 'pending',
       'submittedAt': FieldValue.serverTimestamp(),

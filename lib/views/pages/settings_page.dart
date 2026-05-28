@@ -1,7 +1,7 @@
 // settings_page.dart
+import 'dart:ui';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'dart:ui';
 import 'package:my_app/data/app_user.dart';
 import 'package:my_app/data/event_request.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
@@ -12,6 +12,7 @@ import 'package:my_app/views/pages/admin_event_requests_page.dart';
 import 'package:my_app/views/pages/admin_license_page.dart';
 import 'package:my_app/config/legal_texts.dart';
 import 'package:my_app/views/pages/legal_page.dart';
+import 'package:my_app/views/widgets/app_bottom_sheet.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:provider/provider.dart';
@@ -393,52 +394,66 @@ class _SettingsPageState extends State<SettingsPage> {
     final authRepository = context.read<IAuthRepository>();
     final notifService = context.read<NotificationService>();
     bool loading = false;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) {
-          return AlertDialog(
-            backgroundColor: Colors.grey[900],
-            title: const Text("Abmelden", style: TextStyle(color: Colors.white)),
-            content: loading
-                ? const SizedBox(
-                    height: 60,
-                    child: Center(
-                      child: CircularProgressIndicator(color: Colors.amber),
-                    ),
-                  )
-                : const Text(
-                    "Möchtest du dich wirklich abmelden?",
-                    style: TextStyle(color: Colors.white70),
+
+    showAppSheet<void>(
+      context,
+      isDismissible: false,
+      (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => AppSheetShell(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppSheetHeader(
+                icon: Icons.logout,
+                iconColor: Colors.redAccent,
+                title: 'Abmelden',
+              ),
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.only(left: 48),
+                child: Text(
+                  'Möchtest du dich wirklich abmelden?',
+                  style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.65),
+                      fontSize: 13.5,
+                      height: 1.5),
+                ),
+              ),
+              const SizedBox(height: 22),
+              if (loading)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(10),
+                    child: CircularProgressIndicator(
+                        color: Colors.redAccent, strokeWidth: 2),
                   ),
-            actions: loading
-                ? []
-                : [
-                    TextButton(
-                      onPressed: () => Navigator.pop(dialogContext),
-                      child: const Text("Abbrechen",
-                          style: TextStyle(color: Colors.blueAccent)),
-                    ),
-                    TextButton(
-                      onPressed: () async {
-                        setDialogState(() => loading = true);
-                        final userId = authRepository.currentUser?.userId ?? '';
-                        if (userId.isNotEmpty) {
-                          await notifService.removeToken(userId);
-                        }
-                        await authRepository.signOut();
-                        if (dialogContext.mounted) Navigator.pop(dialogContext);
-                        if (context.mounted) {
-                          Navigator.popUntil(context, (route) => route.isFirst);
-                        }
-                      },
-                      child: const Text("Abmelden",
-                          style: TextStyle(color: Colors.red)),
-                    ),
-                  ],
-          );
-        },
+                )
+              else ...[
+                AppSheetDangerButton(
+                  label: 'Abmelden',
+                  onTap: () async {
+                    setSheetState(() => loading = true);
+                    final userId = authRepository.currentUser?.userId ?? '';
+                    if (userId.isNotEmpty) {
+                      await notifService.removeToken(userId);
+                    }
+                    await authRepository.signOut();
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (context.mounted) {
+                      Navigator.popUntil(context, (route) => route.isFirst);
+                    }
+                  },
+                ),
+                const SizedBox(height: 10),
+                AppSheetGhostButton(
+                  label: 'Abbrechen',
+                  onTap: () => Navigator.pop(ctx),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -446,78 +461,89 @@ class _SettingsPageState extends State<SettingsPage> {
   void _showDeleteAccountDialog(BuildContext context) {
     bool loading = false;
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          backgroundColor: Colors.grey[900],
-          title: const Text("Account löschen",
-              style: TextStyle(color: Colors.white)),
-          content: loading
-              ? const SizedBox(
-                  height: 60,
-                  child: Center(
-                    child: CircularProgressIndicator(color: Colors.redAccent),
+    showAppSheet<void>(
+      context,
+      isDismissible: false,
+      (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => AppSheetShell(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppSheetHeader(
+                icon: Icons.delete_forever,
+                iconColor: Colors.redAccent,
+                title: 'Account löschen',
+              ),
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.only(left: 48),
+                child: Text(
+                  'Diese Aktion kann nicht rückgängig gemacht werden. Alle deine Daten, Fahrten und Nachrichten werden dauerhaft gelöscht.',
+                  style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.65),
+                      fontSize: 13.5,
+                      height: 1.5),
+                ),
+              ),
+              const SizedBox(height: 22),
+              if (loading)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(10),
+                    child: CircularProgressIndicator(
+                        color: Colors.redAccent, strokeWidth: 2),
                   ),
                 )
-              : const Text(
-                  "Diese Aktion kann nicht rückgängig gemacht werden. Alle deine Daten, Fahrten und Nachrichten werden dauerhaft gelöscht.",
-                  style: TextStyle(color: Colors.white70),
-                ),
-          actions: loading
-              ? []
-              : [
-                  TextButton(
-                    onPressed: () => Navigator.pop(dialogContext),
-                    child: const Text("Abbrechen",
-                        style: TextStyle(color: Colors.blueAccent)),
-                  ),
-                  TextButton(
-                    onPressed: () async {
-                      setDialogState(() => loading = true);
-                      try {
-                        final auth = context.read<IAuthRepository>();
-                        final userId = auth.currentUser?.userId ?? '';
-                        if (userId.isNotEmpty) {
-                          await context
-                              .read<NotificationService>()
-                              .removeToken(userId);
-                        }
-                        await auth.deleteAccount();
-                        if (dialogContext.mounted) Navigator.pop(dialogContext);
+              else ...[
+                AppSheetDangerButton(
+                  label: 'Endgültig löschen',
+                  onTap: () async {
+                    setSheetState(() => loading = true);
+                    try {
+                      final auth = context.read<IAuthRepository>();
+                      final userId = auth.currentUser?.userId ?? '';
+                      if (userId.isNotEmpty) {
+                        await context
+                            .read<NotificationService>()
+                            .removeToken(userId);
+                      }
+                      await auth.deleteAccount();
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (context.mounted) {
+                        Navigator.popUntil(context, (route) => route.isFirst);
+                      }
+                    } on FirebaseAuthException catch (e) {
+                      if (!ctx.mounted) return;
+                      setSheetState(() => loading = false);
+                      if (e.code == 'requires-recent-login') {
+                        Navigator.pop(ctx);
                         if (context.mounted) {
-                          Navigator.popUntil(
-                              context, (route) => route.isFirst);
+                          _showReauthAndDeleteDialog(context);
                         }
-                      } on FirebaseAuthException catch (e) {
-                        if (!dialogContext.mounted) return;
-                        setDialogState(() => loading = false);
-                        if (e.code == 'requires-recent-login') {
-                          Navigator.pop(dialogContext);
-                          if (context.mounted) {
-                            _showReauthAndDeleteDialog(context);
-                          }
-                        } else {
-                          if (context.mounted) {
-                            AppSnackbar.show(context,
-                                message: 'Account konnte nicht gelöscht werden.');
-                          }
-                        }
-                      } catch (_) {
-                        if (dialogContext.mounted) {
-                          setDialogState(() => loading = false);
-                        }
+                      } else {
                         if (context.mounted) {
                           AppSnackbar.show(context,
                               message: 'Account konnte nicht gelöscht werden.');
                         }
                       }
-                    },
-                    child: const Text("Endgültig löschen",
-                        style: TextStyle(color: Colors.red)),
-                  ),
-                ],
+                    } catch (_) {
+                      if (ctx.mounted) setSheetState(() => loading = false);
+                      if (context.mounted) {
+                        AppSnackbar.show(context,
+                            message: 'Account konnte nicht gelöscht werden.');
+                      }
+                    }
+                  },
+                ),
+                const SizedBox(height: 10),
+                AppSheetGhostButton(
+                  label: 'Abbrechen',
+                  onTap: () => Navigator.pop(ctx),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -529,91 +555,73 @@ class _SettingsPageState extends State<SettingsPage> {
     bool obscure = true;
     String? errorText;
 
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          backgroundColor: Colors.grey[900],
-          title: const Text("Passwort bestätigen",
-              style: TextStyle(color: Colors.white)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                "Bitte gib dein Passwort ein, um den Account zu löschen.",
-                style: TextStyle(color: Colors.white70, fontSize: 14),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: passwordController,
-                obscureText: obscure,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'Passwort',
-                  labelStyle: const TextStyle(color: Colors.white70),
-                  errorText: errorText,
-                  prefixIcon:
-                      const Icon(Icons.lock_outline, color: Colors.white54),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      obscure ? Icons.visibility_off : Icons.visibility,
-                      color: Colors.white54,
-                    ),
-                    onPressed: () =>
-                        setDialogState(() => obscure = !obscure),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Colors.white30),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide:
-                        const BorderSide(color: Colors.blueAccent, width: 2),
-                  ),
-                  errorBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide:
-                        const BorderSide(color: Colors.redAccent),
-                  ),
-                  focusedErrorBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide:
-                        const BorderSide(color: Colors.redAccent, width: 2),
+    await showAppSheet<void>(
+      context,
+      isDismissible: false,
+      (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: AppSheetShell(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppSheetHeader(
+                  icon: Icons.lock_outline,
+                  iconColor: Colors.redAccent,
+                  title: 'Passwort bestätigen',
+                ),
+                const SizedBox(height: 6),
+                Padding(
+                  padding: const EdgeInsets.only(left: 48),
+                  child: Text(
+                    'Bitte gib dein Passwort ein, um den Account zu löschen.',
+                    style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.65),
+                        fontSize: 13.5,
+                        height: 1.5),
                   ),
                 ),
-              ),
-            ],
-          ),
-          actions: loading
-              ? [
-                  const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: SizedBox(
-                      width: 20,
-                      height: 20,
+                const SizedBox(height: 16),
+                TextField(
+                  controller: passwordController,
+                  obscureText: obscure,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: sheetInputDecoration(
+                    label: 'Passwort',
+                    prefixIcon: Icons.lock_outline,
+                    errorText: errorText,
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        obscure ? Icons.visibility_off : Icons.visibility,
+                        color: Colors.white54,
+                      ),
+                      onPressed: () =>
+                          setSheetState(() => obscure = !obscure),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 22),
+                if (loading)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(10),
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.redAccent),
+                          color: Colors.redAccent, strokeWidth: 2),
                     ),
                   )
-                ]
-              : [
-                  TextButton(
-                    onPressed: () => Navigator.pop(dialogContext),
-                    child: const Text("Abbrechen",
-                        style: TextStyle(color: Colors.blueAccent)),
-                  ),
-                  TextButton(
-                    onPressed: () async {
+                else ...[
+                  AppSheetDangerButton(
+                    label: 'Löschen',
+                    onTap: () async {
                       final password = passwordController.text;
                       if (password.isEmpty) {
-                        setDialogState(
+                        setSheetState(
                             () => errorText = 'Bitte Passwort eingeben');
                         return;
                       }
-                      setDialogState(() {
+                      setSheetState(() {
                         loading = true;
                         errorText = null;
                       });
@@ -621,33 +629,39 @@ class _SettingsPageState extends State<SettingsPage> {
                         final auth = context.read<IAuthRepository>();
                         await auth.reauthenticate(password);
                         await auth.deleteAccount();
-                        if (dialogContext.mounted) Navigator.pop(dialogContext);
+                        if (ctx.mounted) Navigator.pop(ctx);
                         if (context.mounted) {
                           Navigator.popUntil(
                               context, (route) => route.isFirst);
                         }
                       } on FirebaseAuthException catch (e) {
-                        if (!dialogContext.mounted) return;
+                        if (!ctx.mounted) return;
                         final msg = e.code == 'wrong-password' ||
                                 e.code == 'invalid-credential'
                             ? 'Falsches Passwort'
                             : 'Fehler beim Löschen';
-                        setDialogState(() {
+                        setSheetState(() {
                           loading = false;
                           errorText = msg;
                         });
                       } catch (_) {
-                        if (!dialogContext.mounted) return;
-                        setDialogState(() {
+                        if (!ctx.mounted) return;
+                        setSheetState(() {
                           loading = false;
                           errorText = 'Fehler beim Löschen';
                         });
                       }
                     },
-                    child: const Text("Löschen",
-                        style: TextStyle(color: Colors.red)),
+                  ),
+                  const SizedBox(height: 10),
+                  AppSheetGhostButton(
+                    label: 'Abbrechen',
+                    onTap: () => Navigator.pop(ctx),
                   ),
                 ],
+              ],
+            ),
+          ),
         ),
       ),
     );

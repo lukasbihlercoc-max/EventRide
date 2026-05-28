@@ -20,11 +20,18 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
   bool _isResending = false;
   bool _resentSuccess = false;
   late String _currentEmail;
+  final _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _currentEmail = widget.email;
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _checkVerification() async {
@@ -149,11 +156,15 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
                 : null,
           ),
           body: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
+            child: Scrollbar(
+              controller: _scrollController,
+              thumbVisibility: true,
+              child: SingleChildScrollView(
+                controller: _scrollController,
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
                   SizedBox(height: SizeHelper.h(context, 0.06)),
                   const Icon(
                     Icons.mark_email_unread_outlined,
@@ -283,6 +294,7 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
                   ),
                   const SizedBox(height: 8),
                 ],
+                ),
               ),
             ),
           ),

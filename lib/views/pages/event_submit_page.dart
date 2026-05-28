@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:my_app/data/event_service.dart';
 import 'package:my_app/data/event_daten.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
+import 'package:my_app/views/widgets/app_bottom_sheet.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:provider/provider.dart';
@@ -192,29 +193,33 @@ class _EventSubmitPageState extends State<EventSubmitPage> {
   }
 
   void _showPickerSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF1A1F2E),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => SafeArea(
+    showAppSheet<void>(
+      context,
+      (ctx) => AppSheetShell(
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ListTile(
-              leading: const Icon(Icons.photo_library_outlined, color: _kAccent),
-              title: const Text('Aus Galerie', style: TextStyle(color: Colors.white)),
+            AppSheetHeader(
+              icon: Icons.add_photo_alternate_outlined,
+              iconColor: _kAccent,
+              title: 'Bild auswählen',
+            ),
+            const SizedBox(height: 16),
+            _PickerTile(
+              icon: Icons.photo_library_outlined,
+              label: 'Aus Galerie',
               onTap: () {
-                Navigator.pop(context);
+                Navigator.pop(ctx);
                 _pickFlyer(ImageSource.gallery);
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.camera_alt_outlined, color: _kAccent),
-              title: const Text('Kamera', style: TextStyle(color: Colors.white)),
+            const SizedBox(height: 8),
+            _PickerTile(
+              icon: Icons.camera_alt_outlined,
+              label: 'Kamera',
               onTap: () {
-                Navigator.pop(context);
+                Navigator.pop(ctx);
                 _pickFlyer(ImageSource.camera);
               },
             ),
@@ -402,7 +407,7 @@ class _EventSubmitPageState extends State<EventSubmitPage> {
           controller: _adresseCtrl,
           decoration: _inputStyle('genaue Adresse'),
           textStyle: _kInputTextStyle,
-          onPlaceSelected: (lat, lng) {
+          onPlaceSelected: (_, __, lat, lng) {
             setState(() {
               _latitude = lat;
               _longitude = lng;
@@ -598,6 +603,41 @@ class _EventSubmitPageState extends State<EventSubmitPage> {
               const SizedBox(height: 24),
               _tab == 0 ? _buildManualTab() : _buildFlyerTab(),
               const SizedBox(height: 24),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PickerTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _PickerTile(
+      {required this.icon, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white.withValues(alpha: 0.06),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Icon(icon, color: const Color(0xFFF5A04A), size: 20),
+              const SizedBox(width: 14),
+              Text(label,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500)),
             ],
           ),
         ),

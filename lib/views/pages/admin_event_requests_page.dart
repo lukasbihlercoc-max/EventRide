@@ -10,6 +10,7 @@ import 'package:my_app/data/event_daten.dart';
 import 'package:my_app/data/event_request.dart';
 import 'package:my_app/data/event_service.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
+import 'package:my_app/views/widgets/app_bottom_sheet.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:provider/provider.dart';
@@ -485,39 +486,42 @@ class _ReviewSheetState extends State<_ReviewSheet> {
 
   Future<void> _discard() async {
     final reasonCtrl = TextEditingController();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1B3A6B),
-        title: const Text(
-          'Anfrage verwerfen?',
-          style: TextStyle(color: Colors.white, fontSize: 16),
-        ),
-        content: TextField(
-          controller: reasonCtrl,
-          style: const TextStyle(color: Colors.white),
-          maxLines: 2,
-          decoration: const InputDecoration(
-            hintText: 'Ablehnungsgrund (optional)',
-            hintStyle: TextStyle(color: Colors.white38),
-            enabledBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: Colors.white24)),
-            focusedBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: Colors.white54)),
+    final confirmed = await showAppSheet<bool>(
+      context,
+      (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: AppSheetShell(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppSheetHeader(
+                icon: Icons.block,
+                iconColor: const Color(0xFFE53935),
+                title: 'Anfrage verwerfen?',
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: reasonCtrl,
+                style: const TextStyle(color: Colors.white),
+                maxLines: 2,
+                decoration: sheetInputDecoration(
+                  label: 'Ablehnungsgrund (optional)',
+                ),
+              ),
+              const SizedBox(height: 22),
+              AppSheetDangerButton(
+                label: 'Verwerfen',
+                onTap: () => Navigator.pop(ctx, true),
+              ),
+              const SizedBox(height: 10),
+              AppSheetGhostButton(
+                label: 'Abbrechen',
+                onTap: () => Navigator.pop(ctx, false),
+              ),
+            ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Abbrechen',
-                style: TextStyle(color: Colors.white54)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Verwerfen',
-                style: TextStyle(color: Color(0xFFE53935))),
-          ),
-        ],
       ),
     );
     final reason =
@@ -651,7 +655,7 @@ class _ReviewSheetState extends State<_ReviewSheet> {
           controller: _adresseCtrl,
           decoration: _inputStyle('genaue Adresse'),
           textStyle: _kInputText,
-          onPlaceSelected: (lat, lng) {
+          onPlaceSelected: (_, __, lat, lng) {
             setState(() {
               _latitude = lat;
               _longitude = lng;

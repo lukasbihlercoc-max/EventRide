@@ -6,134 +6,102 @@ import 'package:intl/intl.dart';
 import 'package:my_app/data/event_daten.dart';
 import 'package:my_app/data/notifiers.dart';
 import 'package:my_app/views/pages/detail_page.dart';
+import 'package:my_app/views/widgets/app_bottom_sheet.dart';
 
 // ---------------------------------------------------------------------------
 // Dialoge
 // ---------------------------------------------------------------------------
 
 void _showEventInfoDialog(BuildContext context, Event event) {
-  showDialog(
-    context: context,
-    barrierDismissible: true,
-    builder: (ctx) {
-      final size = MediaQuery.of(ctx).size;
-      return Dialog(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
-            child: Container(
-              width: size.width * 0.85,
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.35),
-                    blurRadius: 24,
-                    offset: const Offset(0, 12),
-                  ),
-                ],
+  showAppSheet<void>(
+    context,
+    (ctx) => AppSheetShell(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5A04A).withValues(alpha: 0.14),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                      color: const Color(0xFFF5A04A).withValues(alpha: 0.45)),
+                ),
+                child:
+                    const Icon(Icons.event, color: Color(0xFFF5A04A), size: 16),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.event, color: Colors.white),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          event.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () {
-                          final nav = Navigator.of(ctx);
-                          nav.popUntil((route) => route is! DialogRoute);
-                          nav.push(AppRoute(builder: (_) => DetailPage(event: event)));
-                        },
-                        child: const Icon(
-                          Icons.open_in_full,
-                          color: Colors.white54,
-                          size: 18,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      const Icon(Icons.calendar_today,
-                          color: Colors.white70, size: 16),
-                      const SizedBox(width: 6),
-                      Text(
-                        DateFormat('dd.MM.yyyy', 'de_DE')
-                            .format(event.datum.toLocal()),
-                        style: const TextStyle(
-                            color: Colors.white70, fontSize: 14),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(Icons.place, color: Colors.white70, size: 18),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          event.adresse,
-                          style: const TextStyle(
-                              color: Colors.white70, fontSize: 14),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (event.beschreibung.trim().isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    const Divider(color: Colors.white24, thickness: 1),
-                    const SizedBox(height: 8),
-                    Text(
-                      event.beschreibung,
-                      style:
-                          const TextStyle(color: Colors.white, fontSize: 15),
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text(
-                        'Schließen',
-                        style: TextStyle(
-                          color: Colors.lightBlueAccent,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  event.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700),
+                ),
               ),
+              GestureDetector(
+                onTap: () {
+                  Navigator.pop(ctx);
+                  Navigator.push(context,
+                      AppRoute(builder: (_) => DetailPage(event: event)));
+                },
+                child: const Icon(Icons.open_in_full,
+                    color: Colors.white54, size: 18),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Padding(
+            padding: const EdgeInsets.only(left: 48, bottom: 8),
+            child: Row(children: [
+              const Icon(Icons.calendar_today, color: Colors.white54, size: 14),
+              const SizedBox(width: 6),
+              Text(
+                DateFormat('dd.MM.yyyy', 'de_DE').format(event.datum.toLocal()),
+                style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.65), fontSize: 13.5),
+              ),
+            ]),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 48),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.place_outlined, color: Colors.white54, size: 14),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(event.adresse,
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.65),
+                          fontSize: 13.5)),
+                ),
+              ],
             ),
           ),
-        ),
-      );
-    },
+          if (event.beschreibung.trim().isNotEmpty) ...[
+            Divider(color: Colors.white.withValues(alpha: 0.10), height: 28),
+            Text(event.beschreibung,
+                style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.80),
+                    fontSize: 14,
+                    height: 1.5)),
+            const SizedBox(height: 8),
+          ],
+          const SizedBox(height: 16),
+          AppSheetGhostButton(
+              label: 'Schließen', onTap: () => Navigator.pop(ctx)),
+        ],
+      ),
+    ),
   );
 }
 
@@ -142,78 +110,26 @@ void _showDayEventsListDialog(BuildContext context, List<Event> events) {
   final title =
       '${events.length} Events am ${DateFormat('d. MMMM', 'de_DE').format(date)}';
 
-  showDialog(
-    context: context,
-    barrierDismissible: true,
-    builder: (ctx) {
-      final size = MediaQuery.of(ctx).size;
-      return Dialog(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
-            child: Container(
-              width: size.width * 0.85,
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.35),
-                    blurRadius: 24,
-                    offset: const Offset(0, 12),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.star, color: Colors.amber, size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  const Divider(color: Colors.white24, thickness: 1),
-                  ...events.map((event) => _buildEventListRow(ctx, event)),
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text(
-                        'Schließen',
-                        style: TextStyle(
-                          color: Colors.lightBlueAccent,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+  showAppSheet<void>(
+    context,
+    (ctx) => AppSheetShell(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppSheetHeader(
+            icon: Icons.star,
+            iconColor: const Color(0xFFF5A04A),
+            title: title,
           ),
-        ),
-      );
-    },
+          Divider(color: Colors.white.withValues(alpha: 0.10), height: 24),
+          ...events.map((event) => _buildEventListRow(ctx, event)),
+          const SizedBox(height: 12),
+          AppSheetGhostButton(
+              label: 'Schließen', onTap: () => Navigator.pop(ctx)),
+        ],
+      ),
+    ),
   );
 }
 

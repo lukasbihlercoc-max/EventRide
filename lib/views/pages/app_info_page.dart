@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:my_app/data/event_request.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/utils/app_route.dart';
+import 'package:my_app/views/auth/auth_guard.dart';
 import 'package:my_app/views/pages/admin_event_requests_page.dart';
 import 'package:my_app/views/pages/event_submit_page.dart';
 import 'package:provider/provider.dart';
@@ -91,12 +92,14 @@ class AppInfoPage extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      onPressed: () => Navigator.push(
-                        context,
-                        AppRoute(
-                          builder: (_) => const EventSubmitPage(),
-                        ),
-                      ),
+                      onPressed: () async {
+                        if (!await requiresLogin(context)) return;
+                        if (!context.mounted) return;
+                        Navigator.push(
+                          context,
+                          AppRoute(builder: (_) => const EventSubmitPage()),
+                        );
+                      },
                       child: const Text(
                         "Event einreichen",
                         style: TextStyle(fontWeight: FontWeight.w600),

@@ -6,6 +6,7 @@ import 'package:my_app/data/fahrt_daten.dart';
 import 'package:my_app/data/fahrt_service.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/utils/geo_utils.dart';
+import 'package:my_app/views/auth/auth_guard.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/widgets/fahrtencard_widget.dart';
 import 'package:provider/provider.dart';
@@ -53,9 +54,65 @@ class FahrtFindenPage extends StatelessWidget {
                       fahrt.freiePlaetze > 0)
                   .toList();
 
-              final user = context.read<IAuthRepository>().currentUser;
-              final homeLat = user?.homeTownLat;
-              final homeLng = user?.homeTownLng;
+              final user = context.watch<IAuthRepository>().currentUser;
+
+              if (user == null) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.lock_outline,
+                            size: 64,
+                            color: Colors.white.withValues(alpha: 0.4)),
+                        const SizedBox(height: 20),
+                        Text(
+                          'Anmeldung erforderlich',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'Melde dich an, um verfügbare\nMitfahrgelegenheiten zu sehen.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.55),
+                            fontSize: 15,
+                          ),
+                        ),
+                        const SizedBox(height: 28),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () => requiresLogin(context),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blueAccent,
+                              foregroundColor: Colors.white,
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text(
+                              'Jetzt anmelden',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              final homeLat = user.homeTownLat;
+              final homeLng = user.homeTownLng;
               final hasHome = homeLat != null && homeLng != null;
 
               double? distFor(FahrtDaten f) {
@@ -122,21 +179,26 @@ class FahrtFindenPage extends StatelessWidget {
                             onTap: () =>
                                 showEventDetailsPopup(context, event),
                             child: Row(
-                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
-                                Text(
-                                  event.name,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
+                                Flexible(
+                                  child: Text(
+                                    event.name,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 6),
-                                const Icon(
-                                  Icons.info_outline,
-                                  color: Colors.white38,
-                                  size: 18,
+                                const Padding(
+                                  padding: EdgeInsets.only(bottom: 3),
+                                  child: Icon(
+                                    Icons.info_outline,
+                                    color: Colors.white38,
+                                    size: 18,
+                                  ),
                                 ),
                               ],
                             ),

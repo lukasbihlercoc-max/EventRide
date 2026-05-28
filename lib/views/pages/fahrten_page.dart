@@ -1,4 +1,4 @@
-import 'dart:ui';
+import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -17,6 +17,7 @@ import 'package:my_app/data/fahrt_daten.dart';
 import 'package:my_app/data/event_daten.dart';
 import 'package:my_app/data/event_service.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
+import 'package:my_app/data/chat_conversation.dart';
 import 'package:my_app/data/chat_service.dart';
 import 'package:my_app/data/seen_anfragen_service.dart';
 import 'package:my_app/views/pages/login_page.dart';
@@ -28,6 +29,7 @@ import 'package:my_app/views/pages/public_profile_page.dart';
 import 'package:my_app/views/pages/fahrt_finden_page.dart';
 
 import 'package:my_app/views/auth/verification_guard.dart';
+import 'package:my_app/views/widgets/app_bottom_sheet.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/pages/chat_page.dart';
 import 'package:my_app/views/pages/detail_page.dart';
@@ -39,221 +41,171 @@ import 'package:my_app/data/interessenten_daten.dart';
 // ---------------------------------------------------------------------------
 void _showEventInfoDialog(BuildContext context, Event event) {
   bool ichWillHinExpanded = false;
-  showDialog(
-    context: context,
-    barrierDismissible: true,
-    builder: (ctx) {
-      final size = MediaQuery.of(ctx).size;
-      return StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          final interessenten =
-              Provider.of<InteressentenService>(ctx, listen: false)
-                  .getForEvent(event.id);
-          final sorted = [...interessenten]
-            ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-          final extraCount = sorted.length - 1;
+  showAppSheet<void>(
+    context,
+    (ctx) => StatefulBuilder(
+      builder: (ctx, setSheetState) {
+        final interessenten =
+            Provider.of<InteressentenService>(ctx, listen: false)
+                .getForEvent(event.id);
+        final sorted = [...interessenten]
+          ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+        final extraCount = sorted.length - 1;
 
-          return Dialog(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            insetPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(24),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
-                child: Container(
-                  width: size.width * 0.85,
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.35),
-                        blurRadius: 24,
-                        offset: const Offset(0, 12),
-                      ),
-                    ],
+        return AppSheetShell(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5A04A).withValues(alpha: 0.14),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                          color: const Color(0xFFF5A04A).withValues(alpha: 0.45)),
+                    ),
+                    child: const Icon(Icons.event,
+                        color: Color(0xFFF5A04A), size: 16),
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.event, color: Colors.white),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              event.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              Navigator.push(
-                                context,
-                                AppRoute(
-                                  builder: (_) => DetailPage(event: event),
-                                ),
-                              );
-                            },
-                            child: const Icon(
-                              Icons.open_in_full,
-                              color: Colors.white54,
-                              size: 18,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      if (event.datum.year != 2000)
-                        Row(
-                          children: [
-                            const Icon(Icons.calendar_today,
-                                color: Colors.white70, size: 16),
-                            const SizedBox(width: 6),
-                            Text(
-                              DateFormat('dd.MM.yyyy').format(event.datum),
-                              style: const TextStyle(
-                                  color: Colors.white70, fontSize: 14),
-                            ),
-                          ],
-                        ),
-                      const SizedBox(height: 12),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(Icons.place,
-                              color: Colors.white70, size: 18),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              event.adresse,
-                              style: const TextStyle(
-                                  color: Colors.white70, fontSize: 14),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (event.beschreibung.trim().isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        const Divider(color: Colors.white24, thickness: 1),
-                        const SizedBox(height: 12),
-                        Text(
-                          event.beschreibung,
-                          style: const TextStyle(
-                              color: Colors.white, fontSize: 15),
-                        ),
-                      ],
-                      // ── Ich will hin ──
-                      if (sorted.isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        const Divider(color: Colors.white24, thickness: 1),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            const Icon(Icons.people_outline,
-                                size: 14, color: Colors.white54),
-                            const SizedBox(width: 6),
-                            const Text(
-                              'Ich will hin',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              '${sorted.length}',
-                              style: const TextStyle(
-                                color: Colors.amber,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        _IchWillHinRow(person: sorted[0]),
-                        if (extraCount > 0) ...[
-                          AnimatedSize(
-                            duration: const Duration(milliseconds: 200),
-                            curve: Curves.easeInOut,
-                            child: ichWillHinExpanded
-                                ? Column(
-                                    children: sorted
-                                        .skip(1)
-                                        .map((p) => _IchWillHinRow(person: p))
-                                        .toList(),
-                                  )
-                                : const SizedBox.shrink(),
-                          ),
-                          GestureDetector(
-                            onTap: () => setDialogState(
-                                () => ichWillHinExpanded = !ichWillHinExpanded),
-                            child: Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 6),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    ichWillHinExpanded
-                                        ? Icons.expand_less
-                                        : Icons.expand_more,
-                                    size: 14,
-                                    color: Colors.white54,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    ichWillHinExpanded
-                                        ? 'Weniger anzeigen'
-                                        : '+ $extraCount weitere anzeigen',
-                                    style: const TextStyle(
-                                      color: Colors.white54,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                      const SizedBox(height: 20),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          child: const Text(
-                            'Schließen',
-                            style: TextStyle(
-                              color: Colors.lightBlueAccent,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      event.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700),
+                    ),
                   ),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      Navigator.push(context,
+                          AppRoute(builder: (_) => DetailPage(event: event)));
+                    },
+                    child: const Icon(Icons.open_in_full,
+                        color: Colors.white54, size: 18),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              if (event.datum.year != 2000)
+                Padding(
+                  padding: const EdgeInsets.only(left: 48, bottom: 8),
+                  child: Row(children: [
+                    const Icon(Icons.calendar_today,
+                        color: Colors.white54, size: 14),
+                    const SizedBox(width: 6),
+                    Text(DateFormat('dd.MM.yyyy').format(event.datum),
+                        style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.65),
+                            fontSize: 13.5)),
+                  ]),
+                ),
+              Padding(
+                padding: const EdgeInsets.only(left: 48),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.place_outlined,
+                        color: Colors.white54, size: 14),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(event.adresse,
+                          style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.65),
+                              fontSize: 13.5)),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          );
-        },
-      );
-    },
+              if (event.beschreibung.trim().isNotEmpty) ...[
+                Divider(
+                    color: Colors.white.withValues(alpha: 0.10), height: 28),
+                Text(event.beschreibung,
+                    style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.80),
+                        fontSize: 14,
+                        height: 1.5)),
+              ],
+              if (sorted.isNotEmpty) ...[
+                Divider(
+                    color: Colors.white.withValues(alpha: 0.10), height: 28),
+                Row(children: [
+                  const Icon(Icons.people_outline,
+                      size: 14, color: Colors.white54),
+                  const SizedBox(width: 6),
+                  Text('Ich will hin',
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.65),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(width: 6),
+                  Text('${sorted.length}',
+                      style: const TextStyle(
+                          color: Color(0xFFF5A04A),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600)),
+                ]),
+                const SizedBox(height: 8),
+                _IchWillHinRow(person: sorted[0]),
+                if (extraCount > 0) ...[
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeInOut,
+                    child: ichWillHinExpanded
+                        ? Column(
+                            children: sorted
+                                .skip(1)
+                                .map((p) => _IchWillHinRow(person: p))
+                                .toList(),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                  GestureDetector(
+                    onTap: () => setSheetState(
+                        () => ichWillHinExpanded = !ichWillHinExpanded),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            ichWillHinExpanded
+                                ? Icons.expand_less
+                                : Icons.expand_more,
+                            size: 14,
+                            color: Colors.white54,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            ichWillHinExpanded
+                                ? 'Weniger anzeigen'
+                                : '+ $extraCount weitere anzeigen',
+                            style: const TextStyle(
+                                color: Colors.white54, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+              const SizedBox(height: 16),
+              AppSheetGhostButton(
+                  label: 'Schließen', onTap: () => Navigator.pop(ctx)),
+            ],
+          ),
+        );
+      },
+    ),
   );
 }
 
@@ -428,13 +380,46 @@ class _LoggedInFahrtenViewState extends State<_LoggedInFahrtenView>
   }
 }
 
-/// Eigener Widget für die TabBar — hört nur auf AnfrageService + SeenAnfragenService.
+/// Eigener Widget für die TabBar — hört auf AnfrageService, SeenAnfragenService und Chat-Unread.
 /// AppBackground, Scaffold und TabBarView werden dadurch nicht mehr neu gebaut.
-class _FahrtenTabBar extends StatelessWidget {
+class _FahrtenTabBar extends StatefulWidget {
   final String userId;
   final TabController tabController;
 
   const _FahrtenTabBar({required this.userId, required this.tabController});
+
+  @override
+  State<_FahrtenTabBar> createState() => _FahrtenTabBarState();
+}
+
+class _FahrtenTabBarState extends State<_FahrtenTabBar> {
+  bool _hasPassengerChatUnread = false;
+  StreamSubscription<List<ChatConversation>>? _convoSub;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _convoSub = context
+          .read<ChatService>()
+          .conversationsStream(widget.userId)
+          .listen((convos) {
+        if (!mounted) return;
+        final hasUnread = convos.any((c) =>
+            c.requesterId == widget.userId && c.isUnreadFor(widget.userId));
+        if (hasUnread != _hasPassengerChatUnread) {
+          setState(() => _hasPassengerChatUnread = hasUnread);
+        }
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _convoSub?.cancel();
+    super.dispose();
+  }
 
   Widget _tabLabel(String text, bool showDot) {
     return Tab(
@@ -468,20 +453,23 @@ class _FahrtenTabBar extends StatelessWidget {
     return Consumer2<AnfrageService, SeenAnfragenService>(
       builder: (context, anfrageService, seenService, _) {
         final requesterIds = anfrageService
-            .getAnfragenByRequester(userId)
+            .getAnfragenByRequester(widget.userId)
             .where((a) =>
               (a.status != AnfrageStatus.offen &&
                   a.status != AnfrageStatus.storniert) ||
               a.vonFahrer)
             .map((a) => a.id);
 
+        final showMitfahrtenDot = seenService.hasUnseenRequester(widget.userId, requesterIds)
+            || _hasPassengerChatUnread;
+
         return TabBar(
-          controller: tabController,
+          controller: widget.tabController,
           indicatorColor: Colors.amber,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
           tabs: [
-            _tabLabel('Mitfahrten', seenService.hasUnseenRequester(userId, requesterIds)),
+            _tabLabel('Mitfahrten', showMitfahrtenDot),
             const Tab(child: Text('Meine Fahrten')),
           ],
         );
@@ -506,86 +494,52 @@ class _AngeboteneFahrtenTabState extends State<_AngeboteneFahrtenTab>
     with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
+
+  Map<String, int> _unreadByFahrtId = {};
+  StreamSubscription<List<ChatConversation>>? _convoSub;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _convoSub = context
+          .read<ChatService>()
+          .conversationsStream(widget.userId)
+          .listen((convos) {
+        if (!mounted) return;
+        final map = <String, int>{};
+        for (final c in convos) {
+          if (c.isUnreadFor(widget.userId)) {
+            map[c.fahrtId] = (map[c.fahrtId] ?? 0) + 1;
+          }
+        }
+        setState(() => _unreadByFahrtId = map);
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _convoSub?.cancel();
+    super.dispose();
+  }
+
   /// Zeigt Bestätigungs-Dialog und gibt true zurück wenn löschen bestätigt.
   Future<bool?> _confirmDelete(FahrtDaten fahrt) async {
     if (!mounted) return false;
-    return showDialog<bool>(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) => Dialog(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        insetPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.35),
-                    blurRadius: 24,
-                    offset: const Offset(0, 12),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.delete_forever,
-                          color: Colors.redAccent, size: 24),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Fahrt löschen?',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Wenn du diese Fahrt löscht, werden auch alle Mitfahr-Anfragen dafür abgebrochen.',
-                    style: TextStyle(color: Colors.white70, fontSize: 14),
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, false),
-                        child: const Text('Abbrechen',
-                            style: TextStyle(
-                                color: Colors.white70, fontSize: 16)),
-                      ),
-                      const SizedBox(width: 12),
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, true),
-                        child: const Text('Löschen',
-                            style: TextStyle(
-                                color: Colors.redAccent,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16)),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
+    return showAppSheet<bool>(
+      context,
+      (ctx) => AppBottomSheet(
+        icon: Icons.delete_forever,
+        iconColor: Colors.redAccent,
+        title: 'Fahrt löschen?',
+        body: 'Wenn du diese Fahrt löscht, werden auch alle Mitfahr-Anfragen dafür abgebrochen.',
+        primaryLabel: 'Löschen',
+        onPrimary: () => Navigator.pop(ctx, true),
+        secondaryLabel: 'Abbrechen',
+        onSecondary: () => Navigator.pop(ctx, false),
+        danger: true,
       ),
     );
   }
@@ -678,7 +632,10 @@ class _AngeboteneFahrtenTabState extends State<_AngeboteneFahrtenTab>
                             onDismissed: (_) => _deleteFahrt(fahrt),
                             background: const _SwipeEditBackground(),
                             secondaryBackground: const _SwipeDeleteBackground(),
-                            child: _FahrerGlassCard(fahrt: fahrt),
+                            child: _FahrerGlassCard(
+                              fahrt: fahrt,
+                              unreadChatCount: _unreadByFahrtId[fahrt.id] ?? 0,
+                            ),
                           ),
                         );
                       },
@@ -724,6 +681,41 @@ class _SwipeDeleteBackground extends StatelessWidget {
               SizedBox(height: 4),
               Text(
                 'Löschen',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Roter Hintergrund beim Wischen für Mitfahrt-Stornieren (rechts → links)
+class _SwipeStorniereBackground extends StatelessWidget {
+  const _SwipeStorniereBackground();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: Container(
+          alignment: Alignment.centerRight,
+          color: Colors.redAccent,
+          padding: const EdgeInsets.only(right: 24),
+          child: const Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.undo, color: Colors.white, size: 28),
+              SizedBox(height: 4),
+              Text(
+                'Zurückziehen',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 12,
@@ -830,6 +822,41 @@ class _SwipeHint extends StatelessWidget {
   }
 }
 
+/// Einmaliger Hinweis im Mitfahrten-Tab: links wischen zum Zurückziehen
+class _MitfahrtSwipeHint extends StatelessWidget {
+  const _MitfahrtSwipeHint();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.swipe_left_outlined, color: Colors.redAccent, size: 15),
+            SizedBox(width: 5),
+            Text(
+              'Links wischen zum Zurückziehen',
+              style: TextStyle(
+                color: Colors.redAccent,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// ------------------------------------------------------------
 /// TAB 2 – angefragte Fahrten (nach Datum sortiert)
 /// ------------------------------------------------------------
@@ -874,11 +901,33 @@ class _AngefragteFahrtenTabState extends State<_AngefragteFahrtenTab>
     }
   }
 
+  Future<void> _stornierenItem(_RequestedRideItem item) async {
+    final ok =
+        await context.read<AnfrageService>().storniereAnfrage(item.anfrage);
+    if (ok && item.anfrage.status == AnfrageStatus.akzeptiert && mounted) {
+      await context.read<ChatService>().sendStatusNotification(
+            fahrtId: item.fahrt!.id,
+            ownerId: item.fahrt!.ownerId,
+            requesterId: item.anfrage.requesterId,
+            text: 'Anfrage zurückgezogen – Platz wurde wieder freigegeben.',
+            eventName: item.fahrt!.eventName,
+            startOrt: item.fahrt!.abfahrtsort,
+            zielOrt: item.fahrt!.standort,
+            seatsRequested: item.anfrage.seatsRequested,
+          );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return Consumer3<AnfrageService, FahrtService, SeenAnfragenService>(
-      builder: (context, anfrageService, fahrtService, seenService, _) {
+    final chatService = context.read<ChatService>();
+    return StreamBuilder<List<ChatConversation>>(
+      stream: chatService.conversationsStream(widget.userId),
+      builder: (context, convoSnap) {
+        final convoMap = {for (final c in convoSnap.data ?? []) c.id: c};
+        return Consumer3<AnfrageService, FahrtService, SeenAnfragenService>(
+          builder: (context, anfrageService, fahrtService, seenService, _) {
         final fahrtMap = {for (final f in fahrtService.alleFahrten) f.id: f};
         final es = context.read<EventService>();
         final eventDatumCache = {for (final e in es.events) e.id: e.datum};
@@ -995,6 +1044,11 @@ class _AngefragteFahrtenTabState extends State<_AngefragteFahrtenTab>
                   ),
                 ),
               ),
+              if (normalAnfragen.any((i) =>
+                  i.fahrt != null &&
+                  (i.anfrage.status == AnfrageStatus.offen ||
+                      i.anfrage.status == AnfrageStatus.akzeptiert)))
+                const SliverToBoxAdapter(child: _MitfahrtSwipeHint()),
               SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
@@ -1005,13 +1059,56 @@ class _AngefragteFahrtenTabState extends State<_AngefragteFahrtenTab>
                       );
                     }
                     final anfrageId = item.anfrage.id;
-                    return RepaintBoundary(
+                    final isSwipeable =
+                        item.anfrage.status == AnfrageStatus.offen ||
+                            item.anfrage.status == AnfrageStatus.akzeptiert;
+                    final convoId = chatService.buildConversationId(
+                      fahrtId: item.fahrt!.id,
+                      userA: item.fahrt!.ownerId,
+                      userB: item.anfrage.requesterId,
+                    );
+                    final isUnreadChat =
+                        convoMap[convoId]?.isUnreadFor(widget.userId) ?? false;
+                    final card = RepaintBoundary(
                       child: _RequestedRideCard(
                         fahrt: item.fahrt!,
                         anfrage: item.anfrage,
                         isUnseen: _unseenCardIds.contains(anfrageId),
+                        isUnreadChat: isUnreadChat,
                         onInteracted: () => _markCardSeen(anfrageId),
                       ),
+                    );
+                    if (!isSwipeable) return card;
+                    return Dismissible(
+                      key: ValueKey(anfrageId),
+                      direction: DismissDirection.endToStart,
+                      confirmDismiss: (_) async {
+                        final isAkzeptiert =
+                            item.anfrage.status == AnfrageStatus.akzeptiert;
+                        return showAppSheet<bool>(
+                          context,
+                          (ctx) => AppBottomSheet(
+                            icon: Icons.undo,
+                            iconColor: Colors.redAccent,
+                            title: 'Anfrage zurückziehen?',
+                            body: isAkzeptiert
+                                ? 'Möchtest du deine akzeptierte Anfrage wirklich zurückziehen?\n\n'
+                                    'Der Fahrer wird benachrichtigt und dein Platz wird wieder freigegeben.'
+                                : 'Möchtest du deine Anfrage wirklich zurückziehen?',
+                            primaryLabel: 'Zurückziehen',
+                            onPrimary: () => Navigator.pop(ctx, true),
+                            secondaryLabel: 'Abbrechen',
+                            onSecondary: () => Navigator.pop(ctx, false),
+                            danger: true,
+                          ),
+                        );
+                      },
+                      onDismissed: (_) {
+                        _markCardSeen(anfrageId);
+                        _stornierenItem(item);
+                      },
+                      background: const _SwipeStorniereBackground(),
+                      child: card,
                     );
                   },
                   childCount: normalAnfragen.length,
@@ -1027,6 +1124,8 @@ class _AngefragteFahrtenTabState extends State<_AngefragteFahrtenTab>
               ),
             const SliverToBoxAdapter(child: SizedBox(height: 130)),
           ],
+        );
+          },
         );
       },
     );
@@ -1400,8 +1499,9 @@ class _EinladungsCardState extends State<_EinladungsCard> {
 /// ------------------------------------------------------------
 class _FahrerGlassCard extends StatelessWidget {
   final FahrtDaten fahrt;
+  final int unreadChatCount;
 
-  const _FahrerGlassCard({required this.fahrt});
+  const _FahrerGlassCard({required this.fahrt, this.unreadChatCount = 0});
 
   @override
   Widget build(BuildContext context) {
@@ -1627,9 +1727,11 @@ class _FahrerGlassCard extends StatelessWidget {
                                     ),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.blueAccent
-                                            .withValues(alpha: 0.2),
-                                        blurRadius: 10,
+                                        color: Colors.blueAccent.withValues(
+                                          alpha: unreadChatCount > 0 ? 0.45 : 0.2,
+                                        ),
+                                        blurRadius: unreadChatCount > 0 ? 16 : 10,
+                                        spreadRadius: unreadChatCount > 0 ? 1 : 0,
                                         offset: const Offset(0, 3),
                                       ),
                                     ],
@@ -1653,25 +1755,51 @@ class _FahrerGlassCard extends StatelessWidget {
                                         Container(
                                           padding: const EdgeInsets.symmetric(
                                               horizontal: 7, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(12),
-                                        color: Colors.white.withValues(
-                                          alpha: 0.08,
-                                        ),
-                                        border: Border.all(
-                                          color: Colors.white.withValues(
-                                            alpha: 0.18,
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(12),
+                                            color: Colors.white.withValues(alpha: 0.08),
+                                            border: Border.all(
+                                              color: Colors.white.withValues(alpha: 0.18),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            '${counts.offen}',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 13,
+                                              letterSpacing: 0.2,
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                      child: Text(
-                                        '${counts.offen}',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 14,
-                                          letterSpacing: 0.2,
-                                        ),
+                                      ],
+                                      if (unreadChatCount > 0) ...[
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 7, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(12),
+                                            color: Colors.white.withValues(alpha: 0.2),
+                                            border: Border.all(
+                                              color: Colors.white.withValues(alpha: 0.55),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(Icons.chat_bubble_rounded,
+                                                  color: Colors.white, size: 11),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                '$unreadChatCount',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 13,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ],
@@ -1700,12 +1828,14 @@ class _RequestedRideCard extends StatefulWidget {
   final FahrtDaten fahrt;
   final AnfrageDaten anfrage;
   final bool isUnseen;
+  final bool isUnreadChat;
   final VoidCallback? onInteracted;
 
   const _RequestedRideCard({
     required this.fahrt,
     required this.anfrage,
     required this.isUnseen,
+    this.isUnreadChat = false,
     this.onInteracted,
   });
 
@@ -1814,6 +1944,7 @@ class _RequestedRideCardState extends State<_RequestedRideCard> {
             event: event,
             openChat: () => _openChat(context),
             onInteracted: widget.onInteracted,
+            isUnreadChat: widget.isUnreadChat,
           );
 
     // ── Einladungs-Label ──
@@ -1937,25 +2068,95 @@ class _RequestedRideCardState extends State<_RequestedRideCard> {
                           fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 5,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        _TimeBadge(
-                            icon: Icons.schedule,
-                            text: fahrt.uhrzeit.format(context)),
-                        if (istHinUndZurueck)
-                          _TimeBadge(icon: Icons.sync, text: rueckuhrzeit),
-                        _TimeBadge(
-                          icon: Icons.event_seat,
-                          text: anfrage.seatsAccepted != null
-                              ? '${anfrage.seatsAccepted} / ${anfrage.seatsRequested} Plätze'
-                              : '${anfrage.seatsRequested} Plätze',
+                        // Uhrzeit(en) oben, Plätze unten
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: [
+                                  _TimeBadge(
+                                      icon: Icons.schedule,
+                                      text: fahrt.uhrzeit.format(context)),
+                                  if (istHinUndZurueck)
+                                    _TimeBadge(icon: Icons.sync, text: rueckuhrzeit),
+                                ],
+                              ),
+                              const SizedBox(height: 5),
+                              _TimeBadge(
+                                icon: Icons.event_seat,
+                                text: anfrage.seatsAccepted != null
+                                    ? '${anfrage.seatsAccepted} / ${anfrage.seatsRequested} Plätze'
+                                    : '${anfrage.seatsRequested} Plätze',
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        // Chat-Button rechts, beide Zeilen hoch
+                        GestureDetector(
+                          onTap: () => _openChat(context),
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 350),
+                                curve: Curves.easeOutCubic,
+                                width: 52,
+                                height: 52,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: widget.isUnreadChat
+                                      ? Colors.blueAccent.withValues(alpha: 0.38)
+                                      : Colors.blueAccent.withValues(alpha: 0.18),
+                                  border: Border.all(
+                                    color: widget.isUnreadChat
+                                        ? Colors.blueAccent.withValues(alpha: 0.9)
+                                        : Colors.blueAccent.withValues(alpha: 0.65),
+                                    width: widget.isUnreadChat ? 1.8 : 1.5,
+                                  ),
+                                  boxShadow: widget.isUnreadChat
+                                      ? [BoxShadow(
+                                          color: Colors.blueAccent.withValues(alpha: 0.35),
+                                          blurRadius: 10,
+                                          spreadRadius: 0,
+                                        )]
+                                      : null,
+                                ),
+                                child: const Icon(
+                                  Icons.chat_bubble_rounded,
+                                  color: Colors.white,
+                                  size: 22,
+                                ),
+                              ),
+                              if (widget.isUnreadChat)
+                                Positioned(
+                                  right: 1,
+                                  top: 1,
+                                  child: Container(
+                                    width: 9,
+                                    height: 9,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: Colors.blueAccent.withValues(alpha: 0.4),
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    aktionenWidget,
                     // Review-Prompt: nur nach abgeschlossener Fahrt anzeigen
                     _ReviewPrompt(
                       fahrtId: fahrt.id,
@@ -2325,6 +2526,7 @@ class _MitfahrerAktionen extends StatefulWidget {
   final Event event;
   final VoidCallback openChat;
   final VoidCallback? onInteracted;
+  final bool isUnreadChat;
 
   const _MitfahrerAktionen({
     required this.fahrt,
@@ -2332,6 +2534,7 @@ class _MitfahrerAktionen extends StatefulWidget {
     required this.event,
     required this.openChat,
     this.onInteracted,
+    this.isUnreadChat = false,
   });
 
   @override
@@ -2339,184 +2542,56 @@ class _MitfahrerAktionen extends StatefulWidget {
 }
 
 class _MitfahrerAktionenState extends State<_MitfahrerAktionen> {
-  bool _loading = false;
-
-  Future<void> _stornieren({bool sendChatMessage = false}) async {
-    setState(() => _loading = true);
-    final ok =
-        await context.read<AnfrageService>().storniereAnfrage(widget.anfrage);
-    if (ok && sendChatMessage && mounted) {
-      await context.read<ChatService>().sendStatusNotification(
-            fahrtId: widget.fahrt.id,
-            ownerId: widget.fahrt.ownerId,
-            requesterId: widget.anfrage.requesterId,
-            text: 'Anfrage zurückgezogen – Platz wurde wieder freigegeben.',
-            eventName: widget.fahrt.eventName,
-            startOrt: widget.fahrt.abfahrtsort,
-            zielOrt: widget.fahrt.standort,
-            seatsRequested: widget.anfrage.seatsRequested,
-          );
-    }
-    widget.onInteracted?.call();
-    if (mounted) setState(() => _loading = false);
-  }
-
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Center(
-        child: SizedBox(
-          height: 36,
-          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.amber),
-        ),
-      );
-    }
-
     switch (widget.anfrage.status) {
-      // ── OFFEN: warten + zurückziehen ──────────────────────────
+      // ── OFFEN: warten (zurückziehen per Swipe) ────────────────
       case AnfrageStatus.offen:
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            IconButton(
-              onPressed: widget.openChat,
-              icon: const Icon(Icons.chat_bubble_outline,
-                  color: Colors.white38, size: 18),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-              style: IconButton.styleFrom(
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              tooltip: 'Chat öffnen',
-            ),
-            TextButton(
-              onPressed: () async {
-                final confirmed = await showDialog<bool>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    backgroundColor: const Color(0xFF1A1F2E),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16)),
-                    title: const Text('Anfrage zurückziehen?',
-                        style: TextStyle(color: Colors.white, fontSize: 16)),
-                    content: const Text(
-                      'Möchtest du deine Anfrage wirklich zurückziehen?',
-                      style: TextStyle(color: Colors.white70, fontSize: 14),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, false),
-                        child: const Text('Abbrechen',
-                            style: TextStyle(color: Colors.white54)),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, true),
-                        child: const Text('Zurückziehen',
-                            style: TextStyle(
-                                color: Colors.redAccent,
-                                fontWeight: FontWeight.w600)),
-                      ),
-                    ],
-                  ),
-                );
-                if (confirmed == true) _stornieren();
-              },
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.white38,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                minimumSize: Size.zero,
-              ),
-              child: const Text(
-                'Anfrage zurückziehen',
-                style: TextStyle(
-                  fontSize: 12,
-                  decoration: TextDecoration.underline,
-                  decorationColor: Colors.white24,
+        return Align(
+          alignment: Alignment.centerRight,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              IconButton(
+                onPressed: widget.openChat,
+                icon: Icon(
+                  Icons.chat_bubble_outline,
+                  color: widget.isUnreadChat
+                      ? Colors.blueAccent.withValues(alpha: 0.9)
+                      : Colors.white38,
+                  size: 18,
                 ),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                style: IconButton.styleFrom(
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                tooltip: 'Chat öffnen',
               ),
-            ),
-          ],
+              if (widget.isUnreadChat)
+                Positioned(
+                  right: -1,
+                  top: -1,
+                  child: Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.blueAccent.withValues(alpha: 0.4),
+                        width: 1.2,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         );
 
-      // ── AKZEPTIERT: mit Fahrer chatten + zurückziehen ────────
+      // ── AKZEPTIERT: Chat-Button ist direkt in der Card ────────
       case AnfrageStatus.akzeptiert:
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blueAccent,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 7),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              icon: const Icon(Icons.chat_bubble_outline, size: 14),
-              label: const Text(
-                'Mit Fahrer chatten',
-                style: TextStyle(fontSize: 12),
-              ),
-              onPressed: widget.openChat,
-            ),
-            const SizedBox(height: 6),
-            TextButton(
-              onPressed: () async {
-                final confirmed = await showDialog<bool>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    backgroundColor: const Color(0xFF1A1F2E),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16)),
-                    title: const Text('Anfrage zurückziehen?',
-                        style: TextStyle(color: Colors.white, fontSize: 16)),
-                    content: const Text(
-                      'Möchtest du deine akzeptierte Anfrage wirklich zurückziehen?\n\n'
-                      'Der Fahrer wird benachrichtigt und dein Platz wird wieder freigegeben.',
-                      style: TextStyle(color: Colors.white70, fontSize: 14),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, false),
-                        child: const Text('Abbrechen',
-                            style: TextStyle(color: Colors.white54)),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, true),
-                        child: const Text('Zurückziehen',
-                            style: TextStyle(
-                                color: Colors.redAccent,
-                                fontWeight: FontWeight.w600)),
-                      ),
-                    ],
-                  ),
-                );
-                if (confirmed == true && mounted) {
-                  _stornieren(sendChatMessage: true);
-                }
-              },
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.redAccent.withValues(alpha: 0.7),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                minimumSize: Size.zero,
-              ),
-              child: const Text(
-                'Anfrage zurückziehen',
-                style: TextStyle(
-                  fontSize: 12,
-                  decoration: TextDecoration.underline,
-                  decorationColor: Colors.redAccent,
-                ),
-              ),
-            ),
-          ],
-        );
+        return const SizedBox.shrink();
 
       // ── ABGELEHNT: andere Fahrt finden ────────────────────────
       case AnfrageStatus.abgelehnt:
@@ -2910,25 +2985,24 @@ class _TimeBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scale = (MediaQuery.sizeOf(context).width / 390).clamp(0.78, 1.0);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: 6 * scale, vertical: 2.5 * scale),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(9),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.12),
-        ),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: Colors.white60),
-          const SizedBox(width: 4),
+          Icon(icon, size: 11 * scale, color: Colors.white60),
+          SizedBox(width: 3 * scale),
           Text(
             text,
-            style: const TextStyle(
+            style: TextStyle(
               color: Colors.white,
-              fontSize: 12,
+              fontSize: 11 * scale,
               fontWeight: FontWeight.w500,
             ),
           ),

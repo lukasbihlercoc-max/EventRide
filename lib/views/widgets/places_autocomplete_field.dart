@@ -13,15 +13,20 @@ const _kApiKey = 'AIzaSyB97RZAMf-fmZKhdFFniU20CqK0QWCV3KE';
 
 class _Prediction {
   final String description;
+  final String mainText;
   final String placeId;
-  const _Prediction({required this.description, required this.placeId});
+  const _Prediction({
+    required this.description,
+    required this.mainText,
+    required this.placeId,
+  });
 }
 
 class PlacesAutocompleteField extends StatefulWidget {
   final TextEditingController controller;
   final InputDecoration decoration;
   final TextStyle? textStyle;
-  final void Function(double lat, double lng) onPlaceSelected;
+  final void Function(String name, String fullAddress, double lat, double lng) onPlaceSelected;
 
   const PlacesAutocompleteField({
     super.key,
@@ -91,10 +96,16 @@ class _PlacesAutocompleteFieldState extends State<PlacesAutocompleteField> {
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       _predictions = (data['predictions'] as List? ?? [])
           .take(5)
-          .map((p) => _Prediction(
-                description: p['description'] as String? ?? '',
-                placeId: p['place_id'] as String? ?? '',
-              ))
+          .map((p) {
+            final desc = p['description'] as String? ?? '';
+            final main = (p['structured_formatting']?['main_text'] as String?)
+                ?? desc;
+            return _Prediction(
+              description: desc,
+              mainText: main,
+              placeId: p['place_id'] as String? ?? '',
+            );
+          })
           .where((p) => p.placeId.isNotEmpty)
           .toList();
 
@@ -107,9 +118,9 @@ class _PlacesAutocompleteFieldState extends State<PlacesAutocompleteField> {
   }
 
   Future<void> _select(_Prediction p) async {
-    widget.controller.text = p.description;
+    widget.controller.text = p.mainText;
     widget.controller.selection =
-        TextSelection.collapsed(offset: p.description.length);
+        TextSelection.collapsed(offset: p.mainText.length);
     _predictions = [];
     _removeOverlay();
     _focus.unfocus();
@@ -126,6 +137,8 @@ class _PlacesAutocompleteFieldState extends State<PlacesAutocompleteField> {
       final loc = data['result']?['geometry']?['location'];
       if (loc != null) {
         widget.onPlaceSelected(
+          p.mainText,
+          p.description,
           (loc['lat'] as num).toDouble(),
           (loc['lng'] as num).toDouble(),
         );

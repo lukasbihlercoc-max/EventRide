@@ -6,8 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:my_app/data/review.dart';
-import 'package:google_places_flutter/google_places_flutter.dart';
-import 'package:google_places_flutter/model/place_type.dart';
+import 'package:my_app/views/widgets/places_autocomplete_field.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:my_app/config/feature_flags.dart';
@@ -834,14 +833,15 @@ class _HeroSection extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 8,
+            runSpacing: 6,
             children: [
               _StatChip(
                 icon: Icons.directions_car_rounded,
                 label: "0 Fahrten",
               ),
-              const SizedBox(width: 8),
               _StatChip(
                 icon: Icons.star_rounded,
                 label: (user.ratingAvg != null && user.ratingCount > 0)
@@ -1674,10 +1674,9 @@ class _HomeTownSheetState extends State<_HomeTownSheet> {
             style: TextStyle(color: Colors.white54, fontSize: 13, height: 1.5),
           ),
           const SizedBox(height: 16),
-          GooglePlaceAutoCompleteTextField(
-            textEditingController: _ctrl,
-            googleAPIKey: "AIzaSyB97RZAMf-fmZKhdFFniU20CqK0QWCV3KE",
-            inputDecoration: InputDecoration(
+          PlacesAutocompleteField(
+            controller: _ctrl,
+            decoration: InputDecoration(
               labelText: "Gemeinde",
               labelStyle: const TextStyle(color: Colors.white54),
               filled: true,
@@ -1699,67 +1698,14 @@ class _HomeTownSheetState extends State<_HomeTownSheet> {
               ),
             ),
             textStyle: const TextStyle(color: Colors.white),
-            boxDecoration: const BoxDecoration(color: Colors.transparent),
-            debounceTime: 500,
-            countries: const ["at"],
-            placeType: PlaceType.cities,
-            language: 'de',
-            isLatLngRequired: true,
-            getPlaceDetailWithLatLng: (prediction) {
+            onPlaceSelected: (name, _, lat, lng) {
               setState(() {
-                _selectedName =
-                    prediction.structuredFormatting?.mainText ??
-                        prediction.description ??
-                        '';
-                _selectedLat = double.tryParse(prediction.lat ?? '');
-                _selectedLng = double.tryParse(prediction.lng ?? '');
+                _selectedName = name;
+                _selectedLat = lat;
+                _selectedLng = lng;
                 _error = null;
               });
             },
-            itemClick: (prediction) {
-              _ctrl.text = prediction.structuredFormatting?.mainText ??
-                  prediction.description ??
-                  '';
-              _ctrl.selection = TextSelection.fromPosition(
-                TextPosition(offset: _ctrl.text.length),
-              );
-            },
-            itemBuilder: (context, index, prediction) {
-              return Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1B3F78),
-                  border: Border(
-                    left: BorderSide(
-                      color: const Color(0xFF5DA9FF).withValues(alpha: 0.6),
-                      width: 3,
-                    ),
-                  ),
-                ),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                child: Row(
-                  children: [
-                    const Icon(Icons.location_on_outlined,
-                        color: Color(0xFF5DA9FF), size: 18),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        prediction.description ?? '',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-            seperatedBuilder: Divider(
-              height: 1,
-              color: Colors.white.withValues(alpha: 0.12),
-            ),
           ),
           if (_error != null) ...[
             const SizedBox(height: 8),
@@ -2231,7 +2177,7 @@ class _OwnReviewsSectionState extends State<_OwnReviewsSection> {
         (_reviews!.map((r) => r.rating.toDouble()).reduce((a, b) => a + b) / count);
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // Zusammenfassung
         AppCard(
@@ -2248,25 +2194,27 @@ class _OwnReviewsSectionState extends State<_OwnReviewsSection> {
                 ),
               ),
               const SizedBox(width: 14),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: List.generate(5, (i) {
-                      final filled = i < avg.round();
-                      return Icon(
-                        filled ? Icons.star_rounded : Icons.star_outline_rounded,
-                        size: 18,
-                        color: filled ? Colors.amber : Colors.white24,
-                      );
-                    }),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '$totalCount ${totalCount == 1 ? 'Bewertung' : 'Bewertungen'}',
-                    style: const TextStyle(color: Colors.white54, fontSize: 12),
-                  ),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: List.generate(5, (i) {
+                        final filled = i < avg.round();
+                        return Icon(
+                          filled ? Icons.star_rounded : Icons.star_outline_rounded,
+                          size: 18,
+                          color: filled ? Colors.amber : Colors.white24,
+                        );
+                      }),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$totalCount ${totalCount == 1 ? 'Bewertung' : 'Bewertungen'}',
+                      style: const TextStyle(color: Colors.white54, fontSize: 12),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
