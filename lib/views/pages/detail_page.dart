@@ -173,14 +173,27 @@ class DetailPage extends StatelessWidget {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      event.beschreibung,
-                                      style: TextStyle(
+                                    Builder(builder: (_) {
+                                      final sep = event.beschreibung.indexOf('\n\n');
+                                      final textStyle = TextStyle(
                                         fontSize: width * 0.048,
                                         height: 1.4,
                                         color: Colors.white,
-                                      ),
-                                    ),
+                                      );
+                                      if (sep <= 0) {
+                                        return Text(event.beschreibung, style: textStyle);
+                                      }
+                                      final eintritt = event.beschreibung.substring(0, sep);
+                                      final rest = event.beschreibung.substring(sep + 2);
+                                      return Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(eintritt, style: textStyle),
+                                          SizedBox(height: width * 0.035),
+                                          Text(rest, style: textStyle),
+                                        ],
+                                      );
+                                    }),
                                     // Mini-Karte + Navigationsbutton
                                     if (event.latitude != null &&
                                         event.longitude != null) ...[

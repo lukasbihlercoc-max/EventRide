@@ -73,10 +73,20 @@ class Event {
     DateTime parsedDatum;
 
     if (rawDatum is int) {
-      // fallback: epoch milliseconds
       parsedDatum = DateTime.fromMillisecondsSinceEpoch(rawDatum, isUtc: true);
     } else if (rawDatum is String) {
-      parsedDatum = DateTime.parse(rawDatum).toUtc();
+      // Handle DD.MM.YYYY (legacy manager format)
+      final ddmmyyyy = RegExp(r'^(\d{2})\.(\d{2})\.(\d{4})$');
+      final m = ddmmyyyy.firstMatch(rawDatum);
+      if (m != null) {
+        parsedDatum = DateTime.utc(int.parse(m.group(3)!), int.parse(m.group(2)!), int.parse(m.group(1)!));
+      } else {
+        try {
+          parsedDatum = DateTime.parse(rawDatum).toUtc();
+        } catch (_) {
+          parsedDatum = DateTime.now().toUtc();
+        }
+      }
     } else if (rawDatum is DateTime) {
       parsedDatum = rawDatum.toUtc();
     } else {
