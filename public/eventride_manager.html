@@ -9,86 +9,174 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F7F7F5;color:#1a1a1a;font-size:14px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F0F0EE;color:#1a1a1a;font-size:14px;line-height:1.5}
 a{color:#E88C2E;text-decoration:none}
-button{font-family:inherit;font-size:13px;cursor:pointer;border:1px solid #ddd;background:#fff;border-radius:7px;padding:5px 12px;transition:background .15s}
-button:hover{background:#f0f0ee}
-button.primary{background:#E88C2E;color:#fff;border-color:#E88C2E}
-button.primary:hover{background:#d07a20}
+
+button{font-family:inherit;font-size:13px;cursor:pointer;border:1px solid #ddd;background:#fff;border-radius:7px;padding:6px 13px;transition:background .15s,border-color .15s}
+button:hover{background:#f5f5f3;border-color:#ccc}
+button.primary{background:#E88C2E;color:#fff;border-color:#E88C2E;font-weight:500}
+button.primary:hover{background:#d07a20;border-color:#d07a20}
 button.danger{color:#c0392b;border-color:#f0c0bb;background:#fff}
 button.danger:hover{background:#fef0ee}
-button.small{padding:3px 9px;font-size:12px}
-input,select,textarea{font-family:inherit;font-size:13px;border:1px solid #ddd;border-radius:7px;padding:6px 9px;width:100%;background:#fff;color:#1a1a1a}
-input:focus,select:focus,textarea:focus{outline:none;border-color:#E88C2E}
-.card{background:#fff;border:1px solid #e8e8e5;border-radius:12px}
-.badge{display:inline-flex;align-items:center;font-size:11px;font-weight:500;padding:2px 8px;border-radius:10px;white-space:nowrap}
+button.small{padding:4px 10px;font-size:12px}
+button.icon-btn{border:none;background:none;padding:4px 6px;font-size:16px;line-height:1;border-radius:6px}
+button.icon-btn:hover{background:#f0f0ee}
+
+input,select,textarea{font-family:inherit;font-size:13px;border:1px solid #ddd;border-radius:7px;padding:7px 10px;width:100%;background:#fff;color:#1a1a1a;transition:border-color .15s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:#E88C2E;box-shadow:0 0 0 3px rgba(232,140,46,.12)}
+
+.card{background:#fff;border:1px solid #e2e2df;border-radius:12px}
+
+.badge{display:inline-flex;align-items:center;font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;white-space:nowrap;letter-spacing:.1px}
 .badge-kirchtag{background:#FAEEDA;color:#633806}
 .badge-feuerwehr{background:#EAF3DE;color:#27500A}
 .badge-ball{background:#FBEAF0;color:#72243E}
 .badge-krampus{background:#EEEDFE;color:#3C3489}
 .badge-disco{background:#E6F1FB;color:#0C447C}
 .badge-confirmed{background:#EAF3DE;color:#27500A}
-.badge-check{background:#FAEEDA;color:#633806}
+.badge-check{background:#FFF3D6;color:#7A4A00}
 .badge-inapp{background:#E6F1FB;color:#0C447C}
 .badge-geprueft{background:#f0f0ee;color:#555}
+
+/* Login */
 .login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;background:#0d1420}
-.login-box{background:#fff;border-radius:16px;padding:2.5rem 2rem;text-align:center;width:320px}
+.login-box{background:#fff;border-radius:16px;padding:2.5rem 2rem;text-align:center;width:320px;box-shadow:0 8px 32px rgba(0,0,0,.25)}
 .login-logo{font-size:28px;font-weight:700;color:#1a1a1a;margin-bottom:6px}
 .login-logo span{color:#E88C2E}
 .login-sub{font-size:13px;color:#888;margin-bottom:1.5rem}
-.app-wrap{max-width:1400px;margin:0 auto;padding:1rem}
-.header{display:flex;align-items:center;justify-content:space-between;padding:.75rem 0;border-bottom:1px solid #e8e8e5;margin-bottom:.75rem}
+
+/* App layout */
+.app-wrap{max-width:1440px;margin:0 auto;padding:0 1rem 2rem}
+.header{display:flex;align-items:center;justify-content:space-between;padding:.875rem 0;border-bottom:1px solid #e2e2df;margin-bottom:1rem;background:#F0F0EE;position:sticky;top:0;z-index:50}
 .header-logo{font-size:18px;font-weight:700}
 .header-logo span{color:#E88C2E}
-.stats-row{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:.75rem}
-.stat-card{background:#fff;border:1px solid #e8e8e5;border-radius:10px;padding:10px 12px;text-align:center}
-.stat-num{font-size:22px;font-weight:600}
-.stat-lbl{font-size:10px;color:#888;margin-top:2px}
-.tabs{display:flex;gap:0;border-bottom:1px solid #e8e8e5;margin-bottom:.75rem}
-.tab-btn{padding:7px 16px;font-size:13px;cursor:pointer;border:none;border-bottom:2px solid transparent;background:transparent;color:#888;border-radius:0;font-weight:400}
-.tab-btn.active{color:#1a1a1a;border-bottom:2px solid #E88C2E;font-weight:500}
+
+/* Stats */
+.stats-row{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:1rem}
+.stat-card{background:#fff;border:1px solid #e2e2df;border-radius:11px;padding:12px 14px;text-align:center}
+.stat-num{font-size:26px;font-weight:700;line-height:1.1}
+.stat-lbl{font-size:10px;color:#999;margin-top:3px;text-transform:uppercase;letter-spacing:.4px;font-weight:500}
+
+/* Tabs */
+.tabs{display:flex;gap:0;border-bottom:2px solid #e2e2df;margin-bottom:1rem}
+.tab-btn{padding:9px 18px;font-size:13px;cursor:pointer;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;background:transparent;color:#888;border-radius:0;font-weight:400;transition:color .15s}
+.tab-btn.active{color:#E88C2E;border-bottom:2px solid #E88C2E;font-weight:600}
+.tab-btn:hover:not(.active){color:#444;background:none}
+
+/* Content grid */
 .main-grid{display:grid;grid-template-columns:1fr;gap:12px}
-.main-grid.has-detail{grid-template-columns:1fr 380px}
-.filter-row{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center}
-.filter-row input,.filter-row select{width:auto;font-size:12px}
-.filter-row input[type=text]{width:150px}
-.event-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;cursor:pointer;border-bottom:1px solid #f0f0ee;transition:background .1s}
+.main-grid.has-detail{grid-template-columns:1fr 400px}
+
+/* Filter area */
+.filter-bar{background:#fff;border:1px solid #e2e2df;border-radius:11px;padding:10px 12px;margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.filter-bar input,.filter-bar select{width:auto;font-size:12px;padding:5px 9px}
+.filter-bar input[type=text]{width:160px}
+.filter-count{font-size:11px;color:#bbb;margin-left:auto;white-space:nowrap}
+
+/* Event list */
+.event-list-wrap{background:#fff;border:1px solid #e2e2df;border-radius:11px;overflow:hidden}
+.event-row{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-bottom:1px solid #f2f2f0;border-left:3px solid transparent;transition:background .1s}
+.event-row:last-child{border-bottom:none}
 .event-row:hover{background:#fafaf8}
-.event-row.selected{background:#FFF8F0}
-.event-row.past{opacity:.55}
+.event-row.selected{background:#FFF8F0;border-left-color:#E88C2E}
+.event-row.status-check{border-left-color:#FAC775}
+.event-row.status-confirmed{border-left-color:#7BC47A}
+.event-row.status-inapp{border-left-color:#3498DB}
+.event-row.past{opacity:.45}
 .event-name{flex:1;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.event-meta{font-size:11px;color:#888}
-.event-date{font-size:11px;color:#888;white-space:nowrap}
-.icon-check{color:#27AE60;font-size:13px}
-.icon-upload{color:#3498DB;font-size:13px}
-.detail-panel{background:#fff;border:1px solid #e8e8e5;border-radius:12px;padding:1rem;position:sticky;top:8px;max-height:90vh;overflow-y:auto}
-.detail-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.75rem}
-.detail-name{font-size:15px;font-weight:600;margin-bottom:4px}
+.event-meta{font-size:11px;color:#999;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.event-date{font-size:12px;font-weight:500;white-space:nowrap}
+.event-icons{display:flex;gap:4px;justify-content:flex-end;margin-top:2px}
+.icon-check{color:#27AE60;font-size:12px;font-weight:700}
+.icon-upload{color:#2980B9;font-size:12px}
+
+/* Detail panel */
+.detail-panel{background:#fff;border:1px solid #e2e2df;border-radius:12px;position:sticky;top:64px;max-height:calc(100vh - 80px);overflow-y:auto;display:flex;flex-direction:column}
+.detail-top{padding:14px 16px;border-bottom:1px solid #f0f0ee}
+.detail-name{font-size:16px;font-weight:700;margin-bottom:6px;line-height:1.3}
 .detail-badges{display:flex;gap:5px;flex-wrap:wrap}
-.field-row{display:grid;grid-template-columns:90px 1fr;gap:4px 8px;font-size:12px;margin-bottom:.75rem;align-items:start}
-.field-label{color:#888;padding-top:7px}
-.field-val{padding:6px 9px;border-radius:7px;background:#f7f7f5;font-size:12px;word-break:break-all}
-.section-sep{border-top:1px solid #f0f0ee;margin:.75rem 0;padding-top:.75rem}
-.warn-box{background:#FFFBF0;border:1px solid #FAC775;border-radius:9px;padding:10px;margin-bottom:.75rem}
-.warn-box h4{font-size:12px;font-weight:500;color:#633806;margin-bottom:6px}
-.url-preview{font-family:monospace;font-size:10px;color:#888;word-break:break-all;background:#f7f7f5;padding:6px 8px;border-radius:7px;margin-bottom:8px;max-height:50px;overflow:hidden}
-.btn-row{display:flex;gap:6px}
+.detail-body{padding:14px 16px;flex:1}
+.detail-section{margin-bottom:14px}
+.detail-section-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#bbb;margin-bottom:8px}
+.field-grid{display:grid;grid-template-columns:80px 1fr;gap:5px 10px;font-size:12px;align-items:start}
+.field-lbl{color:#999;padding-top:1px;font-weight:500}
+.field-val{color:#1a1a1a;word-break:break-word}
+.field-val.mono{font-family:monospace;font-size:11px;color:#666}
+
+.section-div{border-top:1px solid #f0f0ee;margin:14px 0}
+
+/* Warn / info boxes */
+.warn-box{background:#FFFBF0;border:1px solid #FAC775;border-radius:9px;padding:12px;margin-bottom:12px}
+.warn-box-title{font-size:11px;font-weight:700;color:#7A4A00;margin-bottom:8px;text-transform:uppercase;letter-spacing:.3px}
+.info-box{background:#F0F6FF;border:1px solid #BADEFF;border-radius:9px;padding:10px 12px;font-size:12px;color:#1a4a7a;margin-bottom:12px}
+
+/* Checkboxes */
+.check-label{display:flex;align-items:center;gap:9px;cursor:pointer;font-size:13px;padding:5px 0}
+.check-label input[type=checkbox]{width:16px;height:16px;accent-color:#E88C2E;cursor:pointer;flex-shrink:0}
+
+/* Edit form */
+.edit-grid{display:grid;grid-template-columns:80px 1fr;gap:7px 10px;margin-bottom:1rem;align-items:center;font-size:13px}
+.edit-label{color:#888;font-size:12px;font-weight:500}
+
+/* Modals */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:200}
+.modal{background:#fff;border-radius:14px;padding:1.5rem;width:440px;max-height:92vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.18)}
+.modal h3{font-size:16px;font-weight:700;margin-bottom:1rem}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}
+.btn-row{display:flex;gap:8px}
 .btn-row button{flex:1}
-.vorschlag-card{background:#fff;border:1px solid #e8e8e5;border-radius:10px;padding:10px 12px;margin-bottom:8px}
-.empty-state{text-align:center;padding:3rem;color:#aaa;font-size:13px}
-.gem-row{display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;cursor:pointer;font-size:12px;border:1px solid #f0f0ee;margin-bottom:3px}
-.gem-row.no-events{background:#FFF5F5;border-color:#fdd;color:#c0392b}
-.gem-row.has-events{background:#f7f7f5}
-.gem-event{padding:5px 8px 5px 20px;font-size:12px;border-bottom:1px solid #f7f7f5;cursor:pointer;display:flex;align-items:center;gap:7px}
+
+/* Bezirke */
+.bez-card{background:#fff;border:1px solid #e2e2df;border-radius:11px;margin-bottom:8px;overflow:hidden}
+.bez-header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;transition:background .1s}
+.bez-header:hover{background:#fafaf8}
+.bez-body{border-top:1px solid #f0f0ee}
+.gem-row{display:flex;align-items:center;justify-content:space-between;padding:8px 14px 8px 24px;font-size:12px;border-bottom:1px solid #f5f5f3;cursor:pointer;transition:background .1s}
+.gem-row:last-child{border-bottom:none}
+.gem-row:hover{background:#fafaf8}
+.gem-row.no-events{color:#ccc}
+.gem-row.no-events .gem-count{color:#ddd}
+.gem-count{font-size:11px;color:#bbb}
+.gem-event{padding:7px 14px 7px 36px;font-size:12px;border-bottom:1px solid #f7f7f5;cursor:pointer;display:flex;align-items:center;gap:8px;transition:background .1s}
+.gem-event:last-child{border-bottom:none}
 .gem-event:hover{background:#fafaf8}
-.bez-header{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;cursor:pointer;background:#fafaf8;border-radius:10px;margin-bottom:5px;border:1px solid #e8e8e5}
-.edit-grid{display:grid;grid-template-columns:90px 1fr;gap:5px 8px;margin-bottom:.75rem;align-items:center;font-size:12px}
-.edit-label{color:#888;font-size:12px}
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:200}
-.modal{background:#fff;border-radius:14px;padding:1.5rem;width:420px;max-height:90vh;overflow-y:auto}
-.modal h3{font-size:15px;font-weight:600;margin-bottom:1rem}
+
+/* Vorschlag / upload */
+.url-preview{font-family:monospace;font-size:10px;color:#888;word-break:break-all;background:#f7f7f5;padding:6px 8px;border-radius:7px;margin-bottom:8px;max-height:48px;overflow:hidden}
 .tag-new{background:#E6F1FB;color:#0C447C;font-size:10px;padding:1px 6px;border-radius:8px;margin-left:5px}
-@media(max-width:900px){.main-grid.has-detail{grid-template-columns:1fr}.stats-row{grid-template-columns:repeat(3,1fr)}}
+
+/* Toast */
+#mgr-toast{display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:10px 20px;border-radius:8px;font-size:13px;font-weight:500;color:#fff;z-index:999;box-shadow:0 4px 16px rgba(0,0,0,.2)}
+
+/* Empty state */
+.empty-state{text-align:center;padding:3rem 2rem;color:#bbb;font-size:13px}
+
+/* Inapp detail */
+.inapp-id{font-family:monospace;font-size:11px;color:#999;background:#f7f7f5;padding:4px 8px;border-radius:6px;display:inline-block;margin-top:4px}
+
+/* CSV import progress */
+@keyframes spin{to{transform:rotate(360deg)}}
+.csv-spinner{width:18px;height:18px;border:2px solid #e2e2df;border-top-color:#E88C2E;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+.csv-progress{background:#fff;border:1px solid #e2e2df;border-radius:10px;padding:16px 18px;margin-top:12px}
+.csv-progress-row{display:flex;align-items:center;gap:10px;font-size:13px;margin-bottom:6px}
+.csv-progress-row:last-child{margin-bottom:0}
+.csv-stat{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;font-size:13px}
+.csv-stat.new{background:#EAF3DE;color:#27500A}
+.csv-stat.skipped{background:#f5f5f3;color:#666}
+.csv-stat.error{background:#fef0ee;color:#c0392b}
+
+/* Duplicate grouping */
+.event-row.has-dupes{border-bottom:none}
+.dupe-group{border-bottom:1px solid #f2f2f0;border-left:3px solid #FAC775;background:#FDFCF7}
+.dupe-row{display:flex;align-items:center;gap:8px;padding:7px 14px 7px 28px;border-bottom:1px solid #f5f4f0;font-size:12px}
+.dupe-row:last-child{border-bottom:none}
+.dupe-actions{display:flex;gap:5px;flex-shrink:0;margin-left:8px}
+
+@media(max-width:900px){
+  .main-grid.has-detail{grid-template-columns:1fr}
+  .stats-row{grid-template-columns:repeat(3,1fr)}
+  .detail-panel{position:static;max-height:none}
+}
 </style>
 </head>
 <body>
@@ -97,7 +185,8 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#E88C2E}
   <div class="login-box">
     <div class="login-logo">Event<span>Ride</span></div>
     <div class="login-sub">Manager — Intern</div>
-    <button class="primary" style="width:100%;padding:10px;font-size:14px" onclick="login()">
+    <div id="login-error" style="display:none;background:#fef0ee;color:#c0392b;border-radius:8px;padding:10px 12px;font-size:12px;margin-bottom:1rem;text-align:left"></div>
+    <button class="primary" style="width:100%;padding:11px;font-size:14px" onclick="login()">
       Mit Google anmelden
     </button>
   </div>
@@ -107,10 +196,10 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#E88C2E}
   <div class="app-wrap">
     <div class="header">
       <div>
-        <span class="header-logo">Event<span>Ride</span> <span style="font-weight:400;color:#888;font-size:14px">Manager</span></span>
+        <span class="header-logo">Event<span>Ride</span> <span style="font-weight:400;color:#aaa;font-size:13px">Manager</span></span>
       </div>
       <div style="display:flex;align-items:center;gap:10px">
-        <span id="user-name" style="font-size:12px;color:#888"></span>
+        <span id="user-name" style="font-size:12px;color:#999"></span>
         <button class="small" onclick="logout()">Abmelden</button>
         <button class="small primary" onclick="openAdd()">+ Event</button>
       </div>
@@ -131,17 +220,33 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#E88C2E}
 
 <div id="modal-add" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeAdd()">
   <div class="modal">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+    <div class="modal-header">
       <h3 style="margin:0">Event hinzufügen</h3>
-      <button onclick="closeAdd()" style="border:none;background:none;font-size:20px;cursor:pointer">×</button>
+      <button class="icon-btn" onclick="closeAdd()">×</button>
     </div>
     <div id="add-form"></div>
-    <div class="btn-row" style="margin-top:.75rem">
+    <div class="btn-row" style="margin-top:1rem">
       <button onclick="closeAdd()">Abbrechen</button>
       <button class="primary" onclick="submitAdd()">Hinzufügen</button>
     </div>
   </div>
 </div>
+
+<div id="modal-upload" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeUpload()">
+  <div class="modal" style="width:520px;max-width:95vw">
+    <div class="modal-header">
+      <h3 style="margin:0">In App hochladen</h3>
+      <button class="icon-btn" onclick="closeUpload()">×</button>
+    </div>
+    <div id="upload-form-content"></div>
+    <div class="btn-row" style="margin-top:1rem">
+      <button onclick="closeUpload()">Abbrechen</button>
+      <button class="primary" id="btn-upload-submit" onclick="submitUpload()">↑ In App speichern</button>
+    </div>
+  </div>
+</div>
+
+<div id="mgr-toast"></div>
 
 <script>
 const CFG = {
@@ -183,11 +288,28 @@ let expandBez = {};
 let expandGem = {};
 let fBez = "Alle", fTyp = "Alle", fStatus = "Alle", fSearch = "";
 let sortDir = "asc";
+let showPast = false;
 let addFormData = {};
+let uploadData = {};
+let uploadPendingId = null;
 
 // ---- AUTH ----
+const ALLOWED_EMAILS = ['lukas.bihler.coc@gmail.com', 'matzematze666@gmail.com', 'chiara.bihler.cb@gmail.com'];
+
+function showLoginError(msg) {
+  const errEl = document.getElementById("login-error");
+  if(errEl) { errEl.style.display = "block"; errEl.textContent = msg; }
+}
+
 auth.onAuthStateChanged(user => {
   if(user) {
+    if(!ALLOWED_EMAILS.includes((user.email||'').toLowerCase().trim())) {
+      auth.signOut();
+      showLoginError(`Kein Zugriff für ${user.email}. Bitte mit einem berechtigten Account anmelden.`);
+      return;
+    }
+    const errEl = document.getElementById("login-error");
+    if(errEl) errEl.style.display = "none";
     document.getElementById("login-screen").style.display = "none";
     document.getElementById("app").style.display = "block";
     document.getElementById("user-name").textContent = user.displayName || user.email;
@@ -198,7 +320,23 @@ auth.onAuthStateChanged(user => {
     appEvents = []; pending = [];
   }
 });
-function login() { auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }
+
+// Redirect-Result abfangen (wird nach signInWithRedirect aufgerufen)
+auth.getRedirectResult().catch(e => {
+  if(e.code !== 'auth/no-auth-event') showLoginError("Fehler beim Anmelden: " + e.message);
+});
+
+function login() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).catch(e => {
+    if(e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
+      // Popup geblockt → Redirect-Modus als Fallback
+      auth.signInWithRedirect(provider);
+    } else {
+      showLoginError("Fehler: " + e.message);
+    }
+  });
+}
 function logout() { auth.signOut(); }
 
 // ---- FIRESTORE ----
@@ -222,7 +360,6 @@ function initFS() {
     pending = snap.docs.map(d => ({_id: d.id, _src: "pending", ...d.data()}));
     render();
   }, e => {
-    // Collection doesn't exist yet — that's fine
     pending = [];
     render();
   });
@@ -251,6 +388,15 @@ function getYear(s) { const d=parseDatum(s); return d?d.getFullYear():0; }
 function isCheck(ev) { return ev.status==="check" || getYear(ev.datum)<2026; }
 function isPast(s) { const d=parseDatum(s); if(!d) return false; const t=new Date();t.setHours(0,0,0,0);return d<t; }
 
+function isMonthDayPast(s, bufferDays=5) {
+  const d = parseDatum(s);
+  if(!d) return false;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const thisYear = new Date(today.getFullYear(), d.getMonth(), d.getDate());
+  const cutoff = new Date(today); cutoff.setDate(cutoff.getDate() - bufferDays);
+  return thisYear < cutoff;
+}
+
 function buildAdminUrl(ev) {
   const base = "https://eventride-cd0e9.web.app/index.html";
   const p = new URLSearchParams({
@@ -275,6 +421,83 @@ function isDupe(name) {
          pending.some(e=>e.name&&e.name.trim().toLowerCase()===n);
 }
 
+// ---- DUPLICATE DETECTION ----
+function normalizeName(s) {
+  return (s||'').toLowerCase().trim()
+    .replace(/\b(20\d\d)\b/g,'')
+    .replace(/[-–—\/\\.,!?()]/g,' ')
+    .replace(/[^a-zäöüß\s]/g,'')
+    .replace(/\s+/g,' ').trim();
+}
+
+function levenshtein(a,b) {
+  if(!a.length) return b.length;
+  if(!b.length) return a.length;
+  const m=Array.from({length:b.length+1},(_,i)=>[i]);
+  for(let j=0;j<=a.length;j++) m[0][j]=j;
+  for(let i=1;i<=b.length;i++)
+    for(let j=1;j<=a.length;j++)
+      m[i][j]=b[i-1]===a[j-1]?m[i-1][j-1]:1+Math.min(m[i-1][j],m[i][j-1],m[i-1][j-1]);
+  return m[b.length][a.length];
+}
+
+function isSimilarName(nameA,nameB) {
+  const a=normalizeName(nameA), b=normalizeName(nameB);
+  if(!a||!b) return false;
+  if(a===b) return true;
+  if(a.includes(b)||b.includes(a)) return true;
+  if(Math.min(a.length,b.length)<8) return false;
+  return levenshtein(a,b)/Math.max(a.length,b.length)<0.2;
+}
+
+function isSimilarEvent(a,b) {
+  if(a._id===b._id) return false;
+  if(!a.bezirk||!b.bezirk||a.bezirk!==b.bezirk) return false;
+  return isSimilarName(a.name,b.name);
+}
+
+// Hard dupe: same normalized name + same bezirk + same date (for CSV auto-skip)
+function isHardDupe(name,bezirk,datum,alreadyAdded) {
+  const n=normalizeName(name);
+  const d=parseDatum(datum);
+  if(!d) return false;
+  const dKey=`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  if(alreadyAdded&&alreadyAdded.has(`${n}|${bezirk}|${dKey}`)) return true;
+  return [...appEvents,...pending].some(e=>{
+    if(normalizeName(e.name)!==n||e.bezirk!==bezirk) return false;
+    const ed=parseDatum(e.datum);
+    if(!ed) return false;
+    return `${ed.getFullYear()}-${ed.getMonth()}-${ed.getDate()}`===dKey;
+  });
+}
+
+// Group filtered events: primary + suspected dupes below
+function buildDupeGroups(evs) {
+  const used=new Set();
+  const groups=[];
+  for(const ev of evs) {
+    if(used.has(ev._id)) continue;
+    used.add(ev._id);
+    if(ev.confirmedUnique) { groups.push({main:ev,dupes:[]}); continue; }
+    const dupes=[];
+    for(const other of evs) {
+      if(used.has(other._id)||other.confirmedUnique) continue;
+      if(isSimilarEvent(ev,other)) { dupes.push(other); used.add(other._id); }
+    }
+    groups.push({main:ev,dupes});
+  }
+  return groups;
+}
+
+function markNotDupe(id) {
+  updPending(id,{confirmedUnique:true});
+}
+
+// Similar events already in Firebase (for upload warning)
+function similarInApp(name,bezirk) {
+  return appEvents.filter(e=>isSimilarName(e.name,name)&&(!bezirk||e.bezirk===bezirk));
+}
+
 // ---- STATS ----
 function renderStats() {
   const today = new Date(); today.setHours(0,0,0,0);
@@ -288,8 +511,8 @@ function renderStats() {
   };
   document.getElementById("stats-row").innerHTML = [
     {l:"In App",v:s.inApp,c:"#0C447C"},
-    {l:"Recherche",v:s.pending_total,c:"#1a1a1a"},
-    {l:"Zu prüfen",v:s.pending_check,c:"#633806"},
+    {l:"Recherche",v:s.pending_total,c:"#333"},
+    {l:"Zu prüfen",v:s.pending_check,c:"#7A4A00"},
     {l:"Geprüft",v:s.pending_geprueft,c:"#27500A"},
     {l:"Bereit",v:s.pending_ready,c:"#3B6D11"},
     {l:"Bevorstehend",v:s.upcoming,c:"#853606"}
@@ -315,6 +538,7 @@ function switchTab(t) {
 // ---- RECHERCHE TAB ----
 function getFiltered() {
   let evs = [...pending];
+  if(!showPast) evs = evs.filter(e=>!isMonthDayPast(e.datum));
   if(fBez!=="Alle") evs = evs.filter(e=>e.bezirk===fBez);
   if(fTyp!=="Alle") evs = evs.filter(e=>e.typ===fTyp);
   if(fStatus==="confirmed") evs = evs.filter(e=>!isCheck(e));
@@ -331,14 +555,20 @@ function getFiltered() {
 }
 
 function renderRecherche() {
+  const searchEl = document.getElementById("recherche-search");
+  const hadFocus = searchEl && document.activeElement === searchEl;
+  const cursorPos = hadFocus ? searchEl.selectionStart : -1;
+
   const evs = getFiltered();
   const sel = selId ? pending.find(e=>e._id===selId) : null;
   const gridClass = sel ? "main-grid has-detail" : "main-grid";
+  const hasFilter = fBez!=="Alle"||fTyp!=="Alle"||fStatus!=="Alle"||fSearch;
+
   document.getElementById("content").innerHTML = `
   <div class="${gridClass}">
     <div>
-      <div class="filter-row">
-        <input type="text" placeholder="Name / Ort suchen..." value="${fSearch}" oninput="fSearch=this.value;render()">
+      <div class="filter-bar">
+        <input id="recherche-search" type="text" placeholder="Name / Ort suchen…" value="${fSearch}" oninput="fSearch=this.value;render()">
         <select onchange="fBez=this.value;render()">
           <option value="Alle" ${fBez==="Alle"?"selected":""}>Alle Bezirke</option>
           ${BEZIRKE.map(b=>`<option ${fBez===b?"selected":""}>${b}</option>`).join("")}
@@ -355,36 +585,78 @@ function renderRecherche() {
           <option value="ready" ${fStatus==="ready"?"selected":""}>Bereit zum Upload</option>
           <option value="inApp" ${fStatus==="inApp"?"selected":""}>In App hochgeladen</option>
         </select>
-        <button class="small" onclick="sortDir=sortDir==='asc'?'desc':'asc';render()" title="Sortierung">
-          ${sortDir==="asc"?"↑ Monat/Tag aufst.":"↓ Monat/Tag abst."}
+        <button class="small" onclick="sortDir=sortDir==='asc'?'desc':'asc';render()">
+          ${sortDir==="asc"?"↑ Datum":"↓ Datum"}
         </button>
-        ${(fBez!=="Alle"||fTyp!=="Alle"||fStatus!=="Alle"||fSearch)?`<button class="small danger" onclick="fBez='Alle';fTyp='Alle';fStatus='Alle';fSearch='';render()">Filter zurücksetzen</button>`:""}
-        <span style="font-size:11px;color:#aaa;margin-left:auto">${evs.length} Events</span>
+        <button class="small" onclick="showPast=!showPast;render()" style="${showPast?"background:#f0f0ee;font-weight:600":""}">
+          ${showPast?"Vergangene: an":"Vergangene: aus"}
+        </button>
+        ${hasFilter?`<button class="small danger" onclick="fBez='Alle';fTyp='Alle';fStatus='Alle';fSearch='';render()">✕ Filter</button>`:""}
+        <span class="filter-count">${evs.length} Events</span>
       </div>
-      <div id="event-list">
-        ${evs.length===0?`<div class="empty-state">Keine Events gefunden.</div>`:evs.map(ev=>eventRow(ev)).join("")}
+      <div class="event-list-wrap">
+        ${evs.length===0
+          ?`<div class="empty-state">Keine Events gefunden.</div>`
+          :buildDupeGroups(evs).map(g=>renderGroup(g)).join("")}
       </div>
     </div>
     ${sel?`<div>${detailPanel(sel)}</div>`:""}
   </div>`;
+
+  if (hadFocus) {
+    const el = document.getElementById("recherche-search");
+    if (el) { el.focus(); if (cursorPos >= 0) el.setSelectionRange(cursorPos, cursorPos); }
+  }
 }
 
-function eventRow(ev) {
+function eventRow(ev, hasDupes=false) {
   const check = isCheck(ev);
   const past = isPast(ev.datum);
   const isSel = selId===ev._id;
-  const checks = [];
-  if(ev.geprueft) checks.push(`<span class="icon-check">✓</span>`);
-  if(ev.inApp) checks.push(`<span class="icon-upload">↑</span>`);
-  return `<div class="event-row ${isSel?"selected":""} ${past&&!ev.inApp?"past":""}" onclick="selectEv('${ev._id}')">
+  const inApp = ev.inApp || appEvents.some(a=>a.name.trim().toLowerCase()===ev.name.trim().toLowerCase());
+  let statusClass = check ? "status-check" : (inApp ? "status-inapp" : "status-confirmed");
+
+  const icons = [];
+  if(ev.geprueft) icons.push(`<span class="icon-check" title="Manuell geprüft">✓</span>`);
+  if(inApp) icons.push(`<span class="icon-upload" title="In App">↑</span>`);
+  if(hasDupes) icons.push(`<span style="font-size:10px;background:#FFF3D6;color:#7A4A00;padding:1px 6px;border-radius:8px;font-weight:600">ähnlich</span>`);
+
+  return `<div class="event-row ${statusClass} ${isSel?"selected":""} ${past&&!inApp?"past":""} ${hasDupes?"has-dupes":""}" onclick="selectEv('${ev._id}')">
     ${typBadge(ev.typ)}
     <div style="flex:1;min-width:0">
-      <div class="event-name" style="color:${check?"#c37a00":"#1a1a1a"}">${check?"⚠ ":""}${esc(ev.name)}</div>
-      <div class="event-meta">${esc(ev.gemeinde)} · ${esc(ev.bezirk)}</div>
+      <div class="event-name" style="color:${check?"#7A4A00":"#1a1a1a"}">${check?"⚠ ":""}${esc(ev.name)}</div>
+      <div class="event-meta">${esc(ev.gemeinde)}${ev.bezirk?" · "+esc(ev.bezirk):""}</div>
     </div>
     <div style="text-align:right;flex-shrink:0">
-      <div class="event-date" style="color:${past?"#e74c3c":"#888"}">${fmt(ev.datum)}</div>
-      <div style="display:flex;gap:3px;justify-content:flex-end">${checks.join("")}</div>
+      <div class="event-date" style="color:${past?"#e74c3c":"#555"}">${fmt(ev.datum)}</div>
+      <div class="event-icons">${icons.join("")}</div>
+    </div>
+  </div>`;
+}
+
+function renderGroup(g) {
+  let html = eventRow(g.main, g.dupes.length>0);
+  if(g.dupes.length>0) {
+    html += `<div class="dupe-group">`;
+    for(const d of g.dupes) html += dupeRow(d);
+    html += `</div>`;
+  }
+  return html;
+}
+
+function dupeRow(ev) {
+  const check = isCheck(ev);
+  const d = parseDatum(ev.datum);
+  return `<div class="dupe-row">
+    <span style="color:#FAC775;font-size:11px;flex-shrink:0">↳</span>
+    ${typBadge(ev.typ)}
+    <div style="flex:1;min-width:0">
+      <span style="font-weight:500;color:${check?"#7A4A00":"#333"}">${esc(ev.name)}</span>
+      <span style="color:#bbb;margin-left:6px">${esc(ev.gemeinde)} · ${fmt(ev.datum)}</span>
+    </div>
+    <div class="dupe-actions">
+      <button class="small danger" onclick="event.stopPropagation();delPending('${ev._id}')">Löschen</button>
+      <button class="small" onclick="event.stopPropagation();markNotDupe('${ev._id}')" title="Als eigenständiges Event markieren">Kein Duplikat</button>
     </div>
   </div>`;
 }
@@ -398,88 +670,101 @@ function selectEv(id) {
 // ---- DETAIL PANEL ----
 function detailPanel(ev) {
   const check = isCheck(ev);
-  const url = buildAdminUrl(ev);
   const inApp = appEvents.some(a=>a.name.trim().toLowerCase()===ev.name.trim().toLowerCase());
 
   if(editMode) {
     return `<div class="detail-panel">
-      <div class="detail-header">
-        <span style="font-weight:600;font-size:14px">Bearbeiten</span>
-        <button onclick="selId=null;editMode=false;render()" style="border:none;background:none;font-size:18px">×</button>
+      <div class="detail-top">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-weight:700;font-size:14px">Bearbeiten</span>
+          <button class="icon-btn" onclick="selId=null;editMode=false;render()">×</button>
+        </div>
       </div>
-      ${editFormHTML(editData)}
-      <div class="btn-row" style="margin-top:.75rem">
-        <button onclick="cancelEdit()">Abbrechen</button>
-        <button class="primary" onclick="saveEdit('${ev._id}')">Speichern</button>
+      <div class="detail-body">
+        ${editFormHTML(editData)}
+        <div class="btn-row">
+          <button onclick="cancelEdit()">Abbrechen</button>
+          <button class="primary" onclick="saveEdit('${ev._id}')">Speichern</button>
+        </div>
       </div>
     </div>`;
   }
 
   return `<div class="detail-panel">
-    <div class="detail-header">
-      <div style="flex:1;padding-right:8px">
-        <div class="detail-name">${esc(ev.name)}</div>
-        <div class="detail-badges">
-          ${typBadge(ev.typ)}
-          ${check?`<span class="badge badge-check">Datum prüfen</span>`:`<span class="badge badge-confirmed">2026 bestätigt</span>`}
-          ${ev.inApp||inApp?`<span class="badge badge-inapp">In App</span>`:""}
-          ${ev.geprueft?`<span class="badge badge-geprueft">Geprüft</span>`:""}
+    <div class="detail-top">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div style="flex:1;padding-right:8px">
+          <div class="detail-name">${esc(ev.name)}</div>
+          <div class="detail-badges">
+            ${typBadge(ev.typ)}
+            ${check
+              ?`<span class="badge badge-check">⚠ Datum prüfen</span>`
+              :`<span class="badge badge-confirmed">2026 bestätigt</span>`}
+            ${ev.inApp||inApp?`<span class="badge badge-inapp">In App</span>`:""}
+            ${ev.geprueft?`<span class="badge badge-geprueft">Geprüft</span>`:""}
+          </div>
+        </div>
+        <div style="display:flex;gap:4px;align-items:center;flex-shrink:0">
+          <button class="small" onclick="startEdit('${ev._id}')" title="Bearbeiten">✏ Bearbeiten</button>
+          <button class="icon-btn" onclick="selId=null;render()">×</button>
         </div>
       </div>
-      <div style="display:flex;gap:5px;flex-shrink:0">
-        <button class="small" onclick="startEdit('${ev._id}')" title="Bearbeiten" style="padding:3px 8px">✏️</button>
-        <button onclick="selId=null;render()" style="border:none;background:none;font-size:18px;cursor:pointer;padding:0 2px">×</button>
+    </div>
+
+    <div class="detail-body">
+      ${check?`<div class="warn-box">
+        <div class="warn-box-title">2026-Datum unbekannt</div>
+        <div style="display:flex;gap:8px">
+          <input id="inp-datum-${ev._id}" placeholder="TT.MM.2026" style="font-size:12px;flex:1">
+          <button class="primary small" onclick="confirm2026('${ev._id}')">Bestätigen</button>
+        </div>
+      </div>`:""}
+
+      <div class="detail-section">
+        <div class="detail-section-title">Details</div>
+        <div class="field-grid">
+          <span class="field-lbl">Datum</span>
+          <span class="field-val" style="color:${check?"#7A4A00":"#1a1a1a"};font-weight:500">${fmt(ev.datum)}</span>
+          <span class="field-lbl">Uhrzeit</span>
+          <span class="field-val">${esc(ev.uhrzeit)||"—"}</span>
+          <span class="field-lbl">Gemeinde</span>
+          <span class="field-val">${esc(ev.gemeinde)||"—"}</span>
+          <span class="field-lbl">Bezirk</span>
+          <span class="field-val">${esc(ev.bezirk)||"—"}</span>
+          ${ev.veranstalter?`<span class="field-lbl">Veranstalter</span><span class="field-val">${esc(ev.veranstalter)}</span>`:""}
+          <span class="field-lbl">Eintritt</span>
+          <span class="field-val">${esc(ev.eintritt)||"—"}</span>
+        </div>
       </div>
-    </div>
 
-    <div class="field-row">
-      <span class="field-label">Datum</span><span class="field-val" style="color:${check?"#c37a00":"#1a1a1a"}">${fmt(ev.datum)}${check?" ⚠":""}</span>
-      <span class="field-label">Uhrzeit</span><span class="field-val">${esc(ev.uhrzeit)||"—"}</span>
-      <span class="field-label">Gemeinde</span><span class="field-val">${esc(ev.gemeinde)||"—"}</span>
-      <span class="field-label">Bezirk</span><span class="field-val">${esc(ev.bezirk)||"—"}</span>
-      <span class="field-label">Veranstalter</span><span class="field-val">${esc(ev.veranstalter)||"—"}</span>
-      <span class="field-label">Eintritt</span><span class="field-val">${esc(ev.eintritt)||"—"}</span>
-    </div>
+      ${ev.quelle?`<div class="detail-section">
+        <div class="detail-section-title">Quellen</div>
+        <a href="${ev.quelle.startsWith("http")?ev.quelle:"https://"+ev.quelle}" target="_blank" style="font-size:12px;display:block;margin-bottom:6px;word-break:break-all">${esc(ev.quelle)}</a>
+      </div>`:""}
 
-    ${ev.quelle?`<div style="margin-bottom:.75rem">
-      <div style="font-size:11px;color:#888;margin-bottom:3px">Quelle</div>
-      <a href="${ev.quelle.startsWith("http")?ev.quelle:"https://"+ev.quelle}" target="_blank" style="font-size:12px;word-break:break-all">${esc(ev.quelle)}</a>
-    </div>`:""}
-
-    <div style="margin-bottom:.75rem">
-      <div style="font-size:11px;color:#888;margin-bottom:3px">Weitere Quellen</div>
-      <input value="${esc(ev.quelle2||"")}" placeholder="Instagram, Facebook, ..." onchange="updPending('${ev._id}',{quelle2:this.value})" style="font-size:12px">
-    </div>
-
-    ${check?`<div class="warn-box">
-      <h4>2026-Datum noch unbekannt</h4>
-      <div style="display:flex;gap:6px">
-        <input id="inp-datum-${ev._id}" placeholder="TT.MM.2026" style="font-size:12px;flex:1">
-        <button class="primary small" onclick="confirm2026('${ev._id}')">OK</button>
+      <div class="detail-section">
+        <div class="detail-section-title">Weitere Quelle (Instagram, Facebook …)</div>
+        <input value="${esc(ev.quelle2||"")}" placeholder="URL einfügen…" onchange="updPending('${ev._id}',{quelle2:this.value})" style="font-size:12px">
       </div>
-    </div>`:""}
 
-    <div class="section-sep">
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;margin-bottom:8px">
-        <input type="checkbox" ${ev.geprueft?"checked":""} onchange="updPending('${ev._id}',{geprueft:this.checked})">
-        Manuell überprüft (Instagram / Internet)
-      </label>
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
-        <input type="checkbox" ${ev.inApp?"checked":""} onchange="updPending('${ev._id}',{inApp:this.checked})">
-        In App hochgeladen
-      </label>
-    </div>
+      <div class="section-div"></div>
 
-    ${!check?`<div class="section-sep">
-      <div style="font-size:11px;color:#888;margin-bottom:6px">Admin-URL (vorausgefüllt)</div>
-      <div class="url-preview">${url.substring(0,120)}...</div>
-      <div class="btn-row">
-        <a href="${url}" target="_blank"><button style="width:100%">🔗 Öffnen & hochladen</button></a>
-        <button onclick="navigator.clipboard.writeText('${url.replace(/'/g,"\\'")}');this.textContent='✓ Kopiert';setTimeout(()=>this.textContent='Kopieren',2000)">Kopieren</button>
+      <div class="detail-section">
+        <div class="detail-section-title">Status</div>
+        <label class="check-label">
+          <input type="checkbox" ${ev.geprueft?"checked":""} onchange="updPending('${ev._id}',{geprueft:this.checked})">
+          Manuell überprüft (Instagram / Internet)
+        </label>
+        <label class="check-label">
+          <input type="checkbox" ${ev.inApp?"checked":""} onchange="updPending('${ev._id}',{inApp:this.checked})">
+          In App hochgeladen
+        </label>
       </div>
-    </div>`:""}
 
-    <div class="section-sep">
+      ${!check&&!inApp?`<div class="section-div"></div>
+      <button class="primary" style="width:100%;padding:10px;font-size:14px" onclick="openUpload('${ev._id}')">↑ In App hochladen</button>`:""}
+
+      <div class="section-div"></div>
       <button class="danger" style="width:100%;font-size:12px" onclick="delPending('${ev._id}')">🗑 Event löschen</button>
     </div>
   </div>`;
@@ -580,19 +865,22 @@ function renderInApp() {
   document.getElementById("content").innerHTML = `
   <div class="${gridClass}">
     <div>
-      <div style="font-size:12px;color:#888;margin-bottom:10px">
-        ${appEvents.length} Events direkt aus Firebase geladen — Echtzeit-Sync.
+      <div style="font-size:12px;color:#999;margin-bottom:10px;padding:0 2px">
+        ${appEvents.length} Events live in Firebase — Echtzeit-Sync
       </div>
-      ${sorted.length===0?`<div class="empty-state">Keine Events in Firebase gefunden.</div>`:
-        sorted.map(ev=>`
-        <div class="event-row ${selId===ev._id?"selected":""} ${isPast(ev.datum)?"past":""}" onclick="selId=selId==='${ev._id}'?null:'${ev._id}';render()">
+      <div class="event-list-wrap">
+        ${sorted.length===0
+          ?`<div class="empty-state">Keine Events in Firebase gefunden.</div>`
+          :sorted.map(ev=>`
+        <div class="event-row status-inapp ${selId===ev._id?"selected":""} ${isPast(ev.datum)?"past":""}" onclick="selId=selId==='${ev._id}'?null:'${ev._id}';render()">
           ${typBadge(ev.typ)}
           <div style="flex:1;min-width:0">
             <div class="event-name">${esc(ev.name)}</div>
-            <div class="event-meta">${esc(ev.gemeinde)} · ${esc(ev.bezirk)}</div>
+            <div class="event-meta">${esc(ev.gemeinde)}${ev.bezirk?" · "+esc(ev.bezirk):""}</div>
           </div>
-          <div class="event-date" style="color:${isPast(ev.datum)?"#e74c3c":"#888"}">${fmt(ev.datum)}</div>
+          <div class="event-date" style="color:${isPast(ev.datum)?"#e74c3c":"#555"}">${fmt(ev.datum)}</div>
         </div>`).join("")}
+      </div>
     </div>
     ${sel?`<div>${appEventDetail(sel)}</div>`:""}
   </div>`;
@@ -600,30 +888,39 @@ function renderInApp() {
 
 function appEventDetail(ev) {
   return `<div class="detail-panel">
-    <div class="detail-header">
-      <div>
-        <div class="detail-name">${esc(ev.name)}</div>
-        <div class="detail-badges">${typBadge(ev.typ)}<span class="badge badge-inapp">In App</span></div>
+    <div class="detail-top">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div class="detail-name">${esc(ev.name)}</div>
+          <div class="detail-badges">${typBadge(ev.typ)}<span class="badge badge-inapp">In App</span></div>
+        </div>
+        <button class="icon-btn" onclick="selId=null;render()">×</button>
       </div>
-      <button onclick="selId=null;render()" style="border:none;background:none;font-size:18px;cursor:pointer">×</button>
     </div>
-    <div class="field-row">
-      <span class="field-label">Datum</span><span class="field-val">${fmt(ev.datum)}</span>
-      <span class="field-label">Uhrzeit</span><span class="field-val">${ev.uhrzeit||"—"}</span>
-      <span class="field-label">Ort</span><span class="field-val">${ev.gemeinde||"—"}</span>
-      <span class="field-label">Bezirk</span><span class="field-val">${ev.bezirk||"—"}</span>
-      <span class="field-label">Eintritt</span><span class="field-val">${ev.eintritt||"—"}</span>
-    </div>
-    ${ev.beschreibung?`<div style="font-size:12px;color:#888;margin-top:4px">${esc(ev.beschreibung)}</div>`:""}
-    <div class="section-sep" style="font-size:12px;color:#888">
-      Firestore-ID: <code style="font-size:11px">${ev._id}</code>
+    <div class="detail-body">
+      <div class="detail-section">
+        <div class="detail-section-title">Details</div>
+        <div class="field-grid">
+          <span class="field-lbl">Datum</span><span class="field-val" style="font-weight:500">${fmt(ev.datum)}</span>
+          <span class="field-lbl">Uhrzeit</span><span class="field-val">${ev.uhrzeit||"—"}</span>
+          <span class="field-lbl">Ort</span><span class="field-val">${ev.gemeinde||"—"}</span>
+          <span class="field-lbl">Bezirk</span><span class="field-val">${ev.bezirk||"—"}</span>
+          <span class="field-lbl">Eintritt</span><span class="field-val">${ev.eintritt||"—"}</span>
+        </div>
+      </div>
+      ${ev.beschreibung?`<div class="detail-section">
+        <div class="detail-section-title">Beschreibung</div>
+        <div style="font-size:12px;color:#555;line-height:1.6">${esc(ev.beschreibung)}</div>
+      </div>`:""}
+      <div class="section-div"></div>
+      <div class="detail-section-title">Firestore-ID</div>
+      <span class="inapp-id">${ev._id}</span>
     </div>
   </div>`;
 }
 
 // ---- BEZIRKE TAB ----
 function renderBezirke() {
-  const allEvs = [...pending, ...appEvents];
   let html = "";
   for(const bez of BEZIRKE) {
     const bezEvs = pending.filter(e=>e.bezirk===bez);
@@ -632,42 +929,41 @@ function renderBezirke() {
     const chk = bezEvs.filter(e=>isCheck(e)).length;
     const isOpen = expandBez[bez];
     const gems = GEMEINDEN[bez]||[];
-    html += `<div style="margin-bottom:8px">
+    const total = bezEvs.length + appBezEvs.length;
+
+    html += `<div class="bez-card">
       <div class="bez-header" onclick="expandBez['${bez}']=!expandBez['${bez}'];render()">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:16px">📍</span>
-          <span style="font-weight:500;font-size:14px">${bez}</span>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-weight:600;font-size:14px">${bez}</span>
           ${appBezEvs.length?`<span class="badge badge-inapp">${appBezEvs.length} in App</span>`:""}
-        </div>
-        <div style="display:flex;align-items:center;gap:6px">
           ${conf?`<span class="badge badge-confirmed">${conf} bestätigt</span>`:""}
           ${chk?`<span class="badge badge-check">${chk} prüfen</span>`:""}
-          ${bezEvs.length===0&&appBezEvs.length===0?`<span style="font-size:11px;color:#aaa">keine Events</span>`:""}
-          <span style="color:#aaa">${isOpen?"▲":"▼"}</span>
+          ${total===0?`<span style="font-size:11px;color:#ccc">keine Events</span>`:""}
         </div>
+        <span style="color:#bbb;font-size:12px">${isOpen?"▲":"▼"}</span>
       </div>`;
+
     if(isOpen) {
-      html += `<div style="padding:0 4px">`;
+      html += `<div class="bez-body">`;
       for(const gem of gems) {
         const gEvs = bezEvs.filter(e=>e.gemeinde===gem||e.gemeinde.startsWith(gem.split(" ")[0]));
-        const gApp = appEvs => appEvents.filter(e=>e.gemeinde===gem||e.gemeinde.startsWith(gem.split(" ")[0]));
         const gAppEvs = appEvents.filter(e=>e.gemeinde===gem||e.gemeinde.startsWith(gem.split(" ")[0]));
         const gKey = bez+"_"+gem;
         const gOpen = expandGem[gKey];
-        const total = gEvs.length + gAppEvs.length;
-        html += `<div class="gem-row ${total===0?"no-events":"has-events"}" onclick="${total?`expandGem['${gKey}']=!expandGem['${gKey}'];render()`:""}" style="cursor:${total?"pointer":"default"}">
-          <span>${gem}</span>
-          <span style="font-size:11px;color:${total===0?"#c0392b":"#888"}">
-            ${total===0?"keine Events":`${gEvs.length} Recherche${gAppEvs.length?` + ${gAppEvs.length} in App`:""}`}
+        const gTotal = gEvs.length + gAppEvs.length;
+        html += `<div class="gem-row ${gTotal===0?"no-events":""}" onclick="${gTotal?`expandGem['${gKey}']=!expandGem['${gKey}'];render()`:""}" style="cursor:${gTotal?"pointer":"default"}">
+          <span style="font-size:12px">${gem}</span>
+          <span class="gem-count">
+            ${gTotal===0?"—":`${gEvs.length} Recherche${gAppEvs.length?` · ${gAppEvs.length} App`:""}`}
           </span>
         </div>`;
-        if(gOpen&&total>0) {
+        if(gOpen&&gTotal>0) {
           gEvs.concat(gAppEvs).sort((a,b)=>monthDay(a.datum)-monthDay(b.datum)).forEach(ev=>{
             const isAppEv = ev._src==="app";
             html += `<div class="gem-event" onclick="${isAppEv?`selId='${ev._id}';switchTab('inapp')`:`selId='${ev._id}';switchTab('recherche')`}">
               ${typBadge(ev.typ)}
               <span style="flex:1;font-size:12px">${esc(ev.name)}</span>
-              <span style="font-size:11px;color:#aaa">${fmt(ev.datum)}</span>
+              <span style="font-size:11px;color:#bbb">${fmt(ev.datum)}</span>
               ${isAppEv?`<span class="badge badge-inapp" style="font-size:10px">App</span>`:""}
             </div>`;
           });
@@ -683,55 +979,158 @@ function renderBezirke() {
 // ---- CSV TAB ----
 function renderCSV() {
   document.getElementById("content").innerHTML = `
-  <div class="card" style="padding:1.25rem;max-width:700px">
-    <h3 style="font-size:15px;font-weight:600;margin-bottom:.5rem">CSV Import (Copilot-Ausgabe)</h3>
-    <p style="font-size:13px;color:#888;margin-bottom:.75rem">Copilot-Tabelle hier einfügen. Pflicht: <code>Eventname</code>, <code>Datum</code>. Optional: Uhrzeit, Gemeinde, Bezirk, Veranstalter, Eintritt, Typ, Quelle. Duplikate werden automatisch erkannt und übersprungen.</p>
-    <div style="background:#f7f7f5;border-radius:8px;padding:8px 10px;font-family:monospace;font-size:11px;color:#888;margin-bottom:.75rem">
+  <div class="card" style="padding:1.5rem;max-width:700px">
+    <h3 style="font-size:15px;font-weight:700;margin-bottom:.5rem">CSV Import (Copilot-Ausgabe)</h3>
+    <p style="font-size:13px;color:#888;margin-bottom:1rem;line-height:1.6">Copilot-Tabelle hier einfügen. Pflicht: <code>Eventname</code>, <code>Datum</code>. Optional: Uhrzeit, Gemeinde, Bezirk, Veranstalter, Eintritt, Typ, Quelle. Duplikate werden automatisch erkannt und übersprungen.</p>
+    <div style="background:#f7f7f5;border-radius:8px;padding:8px 12px;font-family:monospace;font-size:11px;color:#888;margin-bottom:1rem">
       Eventname,Datum,Uhrzeit,Gemeinde,Bezirk,Veranstalter,Eintritt,Typ,Quelle
     </div>
-    <textarea id="csv-input" rows="12" placeholder="CSV hier einfügen..." style="font-family:monospace;font-size:12px;margin-bottom:.75rem"></textarea>
-    <div style="display:flex;align-items:center;gap:10px">
-      <button class="primary" onclick="importCSV()">↑ Importieren</button>
+    <textarea id="csv-input" rows="12" placeholder="CSV hier einfügen…" style="font-family:monospace;font-size:12px;margin-bottom:1rem"></textarea>
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="primary" id="csv-import-btn" onclick="importCSV()">↑ Importieren</button>
       <span id="csv-msg" style="font-size:13px"></span>
     </div>
+    <div id="csv-progress" style="display:none"></div>
   </div>`;
+}
+
+function splitCSVLine(line, sep) {
+  const res = []; let cur = ''; let inQ = false;
+  for(let i=0;i<line.length;i++){
+    const ch=line[i];
+    if(ch==='"'){if(inQ&&line[i+1]==='"'){cur+='"';i++;}else inQ=!inQ;}
+    else if(ch===sep&&!inQ){res.push(cur.trim());cur='';}
+    else cur+=ch;
+  }
+  res.push(cur.trim());
+  return res;
+}
+
+function setCsvProgress(html) {
+  const el = document.getElementById("csv-progress");
+  if(!el) return;
+  el.style.display = html ? "block" : "none";
+  el.innerHTML = html || "";
 }
 
 function importCSV() {
   const text = document.getElementById("csv-input").value.trim();
   const lines = text.split("\n").filter(l=>l.trim());
   if(lines.length<2){setCsvMsg("Mind. Header + 1 Zeile nötig.","red");return;}
-  const hdrs = lines[0].split(",").map(h=>h.trim().toLowerCase());
+
+  const sep = lines[0].includes(";") ? ";" : ",";
+  const hdrs = splitCSVLine(lines[0], sep).map(h=>h.toLowerCase());
   const idx = k => hdrs.findIndex(h=>h.includes(k));
   const iN=idx("name"),iD=idx("datum"),iU=idx("uhrzeit"),iG=idx("gemeinde"),iB=idx("bezirk"),iV=idx("veranstalter"),iE=idx("eintritt"),iT=idx("typ"),iQ=idx("quelle");
   if(iN<0||iD<0){setCsvMsg("Spalten 'Eventname' und 'Datum' fehlen.","red");return;}
 
-  let added=0,dupes=0,batch=db.batch();
-  for(let i=1;i<lines.length;i++){
-    const c = lines[i].split(",").map(s=>s.trim().replace(/^"|"$/g,""));
-    const name = c[iN]||"";
-    if(!name) continue;
-    if(isDupe(name)){dupes++;continue;}
-    const datRaw = c[iD]||"";
-    const typRaw = (iT>=0?c[iT]||"":"").trim().split(" ")[0]||"Kirchtag";
-    const yr = getYear(datRaw);
-    const ref = db.collection("pending_events").doc();
-    batch.set(ref, {
-      name, datum:datRaw, uhrzeit:iU>=0?c[iU]:"20:00",
-      gemeinde:iG>=0?c[iG]:"", bezirk:iB>=0?c[iB]:"",
-      veranstalter:iV>=0?c[iV]:"örtlich", eintritt:iE>=0?c[iE]:"k.A.",
-      typ:typRaw, quelle:iQ>=0?c[iQ]:"", quelle2:"",
-      status:yr>=2026?"confirmed":"check", geprueft:false, inApp:false,
-      createdAt:firebase.firestore.FieldValue.serverTimestamp()
+  const total = lines.length - 1;
+  const btn = document.getElementById("csv-import-btn");
+  if(btn) btn.disabled = true;
+
+  // Phase 1: Ladescreen zeigen, dann Analyse nach kurzem Yield
+  setCsvProgress(`
+    <div class="csv-progress">
+      <div class="csv-progress-row">
+        <div class="csv-spinner"></div>
+        <span style="font-weight:500">Analysiere ${total} Events auf Duplikate…</span>
+      </div>
+      <div style="font-size:12px;color:#aaa;margin-top:4px">Prüfe gegen bestehende Recherche-Liste und Firebase…</div>
+    </div>`);
+
+  setTimeout(() => {
+    // Phase 2: Dupe-Check + Batch aufbauen
+    let added=0, dupes=0, batch=db.batch();
+    const addedKeys=new Set();
+    for(let i=1;i<lines.length;i++){
+      const c = splitCSVLine(lines[i], sep);
+      const name = c[iN]||"";
+      if(!name) continue;
+      const datRaw = c[iD]||"";
+      const bezRaw = iB>=0?c[iB]||"":"";
+      if(isHardDupe(name,bezRaw,datRaw,addedKeys)){dupes++;continue;}
+      const d=parseDatum(datRaw);
+      if(d) addedKeys.add(`${normalizeName(name)}|${bezRaw}|${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`);
+      const typRaw = (iT>=0?c[iT]||"":"").trim().split(" ")[0]||"Kirchtag";
+      const yr = getYear(datRaw);
+      const ref = db.collection("pending_events").doc();
+      batch.set(ref, {
+        name, datum:datRaw, uhrzeit:iU>=0?c[iU]:"20:00",
+        gemeinde:iG>=0?c[iG]:"", bezirk:bezRaw,
+        veranstalter:iV>=0?c[iV]:"örtlich", eintritt:iE>=0?c[iE]:"k.A.",
+        typ:typRaw, quelle:iQ>=0?c[iQ]:"", quelle2:"",
+        status:yr>=2026?"confirmed":"check", geprueft:false, inApp:false,
+        createdAt:firebase.firestore.FieldValue.serverTimestamp()
+      });
+      added++;
+    }
+
+    if(added===0){
+      setCsvProgress(`
+        <div class="csv-progress">
+          <div class="csv-progress-row" style="margin-bottom:10px">
+            <span style="font-size:15px">⊘</span>
+            <span style="font-weight:600">Keine neuen Events gefunden</span>
+          </div>
+          <div class="csv-stat skipped">
+            <span style="font-size:15px">⊘</span>
+            <span><strong>${dupes}</strong> von ${total} Events bereits vorhanden und übersprungen</span>
+          </div>
+        </div>`);
+      if(btn) btn.disabled = false;
+      return;
+    }
+
+    // Phase 3: Batch speichern
+    setCsvProgress(`
+      <div class="csv-progress">
+        <div class="csv-progress-row" style="margin-bottom:10px">
+          <div class="csv-spinner"></div>
+          <span style="font-weight:500">Speichert ${added} Events in Firestore…</span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <div class="csv-stat new">
+            <span style="font-size:15px">✓</span>
+            <span><strong>${added}</strong> neu</span>
+          </div>
+          ${dupes?`<div class="csv-stat skipped">
+            <span style="font-size:15px">⊘</span>
+            <span><strong>${dupes}</strong> übersprungen (bereits vorhanden)</span>
+          </div>`:""}
+        </div>
+      </div>`);
+
+    batch.commit().then(() => {
+      document.getElementById("csv-input").value = "";
+      setCsvProgress(`
+        <div class="csv-progress">
+          <div class="csv-progress-row" style="margin-bottom:10px">
+            <span style="font-size:18px">✅</span>
+            <span style="font-weight:700;font-size:14px">Import abgeschlossen</span>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+            <div class="csv-stat new">
+              <span style="font-size:15px">✓</span>
+              <span><strong>${added}</strong> neue Events importiert</span>
+            </div>
+            ${dupes?`<div class="csv-stat skipped">
+              <span style="font-size:15px">⊘</span>
+              <span><strong>${dupes}</strong> übersprungen — Name + Bezirk + Datum bereits vorhanden</span>
+            </div>`:""}
+          </div>
+          <div style="font-size:12px;color:#aaa">Weiterleitung zur Recherche-Liste…</div>
+        </div>`);
+      setTimeout(() => { setCsvProgress(""); switchTab("recherche"); }, 2000);
+    }).catch(e => {
+      setCsvProgress(`
+        <div class="csv-progress">
+          <div class="csv-stat error">
+            <span>✕ Fehler beim Speichern: ${esc(e.message)}</span>
+          </div>
+        </div>`);
+      if(btn) btn.disabled = false;
     });
-    added++;
-  }
-  if(added===0){setCsvMsg(`Keine neuen Events (${dupes} Duplikate).`,"#888");return;}
-  batch.commit().then(()=>{
-    setCsvMsg(`${added} importiert${dupes?`, ${dupes} Duplikate übersprungen`:""}.`,"#27AE60");
-    document.getElementById("csv-input").value="";
-    setTimeout(()=>switchTab("recherche"),1500);
-  }).catch(e=>setCsvMsg("Fehler: "+e.message,"red"));
+  }, 40);
 }
 
 function setCsvMsg(msg,color) {
@@ -740,8 +1139,151 @@ function setCsvMsg(msg,color) {
   setTimeout(()=>{if(el)el.textContent="";},5000);
 }
 
+// ---- UPLOAD MODAL ----
+function openUpload(id) {
+  const ev = pending.find(e => e._id === id);
+  if (!ev) return;
+  uploadPendingId = id;
+  const d = parseDatum(ev.datum);
+  const datumISO = d
+    ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+    : '';
+  const uhr = ev.uhrzeit === 'ganztags' ? '20:00' : (ev.uhrzeit || '20:00');
+  uploadData = {
+    name: ev.name || '',
+    datum: datumISO,
+    uhrzeit: uhr,
+    standort: ev.gemeinde || '',
+    adresse: '',
+    bezirk: ev.bezirk || '',
+    typ: TYP_CODE[ev.typ] || 'e1',
+    eintritt: (ev.eintritt === 'k.A.' ? '' : ev.eintritt) || '',
+    beschreibung: ev.beschreibung || '',
+    lat: null,
+    lng: null,
+  };
+  document.getElementById('upload-form-content').innerHTML = uploadFormHTML();
+  document.getElementById('up-eintritt').value = uploadData.eintritt;
+  document.getElementById('up-beschreibung').value = uploadData.beschreibung;
+  document.getElementById('modal-upload').style.display = 'flex';
+  if (window.google && window.google.maps && window.google.maps.places) initUploadAutocomplete();
+}
+
+function closeUpload() {
+  document.getElementById('modal-upload').style.display = 'none';
+  const btn = document.getElementById('btn-upload-submit');
+  if (btn) { btn.disabled = false; btn.textContent = '↑ In App speichern'; }
+}
+
+function uploadFormHTML() {
+  const bezOpts = BEZIRKE.map(b => `<option value="${b}" ${uploadData.bezirk===b?'selected':''}>${b}</option>`).join('');
+  const typOpts = [['e1','Kirchtag'],['e2','Feuerwehr'],['e3','Disco/Party'],['e4','Ball'],['e5','Krampus']]
+    .map(([v,l]) => `<option value="${v}" ${uploadData.typ===v?'selected':''}>${l}</option>`).join('');
+  const similar = similarInApp(uploadData.name, uploadData.bezirk);
+  const warnHtml = similar.length > 0 ? `
+    <div class="warn-box" style="margin-bottom:14px">
+      <div class="warn-box-title">⚠ Möglicherweise bereits in App (${similar.length})</div>
+      ${similar.map(e=>`<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid #f5e8c8;font-size:12px">
+        ${typBadge(e.typ)}
+        <span style="flex:1;font-weight:500">${esc(e.name)}</span>
+        <span style="color:#888">${esc(e.gemeinde)}</span>
+        <span style="color:#888;margin-left:8px">${fmt(e.datum)}</span>
+      </div>`).join('')}
+      <div style="font-size:11px;color:#7A4A00;margin-top:6px">Bitte prüfen ob es sich um das gleiche Event handelt, bevor du hochlädst.</div>
+    </div>` : '';
+  return warnHtml + `<div class="edit-grid">
+    <span class="edit-label">Name *</span>
+    <input id="up-name" value="${esc(uploadData.name)}" oninput="uploadData.name=this.value">
+    <span class="edit-label">Datum *</span>
+    <input id="up-datum" type="date" value="${uploadData.datum}" onchange="uploadData.datum=this.value">
+    <span class="edit-label">Uhrzeit</span>
+    <input id="up-uhrzeit" type="time" value="${uploadData.uhrzeit}" onchange="uploadData.uhrzeit=this.value">
+    <span class="edit-label">Standort *</span>
+    <input id="up-standort" value="${esc(uploadData.standort)}" oninput="uploadData.standort=this.value">
+    <span class="edit-label">Adresse</span>
+    <div>
+      <input id="up-adresse" placeholder="Adresse eingeben (Maps-Vorschläge)" oninput="uploadData.adresse=this.value">
+      <div id="up-coords" style="font-size:11px;color:#27AE60;margin-top:3px;display:none">📍 <span id="up-coords-text"></span></div>
+    </div>
+    <span class="edit-label">Bezirk</span>
+    <select id="up-bezirk" onchange="uploadData.bezirk=this.value"><option value="">–</option>${bezOpts}</select>
+    <span class="edit-label">Typ</span>
+    <select id="up-typ" onchange="uploadData.typ=this.value">${typOpts}</select>
+    <span class="edit-label">Eintritt</span>
+    <textarea id="up-eintritt" rows="2" placeholder="z.B. VVK: 15 €&#10;AK: 18 €" oninput="uploadData.eintritt=this.value" style="font-size:12px;padding:7px 10px"></textarea>
+    <span class="edit-label">Beschreibung</span>
+    <textarea id="up-beschreibung" rows="2" oninput="uploadData.beschreibung=this.value" style="font-size:12px;padding:7px 10px"></textarea>
+  </div>`;
+}
+
+function initUploadAutocomplete() {
+  const input = document.getElementById('up-adresse');
+  if (!input) return;
+  const ac = new google.maps.places.Autocomplete(input, {
+    componentRestrictions: { country: 'at' },
+    fields: ['formatted_address', 'geometry'],
+  });
+  ac.addListener('place_changed', () => {
+    const place = ac.getPlace();
+    if (!place.geometry) return;
+    uploadData.lat = place.geometry.location.lat();
+    uploadData.lng = place.geometry.location.lng();
+    uploadData.adresse = place.formatted_address;
+    document.getElementById('up-coords').style.display = 'block';
+    document.getElementById('up-coords-text').textContent =
+      `${uploadData.lat.toFixed(5)}, ${uploadData.lng.toFixed(5)}`;
+  });
+}
+
+function submitUpload() {
+  if (!uploadData.name || !uploadData.standort) { alert('Name und Standort sind Pflichtfelder.'); return; }
+  if (!uploadData.datum) { alert('Bitte ein Datum eingeben.'); return; }
+  const uhr = uploadData.uhrzeit || '20:00';
+  const datumISO = `${uploadData.datum}T${uhr}:00.000Z`;
+  const btn = document.getElementById('btn-upload-submit');
+  btn.disabled = true;
+  btn.textContent = '⏳ Speichert…';
+  const eintrittText = uploadData.eintritt.trim();
+  const beschreibungText = uploadData.beschreibung.trim();
+  const combinedBeschreibung = eintrittText && beschreibungText
+    ? eintrittText + '\n\n' + beschreibungText
+    : eintrittText || beschreibungText;
+
+  db.collection('events').add({
+    name: uploadData.name,
+    datum: datumISO,
+    uhrzeit: uhr,
+    standort: uploadData.standort,
+    gemeinde: uploadData.standort,
+    adresse: uploadData.adresse || '',
+    bezirk: uploadData.bezirk || '',
+    beschreibung: combinedBeschreibung,
+    eintritt: uploadData.eintritt || '',
+    typ: uploadData.typ || 'e1',
+    lat: uploadData.lat || null,
+    lng: uploadData.lng || null,
+    id: Date.now().toString(),
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+  }).then(() => db.collection('pending_events').doc(uploadPendingId).update({ inApp: true }))
+    .then(() => { closeUpload(); showToast('✓ ' + uploadData.name + ' in App gespeichert'); })
+    .catch(e => {
+      btn.disabled = false;
+      btn.textContent = '↑ In App speichern';
+      alert('Fehler: ' + e.message);
+    });
+}
+
+function showToast(msg, ok) {
+  const t = document.getElementById('mgr-toast');
+  t.textContent = msg;
+  t.style.background = ok === false ? '#c0392b' : '#27AE60';
+  t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 3000);
+}
+
 // ---- UTILS ----
 function esc(s){if(!s)return"";return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 </script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDrNxcX35mj5bmBS4_b7GOC2BwfSUl8cyU&libraries=places" async defer></script>
 </body>
 </html>

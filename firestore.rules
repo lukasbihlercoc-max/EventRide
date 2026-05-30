@@ -19,6 +19,16 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isAdmin', false) == true;
     }
 
+    // Darf der Nutzer den Event Manager (Web-Tool) verwenden?
+    function isManager() {
+      return isSignedIn()
+        && request.auth.token.email in [
+             'lukas.bihler.coc@gmail.com',
+             'matzematze666@gmail.com',
+             'chiara.bihler.cb@gmail.com'
+           ];
+    }
+
     // ----------------------------------------------------------------
     // users/{uid}
     //
@@ -137,7 +147,7 @@ service cloud.firestore {
     // ----------------------------------------------------------------
     match /events/{eventId} {
       allow read:  if true;
-      allow write: if isAdmin();
+      allow write: if isAdmin() || isManager();
     }
 
     // ----------------------------------------------------------------
@@ -202,6 +212,15 @@ service cloud.firestore {
       allow create: if isSignedIn()
                     && request.resource.data.reporterId == request.auth.uid;
       allow read, update, delete: if false;
+    }
+
+    // ----------------------------------------------------------------
+    // pending_events/{docId}  (Manager-internes Admin-Tool)
+    //
+    // Lesen/Schreiben: Nur eingeloggte Nutzer (nur über Admin-HTML erreichbar)
+    // ----------------------------------------------------------------
+    match /pending_events/{docId} {
+      allow read, write: if isManager();
     }
 
     match /chat_conversations/{conversationId} {
