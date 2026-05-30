@@ -388,8 +388,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
               pageTransitionsTheme: const PageTransitionsTheme(
                 builders: {
                   TargetPlatform.android: _SlideTransitionsBuilder(),
-                  TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-                  TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
                 },
               ),
             ),
