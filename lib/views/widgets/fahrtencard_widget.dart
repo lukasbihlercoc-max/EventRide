@@ -574,6 +574,11 @@ class _FahrtenCardState extends State<FahrtenCard> {
   }
 
   Widget buildButton(BuildContext context) {
+    final currentUid = context.read<IAuthRepository>().currentUser?.userId;
+    if (currentUid != null && currentUid == fahrt.ownerId) {
+      return const SizedBox.shrink();
+    }
+
     if (isEditable) {
       return Row(
         mainAxisAlignment: MainAxisAlignment.end,
