@@ -483,29 +483,37 @@ class _FahrtenCardState extends State<FahrtenCard> {
         const SizedBox(height: 8),
 
         // Route
-        Wrap(
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: 8,
+        Row(
           children: [
-            Text(
-              fahrt.richtung == Fahrtrichtung.rueckfahrt
-                  ? fahrt.standort
-                  : fahrt.abfahrtsortAnzeige,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
+            Flexible(
+              child: Text(
+                fahrt.richtung == Fahrtrichtung.rueckfahrt
+                    ? fahrt.standort
+                    : fahrt.abfahrtsortAnzeige,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
               ),
             ),
+            const SizedBox(width: 8),
             routeArrow,
-            Text(
-              fahrt.richtung == Fahrtrichtung.rueckfahrt
-                  ? fahrt.abfahrtsortAnzeige
-                  : fahrt.standort,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                fahrt.richtung == Fahrtrichtung.rueckfahrt
+                    ? fahrt.abfahrtsortAnzeige
+                    : fahrt.standort,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
               ),
             ),
           ],
