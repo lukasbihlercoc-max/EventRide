@@ -394,6 +394,7 @@ class _FahrtenTabBar extends StatefulWidget {
 
 class _FahrtenTabBarState extends State<_FahrtenTabBar> {
   bool _hasPassengerChatUnread = false;
+  bool _hasDriverChatUnread = false;
   StreamSubscription<List<ChatConversation>>? _convoSub;
 
   @override
@@ -406,10 +407,18 @@ class _FahrtenTabBarState extends State<_FahrtenTabBar> {
           .conversationsStream(widget.userId)
           .listen((convos) {
         if (!mounted) return;
-        final hasUnread = convos.any((c) =>
+        // Passenger-Conversations (Mitfahrten-Tab): user ist requesterId
+        final hasPassenger = convos.any((c) =>
             c.requesterId == widget.userId && c.isUnreadFor(widget.userId));
-        if (hasUnread != _hasPassengerChatUnread) {
-          setState(() => _hasPassengerChatUnread = hasUnread);
+        // Driver-Conversations (Meine-Fahrten-Tab): user ist ownerId
+        final hasDriver = convos.any((c) =>
+            c.ownerId == widget.userId && c.isUnreadFor(widget.userId));
+        if (hasPassenger != _hasPassengerChatUnread ||
+            hasDriver != _hasDriverChatUnread) {
+          setState(() {
+            _hasPassengerChatUnread = hasPassenger;
+            _hasDriverChatUnread = hasDriver;
+          });
         }
       });
     });
@@ -462,6 +471,7 @@ class _FahrtenTabBarState extends State<_FahrtenTabBar> {
 
         final showMitfahrtenDot = seenService.hasUnseenRequester(widget.userId, requesterIds)
             || _hasPassengerChatUnread;
+        final showMeineFahrtenDot = _hasDriverChatUnread;
 
         return TabBar(
           controller: widget.tabController,
@@ -470,7 +480,7 @@ class _FahrtenTabBarState extends State<_FahrtenTabBar> {
           unselectedLabelColor: Colors.white70,
           tabs: [
             _tabLabel('Mitfahrten', showMitfahrtenDot),
-            const Tab(child: Text('Meine Fahrten')),
+            _tabLabel('Meine Fahrten', showMeineFahrtenDot),
           ],
         );
       },

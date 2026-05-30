@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/services.dart';
 import 'package:my_app/data/notifiers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
@@ -212,8 +214,18 @@ class NotificationService {
     _knownLastMessageAt.clear();
   }
 
+  static const _iosChannel = MethodChannel('eventride/notifications');
+
   Future<void> cancelChatNotification(String conversationId) async {
     await _localNotifications.cancel(conversationId.hashCode);
+    // Auf iOS entfernt flutter_local_notifications.cancel() nur eigene lokale
+    // Notifications. APNs-Push-Notifications (die iOS im Hintergrund anzeigt)
+    // müssen über UNUserNotificationCenter explizit gelöscht werden.
+    if (Platform.isIOS) {
+      try {
+        await _iosChannel.invokeMethod('removeAllDeliveredNotifications');
+      } catch (_) {}
+    }
   }
 
   void _showChatLocalNotification(ChatConversation conv) {
