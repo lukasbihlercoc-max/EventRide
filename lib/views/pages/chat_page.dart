@@ -189,6 +189,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 backgroundColor: Colors.black.withValues(alpha: 0.18),
                 elevation: 0,
                 surfaceTintColor: Colors.transparent,
+                centerTitle: false,
                 title: _appBarTitle(),
               ),
               body: const Center(
@@ -230,6 +231,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   backgroundColor: Colors.black.withValues(alpha: 0.18),
                   elevation: 0,
                   surfaceTintColor: Colors.transparent,
+                  centerTitle: false,
                   title: _appBarTitle(),
                 ),
                 body: GestureDetector(

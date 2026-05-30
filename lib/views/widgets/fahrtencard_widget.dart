@@ -1088,6 +1088,8 @@ class _FahrerProfilBlockState extends State<_FahrerProfilBlock> {
 
   @override
   Widget build(BuildContext context) {
+    final currentUid = context.read<IAuthRepository>().currentUser?.userId;
+    final isMe = currentUid != null && currentUid == widget.userId;
     return GestureDetector(
       onTap: _navigate,
       behavior: HitTestBehavior.opaque,
@@ -1109,7 +1111,7 @@ class _FahrerProfilBlockState extends State<_FahrerProfilBlock> {
                   children: [
                     Flexible(
                       child: Text(
-                        widget.name,
+                        isMe ? '${widget.name} (du)' : widget.name,
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w600,
