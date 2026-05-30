@@ -214,8 +214,6 @@ class _FahrtenCardState extends State<FahrtenCard> {
       (s) => s.offeneAnfragenProFahrt[fahrt.id] ?? 0,
     );
 
-    final screenHeight = MediaQuery.of(context).size.height;
-
     return RepaintBoundary(
       child: ValueListenableBuilder<bool>(
         valueListenable: _pressed,
@@ -243,11 +241,7 @@ class _FahrtenCardState extends State<FahrtenCard> {
                 ),
               ],
             ),
-            child: SizedBox(
-                height: screenHeight * 0.36 < 260 
-                  ? 260 
-                  : screenHeight * 0.36,
-                child: Stack(
+            child: Stack(
                   children: [
                     // ── Hintergrundbild ──
                     Positioned.fill(
@@ -266,15 +260,43 @@ class _FahrtenCardState extends State<FahrtenCard> {
                       ),
                     ),
 
-                    // ── Avatar + Name oben links ──
-                    Positioned(
-                      top: 20,
-                      left: 16,
-                      right: 16,
-                      child: _FahrerProfilBlock(
-                        userId: fahrt.ownerId,
-                        name: fahrt.ownerName,
-                      ),
+                    // ── Layout-Column (bestimmt Kartenhöhe) ──
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+                          child: _FahrerProfilBlock(
+                            userId: fahrt.ownerId,
+                            name: fahrt.ownerName,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(22),
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Colors.white.withValues(alpha: 0.14),
+                                Colors.white.withValues(alpha: 0.05),
+                              ],
+                            ),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.18),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.4),
+                                blurRadius: 8,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: buildContent(context),
+                        ),
+                      ],
                     ),
 
                     // ── Icons oben rechts (nur editierbar) ──
@@ -328,44 +350,8 @@ class _FahrtenCardState extends State<FahrtenCard> {
                           ],
                         ),
                       ),
-
-                    // ── Glas-Panel unten ──
-                    Positioned.fill(
-                      child: Column(
-                        children: [
-                          const Spacer(),
-                          Container(
-                            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-                            decoration: BoxDecoration(
-  borderRadius: BorderRadius.circular(22),
-  gradient: LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [
-      Colors.white.withValues(alpha: 0.14),
-      Colors.white.withValues(alpha: 0.05),
-    ],
-  ),
-  border: Border.all(
-    color: Colors.white.withValues(alpha: 0.18),
-  ),
-  boxShadow: [
-    BoxShadow(
-      color: Colors.black.withValues(alpha: 0.4),
-      blurRadius: 8,
-      offset: Offset(0, 6),
-    ),
-  ],
-),
-                            child: buildContent(context),
-                          ),
-                        ],
-                      ),
-                    ),
-
                   ],
                 ),
-              ),
           ),
         ),
       ),
@@ -374,6 +360,10 @@ class _FahrtenCardState extends State<FahrtenCard> {
   }
 
   Widget buildContent(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final scale = (screenWidth / 390).clamp(0.82, 1.0);
+    final routeFontSize = (screenWidth * 0.053).clamp(15.0, 20.0);
+
     final accentColor = switch (fahrt.richtung) {
       Fahrtrichtung.hinfahrt => Colors.greenAccent,
       Fahrtrichtung.rueckfahrt => Colors.orangeAccent,
@@ -402,7 +392,7 @@ class _FahrtenCardState extends State<FahrtenCard> {
         Row(
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: EdgeInsets.symmetric(horizontal: 10 * scale, vertical: 4 * scale),
               decoration: BoxDecoration(
                 color: accentColor.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(20),
@@ -411,13 +401,13 @@ class _FahrtenCardState extends State<FahrtenCard> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.directions, color: accentColor, size: 13),
+                  Icon(Icons.directions, color: accentColor, size: 13 * scale),
                   const SizedBox(width: 4),
                   Text(
                     richtungLabel,
                     style: TextStyle(
                       color: accentColor,
-                      fontSize: 12,
+                      fontSize: 12 * scale,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -434,16 +424,16 @@ class _FahrtenCardState extends State<FahrtenCard> {
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: Colors.blueGrey),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.event_seat, color: Colors.blueGrey, size: 13),
-                    SizedBox(width: 4),
+                    Icon(Icons.event_seat, color: Colors.blueGrey, size: 13 * scale),
+                    const SizedBox(width: 4),
                     Text(
                       'Ausgebucht',
                       style: TextStyle(
                         color: Colors.blueGrey,
-                        fontSize: 12,
+                        fontSize: 12 * scale,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -483,38 +473,43 @@ class _FahrtenCardState extends State<FahrtenCard> {
         const SizedBox(height: 8),
 
         // Route
-        Row(
+        Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          runSpacing: 4,
           children: [
-            Flexible(
-              child: Text(
-                fahrt.richtung == Fahrtrichtung.rueckfahrt
-                    ? fahrt.standort
-                    : fahrt.abfahrtsortAnzeige,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                ),
+            Text(
+              fahrt.richtung == Fahrtrichtung.rueckfahrt
+                  ? fahrt.standort
+                  : fahrt.abfahrtsortAnzeige,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: routeFontSize,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
               ),
             ),
-            const SizedBox(width: 8),
-            routeArrow,
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                fahrt.richtung == Fahrtrichtung.rueckfahrt
-                    ? fahrt.abfahrtsortAnzeige
-                    : fahrt.standort,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                routeArrow,
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    fahrt.richtung == Fahrtrichtung.rueckfahrt
+                        ? fahrt.abfahrtsortAnzeige
+                        : fahrt.standort,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: routeFontSize,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
           ],
         ),
@@ -528,8 +523,8 @@ class _FahrtenCardState extends State<FahrtenCard> {
             const SizedBox(width: 4),
             Text(
               fahrt.uhrzeit.format(context),
-              style: const TextStyle(
-                  color: Color(0xFF94A3B8), fontSize: 14),
+              style: TextStyle(
+                  color: const Color(0xFF94A3B8), fontSize: 14 * scale),
             ),
             if (fahrt.richtung == Fahrtrichtung.hinUndZurueck &&
                 fahrt.rueckuhrzeit != null) ...[
@@ -557,14 +552,14 @@ class _FahrtenCardState extends State<FahrtenCard> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.event_seat,
-                        color: Colors.greenAccent, size: 13),
+                    Icon(Icons.event_seat,
+                        color: Colors.greenAccent, size: 13 * scale),
                     const SizedBox(width: 4),
                     Text(
                       '${fahrt.freiePlaetze} frei',
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: Colors.greenAccent,
-                        fontSize: 12,
+                        fontSize: 12 * scale,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -582,6 +577,9 @@ class _FahrtenCardState extends State<FahrtenCard> {
   }
 
   Widget buildButton(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final scale = (screenWidth / 390).clamp(0.82, 1.0);
+
     final currentUid = context.read<IAuthRepository>().currentUser?.userId;
     if (currentUid != null && currentUid == fahrt.ownerId) {
       return const SizedBox.shrink();
@@ -631,7 +629,7 @@ class _FahrtenCardState extends State<FahrtenCard> {
     return GestureDetector(
       onTap: () => _handleMitfahren(context),
       child: Container(
-        height: 42,
+        height: 42 * scale,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           gradient: LinearGradient(
@@ -641,13 +639,13 @@ class _FahrtenCardState extends State<FahrtenCard> {
             ],
           ),
         ),
-        child: const Center(
+        child: Center(
           child: Text(
             'Mitfahren',
             style: TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w700,
-              fontSize: 16,
+              fontSize: 16 * scale,
               letterSpacing: 0.3,
             ),
           ),
