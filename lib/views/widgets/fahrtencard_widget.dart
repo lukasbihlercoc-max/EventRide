@@ -37,11 +37,11 @@ String getBackgroundImage(Fahrtrichtung richtung) {
 Alignment getBackgroundAlignment(Fahrtrichtung richtung) {
   switch (richtung) {
     case Fahrtrichtung.hinfahrt:
-      return const Alignment(0.0, 0.7); // ← hier anpassen
+      return const Alignment(0.0, 0.45); // Sonne oben zeigen
     case Fahrtrichtung.rueckfahrt:
-      return const Alignment(0.0, 1.0);  // ← hier anpassen
+      return const Alignment(0.0, 0.7); // Mond oben zeigen
     case Fahrtrichtung.hinUndZurueck:
-      return const Alignment(0.0, 0.85);  // ← hier anpassen
+      return const Alignment(0.0, 0.6); // Sonne + Mond beide sichtbar
   }
 }
 

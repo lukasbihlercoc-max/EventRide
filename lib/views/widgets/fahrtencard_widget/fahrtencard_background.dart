@@ -12,6 +12,19 @@ String getBackgroundImage(Fahrtrichtung richtung) {
   }
 }
 
+// y: -1.0 = ganz oben, 0.0 = Mitte, 1.0 = ganz unten
+// Anpassen bis Sonne/Mond immer sichtbar ist, egal wie hoch die Card ist.
+Alignment getBackgroundAlignment(Fahrtrichtung richtung) {
+  switch (richtung) {
+    case Fahrtrichtung.hinfahrt:
+      return const Alignment(0.0, -0.7); // Sonne oben mittig
+    case Fahrtrichtung.rueckfahrt:
+      return const Alignment(0.0, -0.7); // Mond oben mittig
+    case Fahrtrichtung.hinUndZurueck:
+      return const Alignment(0.0, -0.5); // Sonne + Mond beide sichtbar
+  }
+}
+
 class FahrtenCardBackground extends StatelessWidget {
   final FahrtDaten fahrt;
 
@@ -23,7 +36,7 @@ class FahrtenCardBackground extends StatelessWidget {
       child: Image.asset(
         getBackgroundImage(fahrt.richtung),
         fit: BoxFit.cover,
-        alignment: const Alignment(0.1, 0.1),
+        alignment: getBackgroundAlignment(fahrt.richtung),
       ),
     );
   }

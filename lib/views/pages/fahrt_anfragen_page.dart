@@ -559,7 +559,7 @@ class _AnfragenButtonState extends State<_AnfragenButton> {
 }
 
 // ---------------------------------------------------------------------------
-// Anfrage-Card (unverändert)
+// Anfrage-Card — Status-Strip Design
 // ---------------------------------------------------------------------------
 class _AnfrageCard extends StatefulWidget {
   final AnfrageDaten anfrage;
@@ -582,7 +582,11 @@ class _AnfrageCard extends StatefulWidget {
 class _AnfrageCardState extends State<_AnfrageCard> {
   late int _acceptedSeats;
   bool _loading = false;
-  String? _photoUrl;
+
+  static const _stripGreen  = Color(0xFF2FA56A);
+  static const _stripRed    = Color(0xFFE05A64);
+  static const _stripAmber  = Color(0xFFE0A83A);
+  static const _chatAmber   = Color(0xFFF5A04A);
 
   @override
   void initState() {
@@ -592,15 +596,38 @@ class _AnfrageCardState extends State<_AnfrageCard> {
         widget.anfrage.seatsRequested.clamp(1, freie > 0 ? freie : 1);
   }
 
+  Color get _stripColor => switch (widget.anfrage.status) {
+        AnfrageStatus.akzeptiert    => _stripGreen,
+        AnfrageStatus.abgelehnt     => _stripRed,
+        AnfrageStatus.offen         => _stripAmber,
+        AnfrageStatus.storniert     => Colors.blueGrey,
+        AnfrageStatus.fahrtGeloescht => Colors.deepOrange,
+      };
+
+  (String, Color) get _statusInfo => switch (widget.anfrage.status) {
+        AnfrageStatus.offen          => ('Offen',         _stripAmber),
+        AnfrageStatus.akzeptiert     => ('Akzeptiert',    _stripGreen),
+        AnfrageStatus.abgelehnt      => ('Abgelehnt',     _stripRed),
+        AnfrageStatus.storniert      => ('Storniert',     Colors.blueGrey),
+        AnfrageStatus.fahrtGeloescht => ('Fahrt abgesagt',Colors.deepOrange),
+      };
+
+  String get _subtitle {
+    final a = widget.anfrage;
+    if (a.status == AnfrageStatus.akzeptiert) {
+      final accepted = a.seatsAccepted ?? a.seatsRequested;
+      return '$accepted/${a.seatsRequested} Platz${a.seatsRequested > 1 ? 'ätze' : ''}';
+    }
+    return '${a.seatsRequested} Platz${a.seatsRequested > 1 ? 'e' : ''} angefragt';
+  }
+
   void _openChat(BuildContext context) {
     final chatService = context.read<ChatService>();
-
     final conversationId = chatService.buildConversationId(
       fahrtId: widget.fahrt.id,
       userA: widget.fahrt.ownerId,
       userB: widget.anfrage.requesterId,
     );
-
     Navigator.push(
       context,
       AppRoute(
@@ -611,420 +638,538 @@ class _AnfrageCardState extends State<_AnfrageCard> {
         ),
       ),
     );
+    chatService
+        .ensureConversation(
+          fahrtId: widget.fahrt.id,
+          ownerId: widget.fahrt.ownerId,
+          requesterId: widget.anfrage.requesterId,
+          eventName: widget.fahrt.eventName,
+          startOrt: widget.fahrt.abfahrtsort,
+          zielOrt: widget.fahrt.standort,
+          seatsRequested: widget.anfrage.seatsRequested,
+        )
+        .then((_) => chatService.updateSystemMessage(
+              conversationId: conversationId,
+              eventName: widget.fahrt.eventName,
+              startOrt: widget.fahrt.abfahrtsort,
+              zielOrt: widget.fahrt.standort,
+              seatsRequested: widget.anfrage.seatsRequested,
+              seatsAccepted: widget.anfrage.seatsAccepted ?? 0,
+              uhrzeit:
+                  '${widget.fahrt.uhrzeitHour.toString().padLeft(2, '0')}:${widget.fahrt.uhrzeitMinute.toString().padLeft(2, '0')}',
+              richtung: switch (widget.fahrt.richtung) {
+                Fahrtrichtung.hinfahrt      => 'Hinfahrt',
+                Fahrtrichtung.rueckfahrt    => 'Rückfahrt',
+                Fahrtrichtung.hinUndZurueck => 'Hin und Zurück',
+              },
+              ownerName: widget.fahrt.ownerName,
+            ))
+        .catchError((_) {});
+  }
 
-    chatService.ensureConversation(
-      fahrtId: widget.fahrt.id,
-      ownerId: widget.fahrt.ownerId,
-      requesterId: widget.anfrage.requesterId,
-      eventName: widget.fahrt.eventName,
-      startOrt: widget.fahrt.abfahrtsort,
-      zielOrt: widget.fahrt.standort,
-      seatsRequested: widget.anfrage.seatsRequested,
-    ).then((_) => chatService.updateSystemMessage(
-      conversationId: conversationId,
-      eventName: widget.fahrt.eventName,
-      startOrt: widget.fahrt.abfahrtsort,
-      zielOrt: widget.fahrt.standort,
-      seatsRequested: widget.anfrage.seatsRequested,
-      seatsAccepted: widget.anfrage.seatsAccepted ?? 0,
-      uhrzeit:
-          '${widget.fahrt.uhrzeitHour.toString().padLeft(2, '0')}:${widget.fahrt.uhrzeitMinute.toString().padLeft(2, '0')}',
-      richtung: switch (widget.fahrt.richtung) {
-        Fahrtrichtung.hinfahrt => 'Hinfahrt',
-        Fahrtrichtung.rueckfahrt => 'Rückfahrt',
-        Fahrtrichtung.hinUndZurueck => 'Hin und Zurück',
-      },
-      ownerName: widget.fahrt.ownerName,
-    )).catchError((_) {});
+  Future<void> _handleAblehnen() async {
+    setState(() => _loading = true);
+    try {
+      final chatService = context.read<ChatService>();
+      final a = widget.anfrage;
+      await context.read<AnfrageService>().ablehnenAnfrage(a);
+      if (!mounted) return;
+      chatService.sendStatusNotification(
+        fahrtId: widget.fahrt.id,
+        ownerId: widget.fahrt.ownerId,
+        requesterId: a.requesterId,
+        eventName: widget.fahrt.eventName,
+        startOrt: widget.fahrt.abfahrtsort,
+        zielOrt: widget.fahrt.standort,
+        seatsRequested: a.seatsRequested,
+        text: 'Deine Anfrage wurde leider abgelehnt.',
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _handleAnnehmen() async {
+    final a = widget.anfrage;
+    setState(() => _loading = true);
+    try {
+      final anfrageService      = context.read<AnfrageService>();
+      final fahrtService        = context.read<FahrtService>();
+      final chatService         = context.read<ChatService>();
+      final interessentenService = context.read<InteressentenService>();
+
+      final aktuelleFahrt = fahrtService.alleFahrten
+          .firstWhere((f) => f.id == widget.fahrt.id, orElse: () => widget.fahrt);
+
+      final freie = aktuelleFahrt.freiePlaetze;
+      if (_acceptedSeats > freie) return;
+
+      final ok = await anfrageService.akzeptiereAnfrage(
+        anfrage: a,
+        fahrt: aktuelleFahrt,
+        seatsAccepted: _acceptedSeats,
+      );
+      if (!ok) return;
+
+      await interessentenService.removeForUser(widget.fahrt.eventId, a.requesterId);
+
+      final convo = await chatService.ensureConversation(
+        fahrtId: widget.fahrt.id,
+        ownerId: widget.fahrt.ownerId,
+        requesterId: a.requesterId,
+        eventName: widget.fahrt.eventName,
+        startOrt: widget.fahrt.abfahrtsort,
+        zielOrt: widget.fahrt.standort,
+        seatsRequested: a.seatsRequested,
+      );
+
+      try {
+        await chatService.updateSystemMessage(
+          conversationId: convo.id,
+          eventName: widget.fahrt.eventName,
+          startOrt: widget.fahrt.abfahrtsort,
+          zielOrt: widget.fahrt.standort,
+          seatsRequested: a.seatsRequested,
+          seatsAccepted: _acceptedSeats,
+          uhrzeit:
+              '${widget.fahrt.uhrzeitHour.toString().padLeft(2, '0')}:${widget.fahrt.uhrzeitMinute.toString().padLeft(2, '0')}',
+          richtung: switch (widget.fahrt.richtung) {
+            Fahrtrichtung.hinfahrt      => 'Hinfahrt',
+            Fahrtrichtung.rueckfahrt    => 'Rückfahrt',
+            Fahrtrichtung.hinUndZurueck => 'Hin und Zurück',
+          },
+          ownerName: widget.fahrt.ownerName,
+        );
+      } catch (_) {
+        // System-Nachricht nicht kritisch – Anfrage wurde bereits angenommen.
+      }
+
+      if (!mounted) return;
+      AppSnackbar.show(context, message: 'Anfrage angenommen');
+
+      final newFreie = freie - _acceptedSeats;
+      if (newFreie <= 0) {
+        final offene = anfrageService
+            .getAnfragenForFahrt(widget.fahrt.id)
+            .where((x) => x.id != a.id && x.status == AnfrageStatus.offen)
+            .toList();
+        for (final offeneAnfrage in offene) {
+          await anfrageService.ablehnenAnfrage(offeneAnfrage);
+          if (!mounted) break;
+          chatService.sendStatusNotification(
+            fahrtId: widget.fahrt.id,
+            ownerId: widget.fahrt.ownerId,
+            requesterId: offeneAnfrage.requesterId,
+            eventName: widget.fahrt.eventName,
+            startOrt: widget.fahrt.abfahrtsort,
+            zielOrt: widget.fahrt.standort,
+            seatsRequested: offeneAnfrage.seatsRequested,
+            text: 'Fahrt ist leider voll.',
+          );
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final a = widget.anfrage;
-    final isUnread = widget.conversation?.isUnreadFor(widget.fahrt.ownerId) ?? false;
-    final lastMsg = widget.conversation?.lastMessage;
-    final hasPreview = lastMsg != null && lastMsg.isNotEmpty;
+    final a           = widget.anfrage;
+    final isUnread    = widget.conversation?.isUnreadFor(widget.fahrt.ownerId) ?? false;
+    final showDecision = a.status == AnfrageStatus.offen && !a.vonFahrer && !widget.istVergangen;
+    final stripColor  = _stripColor;
+    final (statusText, statusColor) = _statusInfo;
 
-    return Card(
-      color: Colors.black.withValues(alpha: 0.5),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+    final isStorniert = a.status == AnfrageStatus.storniert;
+
+    final card = Container(
+      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+      clipBehavior: Clip.hardEdge,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment(0.4, 1.0),
+          colors: [Color(0xFF243353), Color(0xFF1F2C4A), Color(0xFF1B2742)],
+          stops: [0.0, 0.6, 1.0],
+        ),
+        border: Border.all(
+          color: showDecision
+              ? _stripAmber.withValues(alpha: 0.25)
+              : Colors.white.withValues(alpha: 0.07),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.22),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+          if (showDecision)
+            BoxShadow(
+              color: _stripAmber.withValues(alpha: 0.08),
+              blurRadius: 0,
+              spreadRadius: 1,
+            ),
+        ],
       ),
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      child: Stack(
+        children: [
+          // ── Inhalt ──
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 11, 12, 11),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Avatar
-                UserAvatarById(
-                  userId: a.requesterId,
-                  name: a.requesterName,
-                  radius: 22,
-                  onPhotoLoaded: (url) => setState(() => _photoUrl = url),
-                  onTap: (photoUrl) => Navigator.push(
-                    context,
-                    AppRoute(
-                      builder: (_) => PublicProfilePage(
-                        userId: a.requesterId,
-                        name: a.requesterName,
-                        photoUrl: photoUrl,
+                // Kopfzeile
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    UserAvatarById(
+                      userId: a.requesterId,
+                      name: a.requesterName,
+                      radius: 21,
+                      onTap: (url) => Navigator.push(
+                        context,
+                        AppRoute(
+                          builder: (_) => PublicProfilePage(
+                            userId: a.requesterId,
+                            name: a.requesterName,
+                            photoUrl: url,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                // Name + Vorschau
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                    const SizedBox(width: 11),
+                    Expanded(
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Flexible(
-                            child: GestureDetector(
-                              onTap: () => Navigator.push(
-                                context,
-                                AppRoute(
-                                  builder: (_) => PublicProfilePage(
-                                    userId: a.requesterId,
-                                    name: a.requesterName,
-                                    photoUrl: _photoUrl,
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  a.requesterName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ),
-                              child: Text(
-                                a.requesterName,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+                              const SizedBox(width: 6),
+                              TrustShieldsByUserId(userId: a.requesterId, size: 10),
+                            ],
+                          ),
+                          const SizedBox(height: 5),
+                          Text.rich(
+                            TextSpan(children: [
+                              TextSpan(
+                                text: statusText,
+                                style: TextStyle(
+                                  color: statusColor,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Padding(
-                            padding: const EdgeInsets.only(top: 3),
-                            child: TrustShieldsByUserId(userId: a.requesterId, size: 15),
+                              TextSpan(
+                                text: ' · $_subtitle',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.6),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ]),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
-                      if (hasPreview)
-                        Text(
-                          lastMsg,
-                          style: TextStyle(
-                            color: isUnread ? Colors.white60 : Colors.white30,
-                            fontSize: 13,
-                            fontWeight: isUnread ? FontWeight.w600 : FontWeight.normal,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                    ],
-                  ),
-                ),
-                // Badge oben, Chat-Button darunter
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    buildStatusChip(a.status),
-                    if (a.status != AnfrageStatus.abgelehnt)
-                      Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          IconButton(
-                            icon: Icon(
-                              Icons.chat_bubble_outline,
-                              color: isUnread ? Colors.amber : Colors.white,
-                            ),
-                            onPressed: () => _openChat(context),
-                          ),
-                          if (isUnread)
-                            Positioned(
-                              top: 6,
-                              right: 6,
-                              child: Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(
-                                  color: Colors.redAccent,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _buildChatButton(isUnread, context),
                   ],
                 ),
-              ],
-            ),
 
-            const SizedBox(height: 8),
+                // Entscheidungsbereich (nur status == offen)
+                if (showDecision)
+                  Container(
+                    margin: const EdgeInsets.only(top: 11),
+                    padding: const EdgeInsets.only(top: 11),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        top: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Stepper — nur bei mehr als 1 angefragtem Platz
+                        if (a.seatsRequested > 1) ...[
+                          Row(
+                            children: [
+                              Text(
+                                'Plätze annehmen',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.55),
+                                  fontSize: 12,
+                                ),
+                              ),
+                              const Spacer(),
+                              _buildStepper(a),
+                              const SizedBox(width: 8),
+                              Text(
+                                'von ${a.seatsRequested} angefragt',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.4),
+                                  fontSize: 11.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 11),
+                        ],
 
-            Row(
-              children: [
-                const Icon(Icons.event_seat, color: Colors.amber, size: 18),
-                const SizedBox(width: 6),
-                Builder(
-                  builder: (_) {
-                    if (a.status == AnfrageStatus.akzeptiert &&
-                        a.seatsAccepted != null) {
-                      return Text(
-                        "${a.seatsAccepted} von ${a.seatsRequested} Platz"
-                        "${a.seatsRequested > 1 ? 'en' : ''} akzeptiert",
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                        // Aktions-Buttons
+                        Row(
+                          children: [
+                            _buildAblehnenBtn(),
+                            const SizedBox(width: 8),
+                            Expanded(child: _buildAnnehmenBtn(a)),
+                          ],
                         ),
-                      );
-                    }
-                    return Text(
-                      "${a.seatsRequested} Platz"
-                      "${a.seatsRequested > 1 ? 'e' : ''} angefragt",
-                      style: const TextStyle(
-                          color: Colors.white70, fontSize: 16),
-                    );
-                  },
-                ),
-              ],
-            ),
-
-            if (a.message != null && a.message!.trim().isNotEmpty) ...[
-              const SizedBox(height: 8),
-              const Text(
-                "Nachricht:",
-                style: TextStyle(
-                    color: Colors.white70, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 4),
-              Text(a.message!,
-                  style: const TextStyle(color: Colors.white)),
-            ],
-
-            if (a.status == AnfrageStatus.offen && !a.vonFahrer && !widget.istVergangen) ...[
-              const SizedBox(height: 12),
-              const Text(
-                "Plätze annehmen",
-                style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500),
-              ),
-              const SizedBox(height: 6),
-
-              Row(
-                children: [
-                  _seatButton(
-                    icon: Icons.remove,
-                    onTap: _acceptedSeats > 1
-                        ? () => setState(() => _acceptedSeats--)
-                        : null,
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    "$_acceptedSeats",
-                    style: const TextStyle(
-                        color: Colors.amber,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(width: 12),
-                  _seatButton(
-                    icon: Icons.add,
-                    onTap: _acceptedSeats >= a.seatsRequested
-                        ? null
-                        : () {
-                            final freie = widget.fahrt.freiePlaetze;
-                            if (_acceptedSeats >= freie) {
-                              AppSnackbar.show(context,
-                                  message:
-                                      'Nur noch $freie Platz${freie == 1 ? '' : 'e'} verfügbar');
-                              return;
-                            }
-                            setState(() => _acceptedSeats++);
-                          },
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      "von ${a.seatsRequested} angefragt",
-                      style: const TextStyle(
-                          color: Colors.white38, fontSize: 12),
+                      ],
                     ),
                   ),
-                ],
-              ),
+              ],
+            ),
+          ),
 
-              const SizedBox(height: 12),
-
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton.icon(
-                    onPressed: _loading
-                        ? null
-                        : () async {
-                            setState(() => _loading = true);
-                            try {
-                              final chatService = context.read<ChatService>();
-                              await context
-                                  .read<AnfrageService>()
-                                  .ablehnenAnfrage(a);
-                              if (!mounted) return;
-                              // Benachrichtigung im Chat senden (fire-and-forget)
-                              chatService.sendStatusNotification(
-                                fahrtId: widget.fahrt.id,
-                                ownerId: widget.fahrt.ownerId,
-                                requesterId: a.requesterId,
-                                eventName: widget.fahrt.eventName,
-                                startOrt: widget.fahrt.abfahrtsort,
-                                zielOrt: widget.fahrt.standort,
-                                seatsRequested: a.seatsRequested,
-                                text: 'Deine Anfrage wurde leider abgelehnt.',
-                              );
-                            } finally {
-                              if (mounted) setState(() => _loading = false);
-                            }
-                          },
-                    icon: const Icon(Icons.close, color: Colors.redAccent),
-                    label: const Text("Ablehnen",
-                        style: TextStyle(color: Colors.redAccent)),
-                  ),
-                  const SizedBox(width: 12),
-                  TextButton.icon(
-                    onPressed: _loading
-                        ? null
-                        : () async {
-                            setState(() => _loading = true);
-                            try {
-                              final anfrageService =
-                                  context.read<AnfrageService>();
-                              final fahrtService =
-                                  context.read<FahrtService>();
-                              final chatService = context.read<ChatService>();
-                              final interessentenService =
-                                  context.read<InteressentenService>();
-
-                              final aktuelleFahrt =
-                                  fahrtService.alleFahrten.firstWhere(
-                                (f) => f.id == widget.fahrt.id,
-                                orElse: () => widget.fahrt,
-                              );
-
-                              final freie = aktuelleFahrt.freiePlaetze;
-                              if (_acceptedSeats > freie) return;
-
-                              final ok = await anfrageService.akzeptiereAnfrage(
-                                anfrage: a,
-                                fahrt: aktuelleFahrt,
-                                seatsAccepted: _acceptedSeats,
-                              );
-
-                              if (!ok) return;
-
-                              // Interessent aus Warteliste entfernen
-                              await interessentenService.removeForUser(
-                                widget.fahrt.eventId,
-                                a.requesterId,
-                              );
-
-                              final convo =
-                                  await chatService.ensureConversation(
-                                fahrtId: widget.fahrt.id,
-                                ownerId: widget.fahrt.ownerId,
-                                requesterId: a.requesterId,
-                                eventName: widget.fahrt.eventName,
-                                startOrt: widget.fahrt.abfahrtsort,
-                                zielOrt: widget.fahrt.standort,
-                                seatsRequested: a.seatsRequested,
-                              );
-
-                              try {
-                                await chatService.updateSystemMessage(
-                                  conversationId: convo.id,
-                                  eventName: widget.fahrt.eventName,
-                                  startOrt: widget.fahrt.abfahrtsort,
-                                  zielOrt: widget.fahrt.standort,
-                                  seatsRequested: a.seatsRequested,
-                                  seatsAccepted: _acceptedSeats,
-                                  uhrzeit:
-                                      '${widget.fahrt.uhrzeitHour.toString().padLeft(2, '0')}:${widget.fahrt.uhrzeitMinute.toString().padLeft(2, '0')}',
-                                  richtung: switch (widget.fahrt.richtung) {
-                                    Fahrtrichtung.hinfahrt => 'Hinfahrt',
-                                    Fahrtrichtung.rueckfahrt => 'Rückfahrt',
-                                    Fahrtrichtung.hinUndZurueck =>
-                                      'Hin und Zurück',
-                                  },
-                                  ownerName: widget.fahrt.ownerName,
-                                );
-                              } catch (_) {
-                                // System-Nachricht ist nicht kritisch – die Anfrage wurde bereits
-                                // erfolgreich angenommen. Fehler (z.B. permission-denied bei
-                                // abgelaufenem JWT) werden ignoriert.
-                              }
-
-                              if (!context.mounted) return;
-                              AppSnackbar.show(context,
-                                  message: 'Anfrage angenommen');
-
-                              // Wenn Fahrt jetzt voll: alle offenen Anfragen auto-ablehnen
-                              final newFreie = freie - _acceptedSeats;
-                              if (newFreie <= 0) {
-                                final offene = anfrageService
-                                    .getAnfragenForFahrt(widget.fahrt.id)
-                                    .where((x) =>
-                                        x.id != a.id &&
-                                        x.status == AnfrageStatus.offen)
-                                    .toList();
-                                for (final offeneAnfrage in offene) {
-                                  await anfrageService
-                                      .ablehnenAnfrage(offeneAnfrage);
-                                  if (!mounted) break;
-                                  chatService.sendStatusNotification(
-                                    fahrtId: widget.fahrt.id,
-                                    ownerId: widget.fahrt.ownerId,
-                                    requesterId: offeneAnfrage.requesterId,
-                                    eventName: widget.fahrt.eventName,
-                                    startOrt: widget.fahrt.abfahrtsort,
-                                    zielOrt: widget.fahrt.standort,
-                                    seatsRequested:
-                                        offeneAnfrage.seatsRequested,
-                                    text: 'Fahrt ist leider voll.',
-                                  );
-                                }
-                              }
-                            } finally {
-                              if (mounted) setState(() => _loading = false);
-                            }
-                          },
-                    icon: const Icon(Icons.check, color: Colors.greenAccent),
-                    label: const Text("Annehmen",
-                        style: TextStyle(color: Colors.greenAccent)),
+          // ── Status-Strip links ──
+          Positioned(
+            left: 0,
+            top: 8,
+            bottom: 8,
+            child: Container(
+              width: 4,
+              decoration: BoxDecoration(
+                color: stripColor,
+                borderRadius: BorderRadius.circular(4),
+                boxShadow: [
+                  BoxShadow(
+                    color: stripColor.withValues(alpha: 0.33),
+                    blurRadius: 10,
                   ),
                 ],
               ),
-            ],
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return isStorniert ? Opacity(opacity: 0.45, child: card) : card;
+  }
+
+  Widget _buildChatButton(bool isUnread, BuildContext context) {
+    return GestureDetector(
+      onTap: () => _openChat(context),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeOutCubic,
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isUnread
+                  ? _chatAmber.withValues(alpha: 0.28)
+                  : Colors.white.withValues(alpha: 0.08),
+              border: Border.all(
+                color: isUnread
+                    ? _chatAmber.withValues(alpha: 0.85)
+                    : Colors.white.withValues(alpha: 0.22),
+                width: isUnread ? 1.8 : 1.5,
+              ),
+              boxShadow: isUnread
+                  ? [
+                      BoxShadow(
+                        color: _chatAmber.withValues(alpha: 0.3),
+                        blurRadius: 10,
+                        spreadRadius: 0,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Icon(
+              Icons.chat_bubble_rounded,
+              size: 20,
+              color: isUnread ? _chatAmber : Colors.white,
+            ),
+          ),
+          if (isUnread)
+            Positioned(
+              right: 1,
+              top: 1,
+              child: Container(
+                width: 9,
+                height: 9,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: _chatAmber.withValues(alpha: 0.5),
+                    width: 1.5,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepper(AnfrageDaten a) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.22),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      padding: const EdgeInsets.all(3),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _miniBtn(
+            Icons.remove,
+            _acceptedSeats > 1 ? () => setState(() => _acceptedSeats--) : null,
+          ),
+          SizedBox(
+            width: 28,
+            child: Text(
+              '$_acceptedSeats',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: _chatAmber,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          _miniBtn(
+            Icons.add,
+            _acceptedSeats >= a.seatsRequested
+                ? null
+                : () {
+                    final freie = widget.fahrt.freiePlaetze;
+                    if (_acceptedSeats >= freie) {
+                      AppSnackbar.show(
+                        context,
+                        message: 'Nur noch $freie Platz${freie == 1 ? '' : 'e'} verfügbar',
+                      );
+                      return;
+                    }
+                    setState(() => _acceptedSeats++);
+                  },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _miniBtn(IconData icon, VoidCallback? onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: SizedBox(
+        width: 26,
+        height: 26,
+        child: Icon(
+          icon,
+          size: 15,
+          color: onTap != null ? Colors.white : Colors.white38,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAblehnenBtn() {
+    return GestureDetector(
+      onTap: _loading ? null : _handleAblehnen,
+      child: Container(
+        height: 38,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: _stripRed.withValues(alpha: 0.4),
+          ),
+          borderRadius: BorderRadius.circular(11),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.close, size: 15,
+                color: _loading ? Colors.white24 : const Color(0xFFE88891)),
+            const SizedBox(width: 5),
+            Text(
+              'Ablehnen',
+              style: TextStyle(
+                color: _loading ? Colors.white24 : const Color(0xFFE88891),
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _seatButton({required IconData icon, VoidCallback? onTap}) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: IconButton(
-        icon: Icon(icon, color: Colors.white),
-        onPressed: onTap,
+  Widget _buildAnnehmenBtn(AnfrageDaten a) {
+    final label = a.seatsRequested > 1 ? '$_acceptedSeats annehmen' : 'Annehmen';
+    return GestureDetector(
+      onTap: _loading ? null : _handleAnnehmen,
+      child: Container(
+        height: 38,
+        decoration: BoxDecoration(
+          gradient: _loading
+              ? null
+              : const LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xFF34B97A), Color(0xFF2A9D68)],
+                ),
+          color: _loading ? Colors.white12 : null,
+          borderRadius: BorderRadius.circular(11),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: _loading
+              ? [
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white54),
+                  ),
+                ]
+              : [
+                  const Icon(Icons.check_rounded, size: 15, color: Colors.white),
+                  const SizedBox(width: 5),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+        ),
       ),
     );
   }
