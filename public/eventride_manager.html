@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EventRide Manager</title>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F7F7F5;color:#1a1a1a;font-size:14px}
+a{color:#E88C2E;text-decoration:none}
+button{font-family:inherit;font-size:13px;cursor:pointer;border:1px solid #ddd;background:#fff;border-radius:7px;padding:5px 12px;transition:background .15s}
+button:hover{background:#f0f0ee}
+button.primary{background:#E88C2E;color:#fff;border-color:#E88C2E}
+button.primary:hover{background:#d07a20}
+button.danger{color:#c0392b;border-color:#f0c0bb;background:#fff}
+button.danger:hover{background:#fef0ee}
+button.small{padding:3px 9px;font-size:12px}
+input,select,textarea{font-family:inherit;font-size:13px;border:1px solid #ddd;border-radius:7px;padding:6px 9px;width:100%;background:#fff;color:#1a1a1a}
+input:focus,select:focus,textarea:focus{outline:none;border-color:#E88C2E}
+.card{background:#fff;border:1px solid #e8e8e5;border-radius:12px}
+.badge{display:inline-flex;align-items:center;font-size:11px;font-weight:500;padding:2px 8px;border-radius:10px;white-space:nowrap}
+.badge-kirchtag{background:#FAEEDA;color:#633806}
+.badge-feuerwehr{background:#EAF3DE;color:#27500A}
+.badge-ball{background:#FBEAF0;color:#72243E}
+.badge-krampus{background:#EEEDFE;color:#3C3489}
+.badge-disco{background:#E6F1FB;color:#0C447C}
+.badge-confirmed{background:#EAF3DE;color:#27500A}
+.badge-check{background:#FAEEDA;color:#633806}
+.badge-inapp{background:#E6F1FB;color:#0C447C}
+.badge-geprueft{background:#f0f0ee;color:#555}
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;background:#0d1420}
+.login-box{background:#fff;border-radius:16px;padding:2.5rem 2rem;text-align:center;width:320px}
+.login-logo{font-size:28px;font-weight:700;color:#1a1a1a;margin-bottom:6px}
+.login-logo span{color:#E88C2E}
+.login-sub{font-size:13px;color:#888;margin-bottom:1.5rem}
+.app-wrap{max-width:1400px;margin:0 auto;padding:1rem}
+.header{display:flex;align-items:center;justify-content:space-between;padding:.75rem 0;border-bottom:1px solid #e8e8e5;margin-bottom:.75rem}
+.header-logo{font-size:18px;font-weight:700}
+.header-logo span{color:#E88C2E}
+.stats-row{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:.75rem}
+.stat-card{background:#fff;border:1px solid #e8e8e5;border-radius:10px;padding:10px 12px;text-align:center}
+.stat-num{font-size:22px;font-weight:600}
+.stat-lbl{font-size:10px;color:#888;margin-top:2px}
+.tabs{display:flex;gap:0;border-bottom:1px solid #e8e8e5;margin-bottom:.75rem}
+.tab-btn{padding:7px 16px;font-size:13px;cursor:pointer;border:none;border-bottom:2px solid transparent;background:transparent;color:#888;border-radius:0;font-weight:400}
+.tab-btn.active{color:#1a1a1a;border-bottom:2px solid #E88C2E;font-weight:500}
+.main-grid{display:grid;grid-template-columns:1fr;gap:12px}
+.main-grid.has-detail{grid-template-columns:1fr 380px}
+.filter-row{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center}
+.filter-row input,.filter-row select{width:auto;font-size:12px}
+.filter-row input[type=text]{width:150px}
+.event-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;cursor:pointer;border-bottom:1px solid #f0f0ee;transition:background .1s}
+.event-row:hover{background:#fafaf8}
+.event-row.selected{background:#FFF8F0}
+.event-row.past{opacity:.55}
+.event-name{flex:1;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.event-meta{font-size:11px;color:#888}
+.event-date{font-size:11px;color:#888;white-space:nowrap}
+.icon-check{color:#27AE60;font-size:13px}
+.icon-upload{color:#3498DB;font-size:13px}
+.detail-panel{background:#fff;border:1px solid #e8e8e5;border-radius:12px;padding:1rem;position:sticky;top:8px;max-height:90vh;overflow-y:auto}
+.detail-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.75rem}
+.detail-name{font-size:15px;font-weight:600;margin-bottom:4px}
+.detail-badges{display:flex;gap:5px;flex-wrap:wrap}
+.field-row{display:grid;grid-template-columns:90px 1fr;gap:4px 8px;font-size:12px;margin-bottom:.75rem;align-items:start}
+.field-label{color:#888;padding-top:7px}
+.field-val{padding:6px 9px;border-radius:7px;background:#f7f7f5;font-size:12px;word-break:break-all}
+.section-sep{border-top:1px solid #f0f0ee;margin:.75rem 0;padding-top:.75rem}
+.warn-box{background:#FFFBF0;border:1px solid #FAC775;border-radius:9px;padding:10px;margin-bottom:.75rem}
+.warn-box h4{font-size:12px;font-weight:500;color:#633806;margin-bottom:6px}
+.url-preview{font-family:monospace;font-size:10px;color:#888;word-break:break-all;background:#f7f7f5;padding:6px 8px;border-radius:7px;margin-bottom:8px;max-height:50px;overflow:hidden}
+.btn-row{display:flex;gap:6px}
+.btn-row button{flex:1}
+.vorschlag-card{background:#fff;border:1px solid #e8e8e5;border-radius:10px;padding:10px 12px;margin-bottom:8px}
+.empty-state{text-align:center;padding:3rem;color:#aaa;font-size:13px}
+.gem-row{display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:7px;cursor:pointer;font-size:12px;border:1px solid #f0f0ee;margin-bottom:3px}
+.gem-row.no-events{background:#FFF5F5;border-color:#fdd;color:#c0392b}
+.gem-row.has-events{background:#f7f7f5}
+.gem-event{padding:5px 8px 5px 20px;font-size:12px;border-bottom:1px solid #f7f7f5;cursor:pointer;display:flex;align-items:center;gap:7px}
+.gem-event:hover{background:#fafaf8}
+.bez-header{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;cursor:pointer;background:#fafaf8;border-radius:10px;margin-bottom:5px;border:1px solid #e8e8e5}
+.edit-grid{display:grid;grid-template-columns:90px 1fr;gap:5px 8px;margin-bottom:.75rem;align-items:center;font-size:12px}
+.edit-label{color:#888;font-size:12px}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:200}
+.modal{background:#fff;border-radius:14px;padding:1.5rem;width:420px;max-height:90vh;overflow-y:auto}
+.modal h3{font-size:15px;font-weight:600;margin-bottom:1rem}
+.tag-new{background:#E6F1FB;color:#0C447C;font-size:10px;padding:1px 6px;border-radius:8px;margin-left:5px}
+@media(max-width:900px){.main-grid.has-detail{grid-template-columns:1fr}.stats-row{grid-template-columns:repeat(3,1fr)}}
+</style>
+</head>
+<body>
+
+<div id="login-screen" class="login-wrap" style="display:none">
+  <div class="login-box">
+    <div class="login-logo">Event<span>Ride</span></div>
+    <div class="login-sub">Manager — Intern</div>
+    <button class="primary" style="width:100%;padding:10px;font-size:14px" onclick="login()">
+      Mit Google anmelden
+    </button>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+  <div class="app-wrap">
+    <div class="header">
+      <div>
+        <span class="header-logo">Event<span>Ride</span> <span style="font-weight:400;color:#888;font-size:14px">Manager</span></span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span id="user-name" style="font-size:12px;color:#888"></span>
+        <button class="small" onclick="logout()">Abmelden</button>
+        <button class="small primary" onclick="openAdd()">+ Event</button>
+      </div>
+    </div>
+
+    <div class="stats-row" id="stats-row"></div>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('recherche')" id="tab-recherche">Recherche</button>
+      <button class="tab-btn" onclick="switchTab('inapp')" id="tab-inapp">In App (Firebase)</button>
+      <button class="tab-btn" onclick="switchTab('bezirke')" id="tab-bezirke">Bezirke</button>
+      <button class="tab-btn" onclick="switchTab('csv')" id="tab-csv">CSV Import</button>
+    </div>
+
+    <div id="content"></div>
+  </div>
+</div>
+
+<div id="modal-add" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeAdd()">
+  <div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+      <h3 style="margin:0">Event hinzufügen</h3>
+      <button onclick="closeAdd()" style="border:none;background:none;font-size:20px;cursor:pointer">×</button>
+    </div>
+    <div id="add-form"></div>
+    <div class="btn-row" style="margin-top:.75rem">
+      <button onclick="closeAdd()">Abbrechen</button>
+      <button class="primary" onclick="submitAdd()">Hinzufügen</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const CFG = {
+  apiKey:"AIzaSyBAq6FHDB3s_mWcE7ZSNifhSiOxUWrxQac",
+  authDomain:"eventride-cd0e9.firebaseapp.com",
+  projectId:"eventride-cd0e9",
+  storageBucket:"eventride-cd0e9.firebasestorage.app",
+  messagingSenderId:"686951435694",
+  appId:"1:686951435694:web:b7ebb9bded06f1fa7e4c3f"
+};
+firebase.initializeApp(CFG);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+const BEZIRKE = ["Hermagor","Klagenfurt-Land","Klagenfurt-Stadt","Feldkirchen","Sankt Veit","Spittal","Villach-Land","Villach-Stadt","Völkermarkt","Wolfsberg"];
+const GEMEINDEN = {
+  "Hermagor":["Dellach","Gitschtal","Hermagor-Pressegger See","Kirchbach","Kötschach-Mauthen","Lesachtal","St. Stefan im Gailtal"],
+  "Klagenfurt-Land":["Ebenthal in Kärnten","Feistritz im Rosental","Ferlach","Grafenstein","Keutschach am See","Krumpendorf am Wörther See","Maria Rain","Maria Saal","Maria Wörth","Moosburg","Poggersdorf","Pörtschach am Wörther See","Schiefling am Wörthersee","St. Margareten im Rosental","Techelsberg am Wörther See","Zell"],
+  "Klagenfurt-Stadt":["Klagenfurt am Wörthersee"],
+  "Feldkirchen":["Albeck","Feldkirchen in Kärnten","Glanegg","Gnesau","Himmelberg","Ossiach","Reichenau","St. Urban","Steindorf am Ossiacher See","Steuerberg"],
+  "Sankt Veit":["Althofen","Brückl","Deutsch-Griffen","Eberstein","Frauenstein","Friesach","Gurk","Guttaring","Hüttenberg","Kappel am Krappfeld","Klein St. Paul","Metnitz","Micheldorf","Mölbling","St. Georgen am Längsee","St. Veit an der Glan","Strassburg"],
+  "Spittal":["Bad Kleinkirchheim","Baldramsdorf","Berg im Drautal","Dellach im Drautal","Ferndorf","Flattach","Fresach","Gmünd in Kärnten","Greifenburg","Großkirchheim","Heiligenblut am Großglockner","Irschen","Kleblach-Lind","Millstatt","Mörtschach","Mühldorf","Oberdrauburg","Obervellach","Radenthein","Rangersdorf","Reißeck","Rennweg am Katschberg","Sachsenburg","Seeboden","Spittal an der Drau","Stall","Steinfeld","Stockenboi","Trebesing","Weißensee","Winklern"],
+  "Villach-Land":["Arnoldstein","Arriach","Bad Bleiberg","Feld am See","Feistritz an der Gail","Finkenstein am Faaker See","Hohenthurn","Nötsch im Gailtal","Paternion","Rosegg","St. Jakob im Rosental","Treffen am Ossiacher See","Velden am Wörther See","Weißenstein","Wernberg"],
+  "Villach-Stadt":["Villach"],
+  "Völkermarkt":["Bleiburg","Diex","Eberndorf","Eisenkappel-Vellach","Feistritz ob Bleiburg","Gallizien","Globasnitz","Griffen","Neuhaus","Ruden","St. Kanzian am Klopeiner See","Sittersdorf","Völkermarkt"],
+  "Wolfsberg":["Bad St. Leonhard im Lavanttal","Frantschach-St. Gertraud","Lavamünd","Preitenegg","Reichenfels","St. Andrä","St. Georgen im Lavanttal","St. Paul im Lavanttal","Wolfsberg"]
+};
+const TYP_CODE = {"Kirchtag":"e1","Feuerwehr":"e2","Disco/Party":"e3","Ball":"e4","Krampus":"e5"};
+const TYP_FROM_CODE = {"e1":"Kirchtag","e2":"Feuerwehr","e3":"Disco/Party","e4":"Ball","e5":"Krampus"};
+const TYPEN = ["Kirchtag","Feuerwehr","Ball","Krampus","Disco/Party"];
+
+let appEvents = [];
+let pending = [];
+let curTab = "recherche";
+let selId = null;
+let editMode = false;
+let editData = {};
+let expandBez = {};
+let expandGem = {};
+let fBez = "Alle", fTyp = "Alle", fStatus = "Alle", fSearch = "";
+let sortDir = "asc";
+let addFormData = {};
+
+// ---- AUTH ----
+auth.onAuthStateChanged(user => {
+  if(user) {
+    document.getElementById("login-screen").style.display = "none";
+    document.getElementById("app").style.display = "block";
+    document.getElementById("user-name").textContent = user.displayName || user.email;
+    initFS();
+  } else {
+    document.getElementById("login-screen").style.display = "flex";
+    document.getElementById("app").style.display = "none";
+    appEvents = []; pending = [];
+  }
+});
+function login() { auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }
+function logout() { auth.signOut(); }
+
+// ---- FIRESTORE ----
+function initFS() {
+  db.collection("events").onSnapshot(snap => {
+    appEvents = snap.docs.map(d => {
+      const data = d.data();
+      const typ = TYP_FROM_CODE[data.typ] || data.typ || "";
+      return {
+        _id: d.id, _src: "app",
+        name: data.name || "", datum: data.datum || "", uhrzeit: data.uhrzeit || "",
+        gemeinde: data.standort || data.gemeinde || "", bezirk: data.bezirk || "",
+        typ, eintritt: data.eintritt != null ? String(data.eintritt) : "k.A.",
+        beschreibung: data.beschreibung || "", lat: data.lat, lng: data.lng
+      };
+    });
+    render();
+  }, e => { console.warn("events read error", e); });
+
+  db.collection("pending_events").orderBy("createdAt","desc").onSnapshot(snap => {
+    pending = snap.docs.map(d => ({_id: d.id, _src: "pending", ...d.data()}));
+    render();
+  }, e => {
+    // Collection doesn't exist yet — that's fine
+    pending = [];
+    render();
+  });
+}
+
+// ---- DATE UTILS ----
+function parseDatum(s) {
+  if(!s) return null;
+  let m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if(m) return new Date(+m[3], +m[2]-1, +m[1]);
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(m) return new Date(+m[1], +m[2]-1, +m[3]);
+  return null;
+}
+function fmt(s) {
+  const d = parseDatum(s);
+  if(!d) return s||"";
+  return d.toLocaleDateString("de-AT",{day:"2-digit",month:"2-digit",year:"numeric"});
+}
+function monthDay(s) {
+  const d = parseDatum(s);
+  if(!d) return 9999;
+  return d.getMonth() * 100 + d.getDate();
+}
+function getYear(s) { const d=parseDatum(s); return d?d.getFullYear():0; }
+function isCheck(ev) { return ev.status==="check" || getYear(ev.datum)<2026; }
+function isPast(s) { const d=parseDatum(s); if(!d) return false; const t=new Date();t.setHours(0,0,0,0);return d<t; }
+
+function buildAdminUrl(ev) {
+  const base = "https://eventride-cd0e9.web.app/index.html";
+  const p = new URLSearchParams({
+    name: ev.name||"", datum: ev.datum||"",
+    uhrzeit: (ev.uhrzeit==="ganztags"?"20:00":ev.uhrzeit)||"20:00",
+    standort: ev.gemeinde||"", bezirk: ev.bezirk||"",
+    typ: TYP_CODE[ev.typ]||"e1",
+    eintritt: ev.eintritt==="kostenlos"?"0":"",
+    beschreibung: ev.beschreibung||(ev.name+" in "+ev.gemeinde)
+  });
+  return base+"?"+p;
+}
+
+function typBadge(typ) {
+  const map = {Kirchtag:"kirchtag",Feuerwehr:"feuerwehr",Ball:"ball",Krampus:"krampus","Disco/Party":"disco"};
+  return `<span class="badge badge-${map[typ]||"kirchtag"}">${typ||"?"}</span>`;
+}
+
+function isDupe(name) {
+  const n = name.trim().toLowerCase();
+  return appEvents.some(e=>e.name.trim().toLowerCase()===n) ||
+         pending.some(e=>e.name&&e.name.trim().toLowerCase()===n);
+}
+
+// ---- STATS ----
+function renderStats() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const s = {
+    inApp: appEvents.length,
+    pending_total: pending.length,
+    pending_check: pending.filter(e=>isCheck(e)).length,
+    pending_geprueft: pending.filter(e=>e.geprueft).length,
+    pending_ready: pending.filter(e=>e.geprueft && !isCheck(e) && !e.inApp).length,
+    upcoming: pending.filter(e=>{ const d=parseDatum(e.datum); return d&&d>=today; }).length
+  };
+  document.getElementById("stats-row").innerHTML = [
+    {l:"In App",v:s.inApp,c:"#0C447C"},
+    {l:"Recherche",v:s.pending_total,c:"#1a1a1a"},
+    {l:"Zu prüfen",v:s.pending_check,c:"#633806"},
+    {l:"Geprüft",v:s.pending_geprueft,c:"#27500A"},
+    {l:"Bereit",v:s.pending_ready,c:"#3B6D11"},
+    {l:"Bevorstehend",v:s.upcoming,c:"#853606"}
+  ].map(x=>`<div class="stat-card"><div class="stat-num" style="color:${x.c}">${x.v}</div><div class="stat-lbl">${x.l}</div></div>`).join("");
+}
+
+// ---- RENDER ROUTING ----
+function render() {
+  renderStats();
+  if(curTab==="recherche") renderRecherche();
+  else if(curTab==="inapp") renderInApp();
+  else if(curTab==="bezirke") renderBezirke();
+  else if(curTab==="csv") renderCSV();
+}
+
+function switchTab(t) {
+  curTab = t; selId = null; editMode = false;
+  document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
+  document.getElementById("tab-"+t).classList.add("active");
+  render();
+}
+
+// ---- RECHERCHE TAB ----
+function getFiltered() {
+  let evs = [...pending];
+  if(fBez!=="Alle") evs = evs.filter(e=>e.bezirk===fBez);
+  if(fTyp!=="Alle") evs = evs.filter(e=>e.typ===fTyp);
+  if(fStatus==="confirmed") evs = evs.filter(e=>!isCheck(e));
+  else if(fStatus==="check") evs = evs.filter(e=>isCheck(e));
+  else if(fStatus==="geprueft") evs = evs.filter(e=>e.geprueft);
+  else if(fStatus==="ready") evs = evs.filter(e=>e.geprueft&&!isCheck(e)&&!e.inApp);
+  else if(fStatus==="inApp") evs = evs.filter(e=>e.inApp);
+  if(fSearch) { const q=fSearch.toLowerCase(); evs=evs.filter(e=>(e.name||"").toLowerCase().includes(q)||(e.gemeinde||"").toLowerCase().includes(q)); }
+  evs.sort((a,b)=>{
+    const ma=monthDay(a.datum), mb=monthDay(b.datum);
+    return sortDir==="asc"?(ma-mb):(mb-ma);
+  });
+  return evs;
+}
+
+function renderRecherche() {
+  const evs = getFiltered();
+  const sel = selId ? pending.find(e=>e._id===selId) : null;
+  const gridClass = sel ? "main-grid has-detail" : "main-grid";
+  document.getElementById("content").innerHTML = `
+  <div class="${gridClass}">
+    <div>
+      <div class="filter-row">
+        <input type="text" placeholder="Name / Ort suchen..." value="${fSearch}" oninput="fSearch=this.value;render()">
+        <select onchange="fBez=this.value;render()">
+          <option value="Alle" ${fBez==="Alle"?"selected":""}>Alle Bezirke</option>
+          ${BEZIRKE.map(b=>`<option ${fBez===b?"selected":""}>${b}</option>`).join("")}
+        </select>
+        <select onchange="fTyp=this.value;render()">
+          <option value="Alle" ${fTyp==="Alle"?"selected":""}>Alle Typen</option>
+          ${TYPEN.map(t=>`<option ${fTyp===t?"selected":""}>${t}</option>`).join("")}
+        </select>
+        <select onchange="fStatus=this.value;render()">
+          <option value="Alle" ${fStatus==="Alle"?"selected":""}>Alle Status</option>
+          <option value="confirmed" ${fStatus==="confirmed"?"selected":""}>2026 bestätigt</option>
+          <option value="check" ${fStatus==="check"?"selected":""}>Datum prüfen</option>
+          <option value="geprueft" ${fStatus==="geprueft"?"selected":""}>Manuell geprüft</option>
+          <option value="ready" ${fStatus==="ready"?"selected":""}>Bereit zum Upload</option>
+          <option value="inApp" ${fStatus==="inApp"?"selected":""}>In App hochgeladen</option>
+        </select>
+        <button class="small" onclick="sortDir=sortDir==='asc'?'desc':'asc';render()" title="Sortierung">
+          ${sortDir==="asc"?"↑ Monat/Tag aufst.":"↓ Monat/Tag abst."}
+        </button>
+        ${(fBez!=="Alle"||fTyp!=="Alle"||fStatus!=="Alle"||fSearch)?`<button class="small danger" onclick="fBez='Alle';fTyp='Alle';fStatus='Alle';fSearch='';render()">Filter zurücksetzen</button>`:""}
+        <span style="font-size:11px;color:#aaa;margin-left:auto">${evs.length} Events</span>
+      </div>
+      <div id="event-list">
+        ${evs.length===0?`<div class="empty-state">Keine Events gefunden.</div>`:evs.map(ev=>eventRow(ev)).join("")}
+      </div>
+    </div>
+    ${sel?`<div>${detailPanel(sel)}</div>`:""}
+  </div>`;
+}
+
+function eventRow(ev) {
+  const check = isCheck(ev);
+  const past = isPast(ev.datum);
+  const isSel = selId===ev._id;
+  const checks = [];
+  if(ev.geprueft) checks.push(`<span class="icon-check">✓</span>`);
+  if(ev.inApp) checks.push(`<span class="icon-upload">↑</span>`);
+  return `<div class="event-row ${isSel?"selected":""} ${past&&!ev.inApp?"past":""}" onclick="selectEv('${ev._id}')">
+    ${typBadge(ev.typ)}
+    <div style="flex:1;min-width:0">
+      <div class="event-name" style="color:${check?"#c37a00":"#1a1a1a"}">${check?"⚠ ":""}${esc(ev.name)}</div>
+      <div class="event-meta">${esc(ev.gemeinde)} · ${esc(ev.bezirk)}</div>
+    </div>
+    <div style="text-align:right;flex-shrink:0">
+      <div class="event-date" style="color:${past?"#e74c3c":"#888"}">${fmt(ev.datum)}</div>
+      <div style="display:flex;gap:3px;justify-content:flex-end">${checks.join("")}</div>
+    </div>
+  </div>`;
+}
+
+function selectEv(id) {
+  selId = selId===id?null:id;
+  editMode = false;
+  render();
+}
+
+// ---- DETAIL PANEL ----
+function detailPanel(ev) {
+  const check = isCheck(ev);
+  const url = buildAdminUrl(ev);
+  const inApp = appEvents.some(a=>a.name.trim().toLowerCase()===ev.name.trim().toLowerCase());
+
+  if(editMode) {
+    return `<div class="detail-panel">
+      <div class="detail-header">
+        <span style="font-weight:600;font-size:14px">Bearbeiten</span>
+        <button onclick="selId=null;editMode=false;render()" style="border:none;background:none;font-size:18px">×</button>
+      </div>
+      ${editFormHTML(editData)}
+      <div class="btn-row" style="margin-top:.75rem">
+        <button onclick="cancelEdit()">Abbrechen</button>
+        <button class="primary" onclick="saveEdit('${ev._id}')">Speichern</button>
+      </div>
+    </div>`;
+  }
+
+  return `<div class="detail-panel">
+    <div class="detail-header">
+      <div style="flex:1;padding-right:8px">
+        <div class="detail-name">${esc(ev.name)}</div>
+        <div class="detail-badges">
+          ${typBadge(ev.typ)}
+          ${check?`<span class="badge badge-check">Datum prüfen</span>`:`<span class="badge badge-confirmed">2026 bestätigt</span>`}
+          ${ev.inApp||inApp?`<span class="badge badge-inapp">In App</span>`:""}
+          ${ev.geprueft?`<span class="badge badge-geprueft">Geprüft</span>`:""}
+        </div>
+      </div>
+      <div style="display:flex;gap:5px;flex-shrink:0">
+        <button class="small" onclick="startEdit('${ev._id}')" title="Bearbeiten" style="padding:3px 8px">✏️</button>
+        <button onclick="selId=null;render()" style="border:none;background:none;font-size:18px;cursor:pointer;padding:0 2px">×</button>
+      </div>
+    </div>
+
+    <div class="field-row">
+      <span class="field-label">Datum</span><span class="field-val" style="color:${check?"#c37a00":"#1a1a1a"}">${fmt(ev.datum)}${check?" ⚠":""}</span>
+      <span class="field-label">Uhrzeit</span><span class="field-val">${esc(ev.uhrzeit)||"—"}</span>
+      <span class="field-label">Gemeinde</span><span class="field-val">${esc(ev.gemeinde)||"—"}</span>
+      <span class="field-label">Bezirk</span><span class="field-val">${esc(ev.bezirk)||"—"}</span>
+      <span class="field-label">Veranstalter</span><span class="field-val">${esc(ev.veranstalter)||"—"}</span>
+      <span class="field-label">Eintritt</span><span class="field-val">${esc(ev.eintritt)||"—"}</span>
+    </div>
+
+    ${ev.quelle?`<div style="margin-bottom:.75rem">
+      <div style="font-size:11px;color:#888;margin-bottom:3px">Quelle</div>
+      <a href="${ev.quelle.startsWith("http")?ev.quelle:"https://"+ev.quelle}" target="_blank" style="font-size:12px;word-break:break-all">${esc(ev.quelle)}</a>
+    </div>`:""}
+
+    <div style="margin-bottom:.75rem">
+      <div style="font-size:11px;color:#888;margin-bottom:3px">Weitere Quellen</div>
+      <input value="${esc(ev.quelle2||"")}" placeholder="Instagram, Facebook, ..." onchange="updPending('${ev._id}',{quelle2:this.value})" style="font-size:12px">
+    </div>
+
+    ${check?`<div class="warn-box">
+      <h4>2026-Datum noch unbekannt</h4>
+      <div style="display:flex;gap:6px">
+        <input id="inp-datum-${ev._id}" placeholder="TT.MM.2026" style="font-size:12px;flex:1">
+        <button class="primary small" onclick="confirm2026('${ev._id}')">OK</button>
+      </div>
+    </div>`:""}
+
+    <div class="section-sep">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;margin-bottom:8px">
+        <input type="checkbox" ${ev.geprueft?"checked":""} onchange="updPending('${ev._id}',{geprueft:this.checked})">
+        Manuell überprüft (Instagram / Internet)
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+        <input type="checkbox" ${ev.inApp?"checked":""} onchange="updPending('${ev._id}',{inApp:this.checked})">
+        In App hochgeladen
+      </label>
+    </div>
+
+    ${!check?`<div class="section-sep">
+      <div style="font-size:11px;color:#888;margin-bottom:6px">Admin-URL (vorausgefüllt)</div>
+      <div class="url-preview">${url.substring(0,120)}...</div>
+      <div class="btn-row">
+        <a href="${url}" target="_blank"><button style="width:100%">🔗 Öffnen & hochladen</button></a>
+        <button onclick="navigator.clipboard.writeText('${url.replace(/'/g,"\\'")}');this.textContent='✓ Kopiert';setTimeout(()=>this.textContent='Kopieren',2000)">Kopieren</button>
+      </div>
+    </div>`:""}
+
+    <div class="section-sep">
+      <button class="danger" style="width:100%;font-size:12px" onclick="delPending('${ev._id}')">🗑 Event löschen</button>
+    </div>
+  </div>`;
+}
+
+// ---- EDIT ----
+function editFormHTML(d) {
+  const bezSelect = BEZIRKE.map(b=>`<option ${d.bezirk===b?"selected":""}>${b}</option>`).join("");
+  const typSelect = TYPEN.map(t=>`<option ${d.typ===t?"selected":""}>${t}</option>`).join("");
+  return `<div class="edit-grid">
+    <span class="edit-label">Name *</span><input value="${esc(d.name||"")}" onchange="editData.name=this.value">
+    <span class="edit-label">Datum *</span><input value="${esc(d.datum||"")}" placeholder="TT.MM.JJJJ" onchange="editData.datum=this.value">
+    <span class="edit-label">Uhrzeit</span><input value="${esc(d.uhrzeit||"")}" onchange="editData.uhrzeit=this.value">
+    <span class="edit-label">Gemeinde</span><input value="${esc(d.gemeinde||"")}" onchange="editData.gemeinde=this.value">
+    <span class="edit-label">Bezirk</span><select onchange="editData.bezirk=this.value">${bezSelect}</select>
+    <span class="edit-label">Typ</span><select onchange="editData.typ=this.value">${typSelect}</select>
+    <span class="edit-label">Veranstalter</span><input value="${esc(d.veranstalter||"")}" onchange="editData.veranstalter=this.value">
+    <span class="edit-label">Eintritt</span><input value="${esc(d.eintritt||"")}" onchange="editData.eintritt=this.value">
+    <span class="edit-label">Quelle</span><input value="${esc(d.quelle||"")}" onchange="editData.quelle=this.value">
+  </div>`;
+}
+
+function startEdit(id) {
+  const ev = pending.find(e=>e._id===id);
+  if(!ev) return;
+  editData = {...ev};
+  editMode = true;
+  render();
+}
+
+function cancelEdit() { editMode=false; render(); }
+
+function saveEdit(id) {
+  if(!editData.name||!editData.datum){alert("Name und Datum sind Pflicht.");return;}
+  const yr = getYear(editData.datum);
+  const patch = {...editData};
+  if(yr>=2026) patch.status="confirmed";
+  db.collection("pending_events").doc(id).update(patch).catch(e=>alert("Fehler: "+e.message));
+  editMode=false;
+}
+
+// ---- PENDING CRUD ----
+function updPending(id, patch) {
+  db.collection("pending_events").doc(id).update(patch).catch(e=>console.error(e));
+}
+
+function delPending(id) {
+  if(!confirm("Event löschen?")) return;
+  db.collection("pending_events").doc(id).delete();
+  selId=null; render();
+}
+
+function confirm2026(id) {
+  const d = document.getElementById("inp-datum-"+id);
+  if(!d||!d.value){alert("Bitte Datum eingeben.");return;}
+  updPending(id,{datum:d.value,status:"confirmed"});
+}
+
+// ---- ADD MODAL ----
+function openAdd() {
+  addFormData = {name:"",datum:"",uhrzeit:"20:00",gemeinde:"",bezirk:"Spittal",veranstalter:"örtlich",eintritt:"kostenlos",typ:"Kirchtag",quelle:""};
+  const bezSelect = BEZIRKE.map(b=>`<option ${b==="Spittal"?"selected":""}>${b}</option>`).join("");
+  const typSelect = TYPEN.map(t=>`<option ${t==="Kirchtag"?"selected":""}>${t}</option>`).join("");
+  document.getElementById("add-form").innerHTML = `<div class="edit-grid">
+    <span class="edit-label">Name *</span><input placeholder="Eventname" oninput="addFormData.name=this.value">
+    <span class="edit-label">Datum *</span><input placeholder="TT.MM.JJJJ" oninput="addFormData.datum=this.value">
+    <span class="edit-label">Uhrzeit</span><input value="20:00" oninput="addFormData.uhrzeit=this.value">
+    <span class="edit-label">Gemeinde</span><input placeholder="z.B. Seeboden" oninput="addFormData.gemeinde=this.value">
+    <span class="edit-label">Bezirk</span><select onchange="addFormData.bezirk=this.value">${bezSelect}</select>
+    <span class="edit-label">Typ</span><select onchange="addFormData.typ=this.value">${typSelect}</select>
+    <span class="edit-label">Veranstalter</span><input value="örtlich" oninput="addFormData.veranstalter=this.value">
+    <span class="edit-label">Eintritt</span><input value="kostenlos" oninput="addFormData.eintritt=this.value">
+    <span class="edit-label">Quelle</span><input placeholder="URL oder Quelle" oninput="addFormData.quelle=this.value">
+  </div>`;
+  document.getElementById("modal-add").style.display="flex";
+}
+
+function closeAdd() { document.getElementById("modal-add").style.display="none"; }
+
+function submitAdd() {
+  if(!addFormData.name||!addFormData.datum){alert("Name und Datum Pflicht.");return;}
+  if(isDupe(addFormData.name)){
+    if(!confirm(`"${addFormData.name}" scheint bereits zu existieren. Trotzdem hinzufügen?`)) return;
+  }
+  const yr = getYear(addFormData.datum);
+  db.collection("pending_events").add({
+    ...addFormData, status:yr>=2026?"confirmed":"check",
+    geprueft:false, inApp:false,
+    createdAt:firebase.firestore.FieldValue.serverTimestamp()
+  }).then(()=>closeAdd()).catch(e=>alert("Fehler: "+e.message));
+}
+
+// ---- IN APP TAB ----
+function renderInApp() {
+  const sel = selId ? appEvents.find(e=>e._id===selId) : null;
+  const sorted = [...appEvents].sort((a,b)=>monthDay(a.datum)-monthDay(b.datum));
+  const gridClass = sel ? "main-grid has-detail" : "main-grid";
+  document.getElementById("content").innerHTML = `
+  <div class="${gridClass}">
+    <div>
+      <div style="font-size:12px;color:#888;margin-bottom:10px">
+        ${appEvents.length} Events direkt aus Firebase geladen — Echtzeit-Sync.
+      </div>
+      ${sorted.length===0?`<div class="empty-state">Keine Events in Firebase gefunden.</div>`:
+        sorted.map(ev=>`
+        <div class="event-row ${selId===ev._id?"selected":""} ${isPast(ev.datum)?"past":""}" onclick="selId=selId==='${ev._id}'?null:'${ev._id}';render()">
+          ${typBadge(ev.typ)}
+          <div style="flex:1;min-width:0">
+            <div class="event-name">${esc(ev.name)}</div>
+            <div class="event-meta">${esc(ev.gemeinde)} · ${esc(ev.bezirk)}</div>
+          </div>
+          <div class="event-date" style="color:${isPast(ev.datum)?"#e74c3c":"#888"}">${fmt(ev.datum)}</div>
+        </div>`).join("")}
+    </div>
+    ${sel?`<div>${appEventDetail(sel)}</div>`:""}
+  </div>`;
+}
+
+function appEventDetail(ev) {
+  return `<div class="detail-panel">
+    <div class="detail-header">
+      <div>
+        <div class="detail-name">${esc(ev.name)}</div>
+        <div class="detail-badges">${typBadge(ev.typ)}<span class="badge badge-inapp">In App</span></div>
+      </div>
+      <button onclick="selId=null;render()" style="border:none;background:none;font-size:18px;cursor:pointer">×</button>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Datum</span><span class="field-val">${fmt(ev.datum)}</span>
+      <span class="field-label">Uhrzeit</span><span class="field-val">${ev.uhrzeit||"—"}</span>
+      <span class="field-label">Ort</span><span class="field-val">${ev.gemeinde||"—"}</span>
+      <span class="field-label">Bezirk</span><span class="field-val">${ev.bezirk||"—"}</span>
+      <span class="field-label">Eintritt</span><span class="field-val">${ev.eintritt||"—"}</span>
+    </div>
+    ${ev.beschreibung?`<div style="font-size:12px;color:#888;margin-top:4px">${esc(ev.beschreibung)}</div>`:""}
+    <div class="section-sep" style="font-size:12px;color:#888">
+      Firestore-ID: <code style="font-size:11px">${ev._id}</code>
+    </div>
+  </div>`;
+}
+
+// ---- BEZIRKE TAB ----
+function renderBezirke() {
+  const allEvs = [...pending, ...appEvents];
+  let html = "";
+  for(const bez of BEZIRKE) {
+    const bezEvs = pending.filter(e=>e.bezirk===bez);
+    const appBezEvs = appEvents.filter(e=>e.bezirk===bez);
+    const conf = bezEvs.filter(e=>!isCheck(e)).length;
+    const chk = bezEvs.filter(e=>isCheck(e)).length;
+    const isOpen = expandBez[bez];
+    const gems = GEMEINDEN[bez]||[];
+    html += `<div style="margin-bottom:8px">
+      <div class="bez-header" onclick="expandBez['${bez}']=!expandBez['${bez}'];render()">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:16px">📍</span>
+          <span style="font-weight:500;font-size:14px">${bez}</span>
+          ${appBezEvs.length?`<span class="badge badge-inapp">${appBezEvs.length} in App</span>`:""}
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          ${conf?`<span class="badge badge-confirmed">${conf} bestätigt</span>`:""}
+          ${chk?`<span class="badge badge-check">${chk} prüfen</span>`:""}
+          ${bezEvs.length===0&&appBezEvs.length===0?`<span style="font-size:11px;color:#aaa">keine Events</span>`:""}
+          <span style="color:#aaa">${isOpen?"▲":"▼"}</span>
+        </div>
+      </div>`;
+    if(isOpen) {
+      html += `<div style="padding:0 4px">`;
+      for(const gem of gems) {
+        const gEvs = bezEvs.filter(e=>e.gemeinde===gem||e.gemeinde.startsWith(gem.split(" ")[0]));
+        const gApp = appEvs => appEvents.filter(e=>e.gemeinde===gem||e.gemeinde.startsWith(gem.split(" ")[0]));
+        const gAppEvs = appEvents.filter(e=>e.gemeinde===gem||e.gemeinde.startsWith(gem.split(" ")[0]));
+        const gKey = bez+"_"+gem;
+        const gOpen = expandGem[gKey];
+        const total = gEvs.length + gAppEvs.length;
+        html += `<div class="gem-row ${total===0?"no-events":"has-events"}" onclick="${total?`expandGem['${gKey}']=!expandGem['${gKey}'];render()`:""}" style="cursor:${total?"pointer":"default"}">
+          <span>${gem}</span>
+          <span style="font-size:11px;color:${total===0?"#c0392b":"#888"}">
+            ${total===0?"keine Events":`${gEvs.length} Recherche${gAppEvs.length?` + ${gAppEvs.length} in App`:""}`}
+          </span>
+        </div>`;
+        if(gOpen&&total>0) {
+          gEvs.concat(gAppEvs).sort((a,b)=>monthDay(a.datum)-monthDay(b.datum)).forEach(ev=>{
+            const isAppEv = ev._src==="app";
+            html += `<div class="gem-event" onclick="${isAppEv?`selId='${ev._id}';switchTab('inapp')`:`selId='${ev._id}';switchTab('recherche')`}">
+              ${typBadge(ev.typ)}
+              <span style="flex:1;font-size:12px">${esc(ev.name)}</span>
+              <span style="font-size:11px;color:#aaa">${fmt(ev.datum)}</span>
+              ${isAppEv?`<span class="badge badge-inapp" style="font-size:10px">App</span>`:""}
+            </div>`;
+          });
+        }
+      }
+      html += `</div>`;
+    }
+    html += `</div>`;
+  }
+  document.getElementById("content").innerHTML = html;
+}
+
+// ---- CSV TAB ----
+function renderCSV() {
+  document.getElementById("content").innerHTML = `
+  <div class="card" style="padding:1.25rem;max-width:700px">
+    <h3 style="font-size:15px;font-weight:600;margin-bottom:.5rem">CSV Import (Copilot-Ausgabe)</h3>
+    <p style="font-size:13px;color:#888;margin-bottom:.75rem">Copilot-Tabelle hier einfügen. Pflicht: <code>Eventname</code>, <code>Datum</code>. Optional: Uhrzeit, Gemeinde, Bezirk, Veranstalter, Eintritt, Typ, Quelle. Duplikate werden automatisch erkannt und übersprungen.</p>
+    <div style="background:#f7f7f5;border-radius:8px;padding:8px 10px;font-family:monospace;font-size:11px;color:#888;margin-bottom:.75rem">
+      Eventname,Datum,Uhrzeit,Gemeinde,Bezirk,Veranstalter,Eintritt,Typ,Quelle
+    </div>
+    <textarea id="csv-input" rows="12" placeholder="CSV hier einfügen..." style="font-family:monospace;font-size:12px;margin-bottom:.75rem"></textarea>
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="primary" onclick="importCSV()">↑ Importieren</button>
+      <span id="csv-msg" style="font-size:13px"></span>
+    </div>
+  </div>`;
+}
+
+function importCSV() {
+  const text = document.getElementById("csv-input").value.trim();
+  const lines = text.split("\n").filter(l=>l.trim());
+  if(lines.length<2){setCsvMsg("Mind. Header + 1 Zeile nötig.","red");return;}
+  const hdrs = lines[0].split(",").map(h=>h.trim().toLowerCase());
+  const idx = k => hdrs.findIndex(h=>h.includes(k));
+  const iN=idx("name"),iD=idx("datum"),iU=idx("uhrzeit"),iG=idx("gemeinde"),iB=idx("bezirk"),iV=idx("veranstalter"),iE=idx("eintritt"),iT=idx("typ"),iQ=idx("quelle");
+  if(iN<0||iD<0){setCsvMsg("Spalten 'Eventname' und 'Datum' fehlen.","red");return;}
+
+  let added=0,dupes=0,batch=db.batch();
+  for(let i=1;i<lines.length;i++){
+    const c = lines[i].split(",").map(s=>s.trim().replace(/^"|"$/g,""));
+    const name = c[iN]||"";
+    if(!name) continue;
+    if(isDupe(name)){dupes++;continue;}
+    const datRaw = c[iD]||"";
+    const typRaw = (iT>=0?c[iT]||"":"").trim().split(" ")[0]||"Kirchtag";
+    const yr = getYear(datRaw);
+    const ref = db.collection("pending_events").doc();
+    batch.set(ref, {
+      name, datum:datRaw, uhrzeit:iU>=0?c[iU]:"20:00",
+      gemeinde:iG>=0?c[iG]:"", bezirk:iB>=0?c[iB]:"",
+      veranstalter:iV>=0?c[iV]:"örtlich", eintritt:iE>=0?c[iE]:"k.A.",
+      typ:typRaw, quelle:iQ>=0?c[iQ]:"", quelle2:"",
+      status:yr>=2026?"confirmed":"check", geprueft:false, inApp:false,
+      createdAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    added++;
+  }
+  if(added===0){setCsvMsg(`Keine neuen Events (${dupes} Duplikate).`,"#888");return;}
+  batch.commit().then(()=>{
+    setCsvMsg(`${added} importiert${dupes?`, ${dupes} Duplikate übersprungen`:""}.`,"#27AE60");
+    document.getElementById("csv-input").value="";
+    setTimeout(()=>switchTab("recherche"),1500);
+  }).catch(e=>setCsvMsg("Fehler: "+e.message,"red"));
+}
+
+function setCsvMsg(msg,color) {
+  const el=document.getElementById("csv-msg");
+  if(el){el.textContent=msg;el.style.color=color||"#1a1a1a";}
+  setTimeout(()=>{if(el)el.textContent="";},5000);
+}
+
+// ---- UTILS ----
+function esc(s){if(!s)return"";return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+</script>
+</body>
+</html>
