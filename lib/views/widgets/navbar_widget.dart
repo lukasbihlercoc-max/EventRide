@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:my_app/data/app_user.dart';
+import 'package:my_app/data/chat_conversation.dart';
 import 'package:my_app/data/chat_service.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/data/anfrage_daten.dart';
@@ -194,8 +195,8 @@ class _NavItemFahrten extends StatefulWidget {
 }
 
 class _NavItemFahrtenState extends State<_NavItemFahrten> {
-  bool _hasChatUnread = false;
-  StreamSubscription<bool>? _chatUnreadSub;
+  List<ChatConversation> _conversations = [];
+  StreamSubscription<List<ChatConversation>>? _chatSub;
   StreamSubscription<AppUser?>? _authSub;
 
   @override
@@ -203,20 +204,20 @@ class _NavItemFahrtenState extends State<_NavItemFahrten> {
     super.initState();
     _authSub = context.read<IAuthRepository>().authStateChanges.listen(
       (user) {
-        _chatUnreadSub?.cancel();
-        _chatUnreadSub = null;
+        _chatSub?.cancel();
+        _chatSub = null;
         if (!mounted) return;
-        setState(() => _hasChatUnread = false);
+        setState(() => _conversations = []);
         if (user != null) {
-          _chatUnreadSub = context
+          _chatSub = context
               .read<ChatService>()
-              .hasAnyUnreadStream(user.userId)
+              .conversationsStream(user.userId)
               .listen(
-                (hasUnread) {
-                  if (mounted) setState(() => _hasChatUnread = hasUnread);
+                (convos) {
+                  if (mounted) setState(() => _conversations = convos);
                 },
                 onError: (_) {
-                  if (mounted) setState(() => _hasChatUnread = false);
+                  if (mounted) setState(() => _conversations = []);
                 },
               );
         }
@@ -228,7 +229,7 @@ class _NavItemFahrtenState extends State<_NavItemFahrten> {
   @override
   void dispose() {
     _authSub?.cancel();
-    _chatUnreadSub?.cancel();
+    _chatSub?.cancel();
     super.dispose();
   }
 
@@ -245,18 +246,37 @@ class _NavItemFahrtenState extends State<_NavItemFahrten> {
               builder: (context, anfrageService, seenService, _) {
                 final uid = context.read<IAuthRepository>().currentUser?.userId;
                 bool hasAnfrageUnseen = false;
+                bool hasChatUnread = false;
                 if (uid != null) {
                   final requesterIds = anfrageService
                       .getAnfragenByRequester(uid)
                       .where((a) =>
                           (a.status != AnfrageStatus.offen &&
                               a.status != AnfrageStatus.storniert) ||
-                          a.vonFahrer)
+                          (a.vonFahrer && a.status == AnfrageStatus.offen))
                       .map((a) => a.id);
                   hasAnfrageUnseen =
                       seenService.hasUnseenRequester(uid, requesterIds);
+
+                  // Nur Chats von aktiven Anfragen zählen (nicht storniert/abgelehnt/fahrtGeloescht)
+                  final activePassengerFahrtIds = anfrageService.alleAnfragen
+                      .where((a) =>
+                          a.requesterId == uid &&
+                          a.status != AnfrageStatus.storniert &&
+                          a.status != AnfrageStatus.abgelehnt &&
+                          a.status != AnfrageStatus.fahrtGeloescht)
+                      .map((a) => a.fahrtId)
+                      .toSet();
+
+                  hasChatUnread = _conversations.any((c) {
+                    if (!c.isUnreadFor(uid)) return false;
+                    if (c.requesterId == uid) {
+                      return activePassengerFahrtIds.contains(c.fahrtId);
+                    }
+                    return c.ownerId == uid;
+                  });
                 }
-                final hasUnseen = hasAnfrageUnseen || _hasChatUnread;
+                final hasUnseen = hasAnfrageUnseen || hasChatUnread;
 
                 return Stack(
                   clipBehavior: Clip.none,

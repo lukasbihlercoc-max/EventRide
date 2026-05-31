@@ -310,12 +310,15 @@ class _LoggedInFahrtenView extends StatefulWidget {
 class _LoggedInFahrtenViewState extends State<_LoggedInFahrtenView>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  late AnfrageService _anfrageService;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(_onTabChange);
+    _anfrageService = context.read<AnfrageService>();
+    _anfrageService.addListener(_onAnfrageUpdate);
     WidgetsBinding.instance
         .addPostFrameCallback((_) => _markCurrentTabAsSeen());
   }
@@ -324,7 +327,12 @@ class _LoggedInFahrtenViewState extends State<_LoggedInFahrtenView>
   void dispose() {
     _tabController.removeListener(_onTabChange);
     _tabController.dispose();
+    _anfrageService.removeListener(_onAnfrageUpdate);
     super.dispose();
+  }
+
+  void _onAnfrageUpdate() {
+    if (_tabController.index == 0) _markCurrentTabAsSeen();
   }
 
   void _onTabChange() {
@@ -343,7 +351,7 @@ class _LoggedInFahrtenViewState extends State<_LoggedInFahrtenView>
         .where((a) =>
             (a.status != AnfrageStatus.offen &&
                 a.status != AnfrageStatus.storniert) ||
-            a.vonFahrer)
+            (a.vonFahrer && a.status == AnfrageStatus.offen))
         .map((a) => a.id)
         .toList();
     seenService.markRequesterAsSeen(userId, ids);
@@ -393,8 +401,7 @@ class _FahrtenTabBar extends StatefulWidget {
 }
 
 class _FahrtenTabBarState extends State<_FahrtenTabBar> {
-  bool _hasPassengerChatUnread = false;
-  bool _hasDriverChatUnread = false;
+  List<ChatConversation> _conversations = [];
   StreamSubscription<List<ChatConversation>>? _convoSub;
 
   @override
@@ -407,19 +414,7 @@ class _FahrtenTabBarState extends State<_FahrtenTabBar> {
           .conversationsStream(widget.userId)
           .listen((convos) {
         if (!mounted) return;
-        // Passenger-Conversations (Mitfahrten-Tab): user ist requesterId
-        final hasPassenger = convos.any((c) =>
-            c.requesterId == widget.userId && c.isUnreadFor(widget.userId));
-        // Driver-Conversations (Meine-Fahrten-Tab): user ist ownerId
-        final hasDriver = convos.any((c) =>
-            c.ownerId == widget.userId && c.isUnreadFor(widget.userId));
-        if (hasPassenger != _hasPassengerChatUnread ||
-            hasDriver != _hasDriverChatUnread) {
-          setState(() {
-            _hasPassengerChatUnread = hasPassenger;
-            _hasDriverChatUnread = hasDriver;
-          });
-        }
+        setState(() => _conversations = convos);
       });
     });
   }
@@ -466,12 +461,36 @@ class _FahrtenTabBarState extends State<_FahrtenTabBar> {
             .where((a) =>
               (a.status != AnfrageStatus.offen &&
                   a.status != AnfrageStatus.storniert) ||
-              a.vonFahrer)
+              (a.vonFahrer && a.status == AnfrageStatus.offen))
             .map((a) => a.id);
 
+        // Nur Chats von aktiven Anfragen (nicht storniert/abgelehnt/fahrtGeloescht)
+        // zählen für den Mitfahrten-Dot.
+        final activeAnfragenIds = anfrageService.alleAnfragen
+            .where((a) =>
+                a.requesterId == widget.userId &&
+                a.status != AnfrageStatus.storniert &&
+                a.status != AnfrageStatus.abgelehnt &&
+                a.status != AnfrageStatus.fahrtGeloescht)
+            .map((a) => a.fahrtId)
+            .toSet();
+
+        final hasPassengerChatUnread = _conversations.any((c) =>
+            c.requesterId == widget.userId &&
+            activeAnfragenIds.contains(c.fahrtId) &&
+            c.isUnreadFor(widget.userId));
+
+        final hasDriverChatUnread = _conversations.any((c) =>
+            c.ownerId == widget.userId && c.isUnreadFor(widget.userId));
+
         final showMitfahrtenDot = seenService.hasUnseenRequester(widget.userId, requesterIds)
-            || _hasPassengerChatUnread;
-        final showMeineFahrtenDot = _hasDriverChatUnread;
+            || hasPassengerChatUnread;
+
+        final hasOffeneEingehende = anfrageService.alleAnfragen.any(
+            (a) => a.fahrtOwnerId == widget.userId &&
+                   a.status == AnfrageStatus.offen &&
+                   !a.vonFahrer);
+        final showMeineFahrtenDot = hasDriverChatUnread || hasOffeneEingehende;
 
         return TabBar(
           controller: widget.tabController,
