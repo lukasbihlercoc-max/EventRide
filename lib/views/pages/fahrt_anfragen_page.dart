@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -17,6 +15,7 @@ import 'package:my_app/views/widgets/user_avatar_widget.dart';
 import 'package:my_app/views/pages/public_profile_page.dart';
 
 import 'package:my_app/views/widgets/background_widget.dart';
+import 'package:my_app/views/widgets/fading_backdrop_filter.dart';
 import 'package:my_app/data/chat_conversation.dart';
 import 'package:my_app/views/pages/chat_page.dart';
 
@@ -36,10 +35,7 @@ class FahrtAnfragenPage extends StatelessWidget {
       children: [
         AppBackground(child: Container()),
         Container(color: Colors.black.withValues(alpha: 0.4)),
-        BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-          child: Container(color: Colors.transparent),
-        ),
+        const FadingBackdropFilter(sigma: 8),
         Scaffold(
           backgroundColor: Colors.transparent,
           appBar: AppBar(

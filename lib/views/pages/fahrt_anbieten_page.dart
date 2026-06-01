@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/foundation.dart';
 import 'package:my_app/utils/platform_pickers.dart';
 import 'package:flutter/material.dart';
@@ -13,6 +11,7 @@ import 'package:my_app/data/fahrt_service.dart';
 import 'package:my_app/data/interessenten_service.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
+import 'package:my_app/views/widgets/fading_backdrop_filter.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
 
 class FahrtAnbietenPage extends StatefulWidget {
@@ -111,10 +110,7 @@ class _FahrtAnbietenPageState extends State<FahrtAnbietenPage>
       children: [
         AppBackground(child: Container()),
         Container(color: Colors.black.withValues(alpha: 0.4)),
-        BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-          child: Container(color: Colors.transparent),
-        ),
+        const FadingBackdropFilter(sigma: 8),
         Scaffold(
           backgroundColor: Colors.transparent,
           appBar: AppBar(

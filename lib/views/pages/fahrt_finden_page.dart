@@ -1,5 +1,4 @@
 // fahrt_finden_page.dart
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:my_app/data/event_daten.dart';
 import 'package:my_app/data/fahrt_daten.dart';
@@ -9,6 +8,7 @@ import 'package:my_app/utils/geo_utils.dart';
 import 'package:my_app/views/auth/auth_guard.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/widgets/fahrtencard_widget.dart';
+import 'package:my_app/views/widgets/fading_backdrop_filter.dart';
 import 'package:provider/provider.dart';
 
 class FahrtFindenPage extends StatelessWidget {
@@ -33,10 +33,7 @@ class FahrtFindenPage extends StatelessWidget {
             ),
           ),
         ),
-        BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-          child: Container(color: Colors.transparent),
-        ),
+        const FadingBackdropFilter(sigma: 6),
 
         Scaffold(
           backgroundColor: Colors.transparent,

@@ -1,5 +1,4 @@
 // settings_page.dart
-import 'dart:ui';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:my_app/data/app_user.dart';
@@ -15,6 +14,7 @@ import 'package:my_app/views/pages/legal_page.dart';
 import 'package:my_app/views/widgets/app_bottom_sheet.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
+import 'package:my_app/views/widgets/fading_backdrop_filter.dart';
 import 'package:provider/provider.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -82,10 +82,7 @@ class _SettingsPageState extends State<SettingsPage> {
       children: [
         AppBackground(child: Container()),
         Container(color: Colors.black.withValues(alpha: 0.4)),
-        BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-          child: Container(color: Colors.transparent),
-        ),
+        const FadingBackdropFilter(sigma: 8),
         Scaffold(
           backgroundColor: Colors.transparent,
           appBar: AppBar(
