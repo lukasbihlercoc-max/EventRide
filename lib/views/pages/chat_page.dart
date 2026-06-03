@@ -546,10 +546,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 keyboardType: TextInputType.multiline,
                 textInputAction: TextInputAction.newline,
                 maxLines: null,
-                autocorrect: false,
-                enableSuggestions: false,
-                spellCheckConfiguration:
-                    const SpellCheckConfiguration.disabled(),
                 style: const TextStyle(color: Colors.white, fontSize: 15),
                 decoration: const InputDecoration(
                   hintText: "Nachricht schreiben …",
@@ -921,19 +917,31 @@ Widget _buildMessageBubble(ChatMessage msg, String myUserId, {bool isLastInGroup
       padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 24),
       child: Center(
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: Colors.redAccent.withValues(alpha: 0.10),
+            color: const Color(0xFF3D1A1A),
             borderRadius: BorderRadius.circular(16),
-          ),
-          child: Text(
-            msg.text,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.redAccent,
-              fontStyle: FontStyle.italic,
+            border: Border.all(
+              color: Colors.redAccent.withValues(alpha: 0.45),
             ),
-            textAlign: TextAlign.center,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.info_outline, size: 13, color: Colors.redAccent),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  msg.text,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.white,
+                    fontStyle: FontStyle.italic,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
           ),
         ),
       ),
