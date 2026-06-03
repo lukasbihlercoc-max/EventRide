@@ -201,7 +201,9 @@ class DetailPage extends StatelessWidget {
                                       ClipRRect(
                                         borderRadius: BorderRadius.circular(
                                             width * 0.032),
-                                        child: SizedBox(
+                                        child: ColoredBox(
+                                          color: Colors.black,
+                                          child: SizedBox(
                                           height: 160,
                                           child: GoogleMap(
                                             liteModeEnabled: !Platform.isIOS,
@@ -227,6 +229,7 @@ class DetailPage extends StatelessWidget {
                                             zoomGesturesEnabled: false,
                                             myLocationButtonEnabled: false,
                                           ),
+                                        ),
                                         ),
                                       ),
                                       SizedBox(height: height * 0.016),

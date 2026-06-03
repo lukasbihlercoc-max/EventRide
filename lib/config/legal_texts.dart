@@ -6,7 +6,8 @@ Stand: 03.05.2026
 1. Verantwortlicher
 
 EventRide
-E-Mail: eventride.25@gmail.com
+E-Mail: hallo@eventride.at
+Website: eventride.at
 
 ──────────────────────────────────────
 
@@ -112,7 +113,7 @@ Nutzer haben folgende Rechte nach der DSGVO:
 • Widerruf einer Einwilligung (Art. 7 Abs. 3 DSGVO)
 
 Zur Ausübung dieser Rechte sowie für Anfragen zur
-Datenlöschung wende dich an: eventride.25@gmail.com
+Datenlöschung wende dich an: hallo@eventride.at
 
 Außerdem besteht das Recht, Beschwerde bei der zuständigen
 Datenschutzbehörde einzulegen:
@@ -256,5 +257,6 @@ Wesentliche Änderungen werden den Nutzern mitgeteilt.
 
 13. Kontakt
 
-E-Mail: eventride.25@gmail.com
+E-Mail: hallo@eventride.at
+Website: eventride.at
 ''';

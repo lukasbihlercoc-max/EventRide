@@ -1,6 +1,5 @@
 // lib/main.dart
 import 'dart:async';
-import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -15,8 +14,6 @@ import 'package:my_app/data/firebase/firestore_event_repository.dart';
 import 'package:my_app/data/fahrt_anfrage_service.dart';
 import 'package:my_app/data/notifiers.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:google_fonts/google_fonts.dart';
-
 // Repositories
 import 'package:my_app/data/firebase/firebase_fahrt_repository.dart';
 import 'package:my_app/data/firebase/firestore_chat_repository.dart';
@@ -377,11 +374,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             navigatorKey: navigatorKey,
             debugShowCheckedModeBanner: false,
             theme: ThemeData(
-              textTheme: Platform.isIOS
-                  ? _buildIosTextTheme(Theme.of(context).textTheme)
-                  : GoogleFonts.poppinsTextTheme(
-                      Theme.of(context).textTheme,
-                    ),
+              textTheme: _buildTextTheme(Theme.of(context).textTheme),
               colorSchemeSeed: Colors.blueAccent,
               brightness:
                   isDarkMode ? Brightness.dark : Brightness.light,
@@ -407,7 +400,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   }
 }
 
-TextTheme _buildIosTextTheme(TextTheme base) => base.copyWith(
+TextTheme _buildTextTheme(TextTheme base) => base.copyWith(
       displayLarge: base.displayLarge?.copyWith(fontWeight: FontWeight.w600),
       displayMedium: base.displayMedium?.copyWith(fontWeight: FontWeight.w600),
       displaySmall: base.displaySmall?.copyWith(fontWeight: FontWeight.w600),

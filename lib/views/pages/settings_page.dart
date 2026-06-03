@@ -16,6 +16,7 @@ import 'package:my_app/views/widgets/app_snackbar.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/widgets/fading_backdrop_filter.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SettingsPage extends StatefulWidget {
   final String title;
@@ -344,6 +345,21 @@ class _SettingsPageState extends State<SettingsPage> {
                             content: kAgbText,
                           ),
                         ),
+                      ),
+                    ),
+                    const Divider(color: Colors.white30),
+                    ListTile(
+                      leading: const Icon(Icons.language,
+                          color: Colors.lightBlueAccent),
+                      title: const Text("Website",
+                          style: TextStyle(color: Colors.white)),
+                      subtitle: const Text("eventride.at",
+                          style: TextStyle(color: Colors.white70)),
+                      trailing: const Icon(Icons.open_in_new,
+                          color: Colors.white38, size: 18),
+                      onTap: () => launchUrl(
+                        Uri.parse('https://eventride.at'),
+                        mode: LaunchMode.externalApplication,
                       ),
                     ),
                     const Divider(color: Colors.white30),
