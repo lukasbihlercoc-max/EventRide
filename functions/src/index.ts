@@ -699,7 +699,7 @@ export const cleanupAbgelaufeneEvents = onSchedule(
   {schedule: "every day 04:00", timeZone: "Europe/Vienna"},
   async () => {
     const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - 1);
+    cutoff.setDate(cutoff.getDate() - 30);
     cutoff.setUTCHours(0, 0, 0, 0);
     const cutoffStr = cutoff.toISOString();
 
