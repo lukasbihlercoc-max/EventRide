@@ -798,54 +798,145 @@ class _SwipeEditBackground extends StatelessWidget {
   }
 }
 
-/// Einmaliger Hinweis oberhalb der Liste
+/// Zwei Chevrons die in Wischrichtung pulsieren (translateX + opacity, 1.8s-Zyklus).
+/// Der hintere Chevron ist bei 55 % Deckkraft für Tiefenwirkung.
+class _AnimatedChevrons extends StatefulWidget {
+  final bool toRight;
+  final Color color;
+
+  const _AnimatedChevrons({required this.toRight, required this.color});
+
+  @override
+  State<_AnimatedChevrons> createState() => _AnimatedChevronsState();
+}
+
+class _AnimatedChevronsState extends State<_AnimatedChevrons>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _offset; // +3 → -3 (pulse nach links)
+  late final Animation<double> _opacity; // 0.35 → 1.0
+
+  @override
+  void initState() {
+    super.initState();
+    // 900 ms * 2 (reverse) = 1800 ms Gesamtzyklus
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 900),
+      vsync: this,
+    )..repeat(reverse: true);
+    _offset = Tween<double>(begin: 3.0, end: -3.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+    _opacity = Tween<double>(begin: 0.35, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Chevron-Glyph (statisch, wird als child übergeben)
+    final glyph = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: widget.toRight
+          ? [
+              Icon(Icons.chevron_right, color: widget.color, size: 17),
+              Transform.translate(
+                offset: const Offset(-8, 0),
+                child: Opacity(
+                  opacity: 0.55,
+                  child: Icon(Icons.chevron_right, color: widget.color, size: 17),
+                ),
+              ),
+            ]
+          : [
+              Opacity(
+                opacity: 0.55,
+                child: Icon(Icons.chevron_left, color: widget.color, size: 17),
+              ),
+              Transform.translate(
+                offset: const Offset(-8, 0),
+                child: Icon(Icons.chevron_left, color: widget.color, size: 17),
+              ),
+            ],
+    );
+
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (_, child) {
+        final dx = widget.toRight ? -_offset.value : _offset.value;
+        return Transform.translate(
+          offset: Offset(dx, 0),
+          child: Opacity(opacity: _opacity.value, child: child),
+        );
+      },
+      child: glyph,
+    );
+  }
+}
+
+/// Einmaliger Hinweis oberhalb der Liste (Meine Fahrten)
 class _SwipeHint extends StatelessWidget {
   const _SwipeHint();
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.swipe_right_outlined,
-                color: Color(0xFF42A5F5), size: 15),
-            const SizedBox(width: 5),
-            const Text(
-              'Bearbeiten',
-              style: TextStyle(
-                color: Color(0xFF42A5F5),
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
+      padding: const EdgeInsets.fromLTRB(0, 10, 0, 2),
+      child: Row(
+        children: [
+          // Linke Hälfte: Bearbeiten zentriert
+          Expanded(
+            child: Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  _AnimatedChevrons(toRight: true, color: Color(0xFF64B5F6)),
+                  SizedBox(width: 3),
+                  Text(
+                    'Bearbeiten',
+                    style: TextStyle(
+                      color: Color(0xFF64B5F6),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
             ),
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 14),
-              width: 1,
-              height: 12,
-              color: Colors.white24,
-            ),
-            const Icon(Icons.swipe_left_outlined,
-                color: Colors.redAccent, size: 15),
-            const SizedBox(width: 5),
-            const Text(
-              'Löschen',
-              style: TextStyle(
-                color: Colors.redAccent,
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
+          ),
+          // Trennstrich in der Mitte
+          Container(
+            width: 1,
+            height: 11,
+            color: Colors.white24,
+          ),
+          // Rechte Hälfte: Löschen zentriert
+          Expanded(
+            child: Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  _AnimatedChevrons(toRight: false, color: Color(0xFFEF5350)),
+                  SizedBox(width: 3),
+                  Text(
+                    'Löschen',
+                    style: TextStyle(
+                      color: Color(0xFFEF5350),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -858,29 +949,21 @@ class _MitfahrtSwipeHint extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-        ),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.swipe_left_outlined, color: Colors.redAccent, size: 15),
-            SizedBox(width: 5),
-            Text(
-              'Links wischen zum Zurückziehen',
-              style: TextStyle(
-                color: Colors.redAccent,
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-              ),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: const [
+          _AnimatedChevrons(toRight: false, color: Color(0xFFEF5350)),
+          SizedBox(width: 5),
+          Text(
+            'Links wischen zum Zurückziehen',
+            style: TextStyle(
+              color: Color(0xFFEF5350),
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1002,10 +1085,21 @@ class _AngefragteFahrtenTabState extends State<_AngefragteFahrtenTab>
                   .compareTo(
                       eventDatumCache[a.fahrt!.eventId] ?? DateTime(2000)));
 
-        // Aktive: alles andere (ohne vergangene)
+        // Aktive: alles andere (ohne vergangene + ohne inaktive nach Event-Ablauf)
         final vergangeneSet = vergangeneAnfragen.toSet();
+        final now = DateTime.now();
         final normalAnfragen = alleNormal
             .where((i) => !vergangeneSet.contains(i))
+            .where((i) {
+              final inaktiv = i.anfrage.status == AnfrageStatus.storniert ||
+                  i.anfrage.status == AnfrageStatus.abgelehnt ||
+                  i.anfrage.status == AnfrageStatus.fahrtGeloescht;
+              if (!inaktiv) return true;
+              if (i.fahrt == null) return false;
+              final datum = eventDatumCache[i.fahrt!.eventId];
+              if (datum == null) return true;
+              return datum.add(const Duration(hours: 3)).isAfter(now);
+            })
             .toList()
           ..sort((a, b) {
             if (a.fahrt == null && b.fahrt == null) return 0;

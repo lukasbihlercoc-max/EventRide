@@ -914,34 +914,22 @@ class _SystemMessageData {
 Widget _buildMessageBubble(ChatMessage msg, String myUserId, {bool isLastInGroup = true}) {
   if (msg.senderId == 'system') {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 24),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 32),
       child: Center(
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
           decoration: BoxDecoration(
-            color: const Color(0xFF3D1A1A),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: Colors.redAccent.withValues(alpha: 0.45),
-            ),
+            color: Colors.white.withValues(alpha: 0.09),
+            borderRadius: BorderRadius.circular(20),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.info_outline, size: 13, color: Colors.redAccent),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  msg.text,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.white,
-                    fontStyle: FontStyle.italic,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ],
+          child: Text(
+            msg.text,
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.white60,
+              height: 1.4,
+            ),
+            textAlign: TextAlign.center,
           ),
         ),
       ),
