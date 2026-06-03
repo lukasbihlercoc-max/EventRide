@@ -1,5 +1,7 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui';
+import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
@@ -15,49 +17,41 @@ class EmailVerificationPage extends StatefulWidget {
   State<EmailVerificationPage> createState() => _EmailVerificationPageState();
 }
 
-class _EmailVerificationPageState extends State<EmailVerificationPage> {
-  bool _isChecking = false;
+class _EmailVerificationPageState extends State<EmailVerificationPage>
+    with SingleTickerProviderStateMixin {
   bool _isResending = false;
   bool _resentSuccess = false;
   late String _currentEmail;
   final _scrollController = ScrollController();
+  Timer? _autoCheckTimer;
+  late AnimationController _dotController;
 
   @override
   void initState() {
     super.initState();
     _currentEmail = widget.email;
+    _dotController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat();
+    _autoCheckTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+      try {
+        await FirebaseAuth.instance.currentUser?.reload();
+        if (!mounted) return;
+        if (FirebaseAuth.instance.currentUser?.emailVerified == true) {
+          _autoCheckTimer?.cancel();
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
+      } catch (_) {}
+    });
   }
 
   @override
   void dispose() {
+    _dotController.dispose();
+    _autoCheckTimer?.cancel();
     _scrollController.dispose();
     super.dispose();
-  }
-
-  Future<void> _checkVerification() async {
-    setState(() => _isChecking = true);
-    try {
-      final auth = context.read<IAuthRepository>();
-      final verified = await auth.reloadAndCheckEmailVerified();
-      if (!mounted) return;
-      if (verified) {
-        Navigator.of(context).popUntil((route) => route.isFirst);
-      } else {
-        AppSnackbar.show(
-          context,
-          message: 'E-Mail noch nicht bestätigt – bitte den Link in der E-Mail anklicken.',
-        );
-      }
-    } catch (_) {
-      if (!mounted) return;
-      AppSnackbar.show(
-        context,
-        message: 'Fehler beim Prüfen der Verifikation',
-        accentColor: Colors.redAccent,
-      );
-    } finally {
-      if (mounted) setState(() => _isChecking = false);
-    }
   }
 
   Future<void> _resendEmail() async {
@@ -136,6 +130,41 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
     );
   }
 
+  Widget _buildWaitingIndicator() {
+    return Column(
+      children: [
+        AnimatedBuilder(
+          animation: _dotController,
+          builder: (_, __) => Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(3, (i) {
+              final phase = (_dotController.value * 3 - i) % 3.0;
+              final dy = phase < 1.0 ? -8.0 * math.sin(phase * math.pi) : 0.0;
+              final alpha = phase < 1.0 ? 0.4 + 0.6 * math.sin(phase * math.pi) : 0.4;
+              return Transform.translate(
+                offset: Offset(0, dy),
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 5),
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: Colors.blueAccent.withValues(alpha: alpha),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+        const SizedBox(height: 14),
+        const Text(
+          'Warte auf Bestätigung …',
+          style: TextStyle(color: Colors.white54, fontSize: 14),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -211,27 +240,8 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
                     ),
                   ),
                   SizedBox(height: SizeHelper.h(context, 0.04)),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _isChecking ? null : _checkVerification,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blueAccent,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: _isChecking
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text(
-                              'Bestätigung prüfen',
-                              style: TextStyle(fontSize: 18),
-                            ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
+                  _buildWaitingIndicator(),
+                  const SizedBox(height: 28),
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton(
