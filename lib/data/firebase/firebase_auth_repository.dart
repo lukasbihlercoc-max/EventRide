@@ -18,6 +18,7 @@ class FirebaseAuthRepository implements IAuthRepository {
   final FirebaseStorage _storage;
 
   bool _isAdmin = false;
+  AppUser? _cachedUser;
 
   FirebaseAuthRepository({
     FirebaseAuth? auth,
@@ -91,6 +92,7 @@ class FirebaseAuthRepository implements IAuthRepository {
 
   @override
   AppUser? get currentUser {
+    if (_cachedUser != null) return _cachedUser;
     final fbUser = _auth.currentUser;
     if (fbUser == null) return null;
     return _mapUser(fbUser);
@@ -115,6 +117,7 @@ class FirebaseAuthRepository implements IAuthRepository {
             firestoreSub?.cancel();
             firestoreSub = null;
             if (fbUser == null) {
+              _cachedUser = null;
               controller.add(null);
               return;
             }
@@ -126,7 +129,8 @@ class FirebaseAuthRepository implements IAuthRepository {
                 .listen(
                   (doc) {
                     _isAdmin = doc.data()?['isAdmin'] == true;
-                    controller.add(_toAppUser(fbUser, doc));
+                    _cachedUser = _toAppUser(fbUser, doc);
+                    controller.add(_cachedUser!);
                   },
                   onError: (_) {
                     // Firestore-Fehler (z.B. PERMISSION_DENIED kurz nach Logout)

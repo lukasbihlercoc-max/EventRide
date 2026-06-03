@@ -15,6 +15,15 @@ async function getTokens(userId: string): Promise<string[]> {
   return (doc.data()?.fcmTokens as string[]) ?? [];
 }
 
+async function getUserName(userId: string, fallback: string): Promise<string> {
+  const doc = await db.doc(`users/${userId}`).get();
+  const data = doc.data() ?? {};
+  const first = (data["firstName"] as string | undefined) ?? "";
+  const last = (data["lastName"] as string | undefined) ?? "";
+  const name = `${first} ${last}`.trim();
+  return name || fallback;
+}
+
 interface NotificationPayload {
   title: string;
   body: string;
@@ -104,24 +113,31 @@ export const onAnfrageUpdated = onDocumentUpdated(
     const statusText = statusMap[statusAfter];
     if (!statusText) return;
 
-    const vonFahrer = after["vonFahrer"] === true;
     // D1-Fix: Mitfahrer storniert eigene Anfrage → Fahrer benachrichtigen, nicht Mitfahrer
     const isMitfahrerStorniert = !vonFahrer && statusAfter === 3;
+    const requesterId = after["requesterId"] as string | undefined;
+    const fahrtOwnerId = after["fahrtOwnerId"] as string | undefined;
     const targetUserId = (vonFahrer || statusAfter === 3)
-      ? (after["fahrtOwnerId"] as string | undefined)
-      : (after["requesterId"] as string | undefined);
+      ? fahrtOwnerId
+      : requesterId;
     if (!targetUserId) return;
+
+    // Namen immer live aus users-Collection lesen – gespeicherte Namen können veraltet sein
+    const [requesterName, fahrerName] = await Promise.all([
+      requesterId ? getUserName(requesterId, "Ein Mitfahrer") : Promise.resolve("Ein Mitfahrer"),
+      fahrtOwnerId ? getUserName(fahrtOwnerId, "Der Fahrer") : Promise.resolve("Der Fahrer"),
+    ]);
 
     let title: string;
     let body: string;
     if (isMitfahrerStorniert) {
       title = "Anfrage zurückgezogen";
-      body = `${after["requesterName"] ?? "Ein Mitfahrer"} hat die Anfrage zurückgezogen`;
+      body = `${requesterName} hat die Anfrage zurückgezogen`;
     } else {
       title = vonFahrer ? `Einladung ${statusText}` : `Anfrage ${statusText}`;
       body = vonFahrer
-        ? `${after["requesterName"] ?? "Ein Nutzer"} hat deine Einladung ${statusText}`
-        : `${after["fahrerName"] ?? "Der Fahrer"} hat deine Anfrage ${statusText}`;
+        ? `${requesterName} hat deine Einladung ${statusText}`
+        : `${fahrerName} hat deine Anfrage ${statusText}`;
     }
 
     const tokens = await getTokens(targetUserId);
@@ -165,6 +181,9 @@ export const onAnfrageCreated = onDocumentCreated(
 
     const data = snap.data();
     const vonFahrer = data["vonFahrer"] === true;
+    const requesterId = data["requesterId"] as string | undefined;
+    const fahrtOwnerId = data["fahrtOwnerId"] as string | undefined;
+    const zielOrt = (data["zielOrt"] as string | undefined) ?? "?";
 
     let targetUserId: string | undefined;
     let title: string;
@@ -172,14 +191,16 @@ export const onAnfrageCreated = onDocumentCreated(
 
     if (vonFahrer) {
       // Fahrer lädt Interessenten ein → Interessent benachrichtigen
-      targetUserId = data["requesterId"] as string | undefined;
+      targetUserId = requesterId;
+      const fahrerName = fahrtOwnerId ? await getUserName(fahrtOwnerId, "Ein Fahrer") : "Ein Fahrer";
       title = "Neue Einladung";
-      body = `${data["fahrerName"] ?? "Ein Fahrer"} lädt dich zur Fahrt nach ${data["zielOrt"] ?? "?"} ein`;
+      body = `${fahrerName} lädt dich zur Fahrt nach ${zielOrt} ein`;
     } else {
       // Mitfahrer fragt an → Fahrer benachrichtigen
-      targetUserId = data["fahrtOwnerId"] as string | undefined;
+      targetUserId = fahrtOwnerId;
+      const requesterName = requesterId ? await getUserName(requesterId, "Jemand") : "Jemand";
       title = "Neue Anfrage";
-      body = `${data["requesterName"] ?? "Jemand"} möchte mitfahren nach ${data["zielOrt"] ?? "?"}`;
+      body = `${requesterName} möchte mitfahren nach ${zielOrt}`;
     }
 
     if (!targetUserId) return;
@@ -206,7 +227,8 @@ export const onFahrtDeleted = onDocumentDeleted(
     const fahrtId = event.params["fahrtId"];
     const eventName = (fahrt["eventName"] as string | undefined) ?? "das Event";
     const zielOrt = (fahrt["standort"] as string | undefined) ?? "?";
-    const fahrerName = (fahrt["ownerName"] as string | undefined) ?? "Der Fahrer";
+    const ownerId = fahrt["ownerId"] as string | undefined;
+    const fahrerName = ownerId ? await getUserName(ownerId, "Der Fahrer") : "Der Fahrer";
 
     // Alle akzeptierten Anfragen für diese Fahrt laden (status = 1)
     const snapshot = await db
@@ -253,7 +275,7 @@ export const onLicenseRequestWritten = onDocumentWritten(
     if (submittedBefore && submittedAfter &&
         submittedBefore.isEqual(submittedAfter)) return;
 
-    const userName = (after["userName"] as string | undefined) ?? "Ein Nutzer";
+    const userName = await getUserName(event.params["uid"], "Ein Nutzer");
 
     const adminsSnap = await db
       .collection("users")
@@ -285,7 +307,8 @@ export const onEventRequestCreated = onDocumentCreated(
     if (!snap) return;
 
     const data = snap.data();
-    const userName = (data["userName"] as string | undefined) ?? "Ein Nutzer";
+    const uid = data["uid"] as string | undefined;
+    const userName = uid ? await getUserName(uid, "Ein Nutzer") : "Ein Nutzer";
     const isFlyer = data["submissionType"] === "flyer";
     const eventName = (data["eventName"] as string | undefined) ?? "";
 
@@ -722,6 +745,19 @@ export const cleanupAbgelaufeneEvents = onSchedule(
       const fahrtenSnap = await db.collection("fahrten")
         .where("eventId", "==", eventId).get();
       if (!fahrtenSnap.empty) {
+        for (const fahrtDoc of fahrtenSnap.docs) {
+          const convsSnap = await db.collection("chat_conversations")
+            .where("fahrtId", "==", fahrtDoc.id).get();
+          for (const convDoc of convsSnap.docs) {
+            const msgsSnap = await convDoc.ref.collection("messages").get();
+            if (!msgsSnap.empty) {
+              const batch = db.batch();
+              msgsSnap.docs.forEach((d) => batch.delete(d.ref));
+              await batch.commit();
+            }
+            await convDoc.ref.delete();
+          }
+        }
         const batch = db.batch();
         fahrtenSnap.docs.forEach((d) => batch.delete(d.ref));
         await batch.commit();
