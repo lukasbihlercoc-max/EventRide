@@ -1,5 +1,23 @@
 # EventRide
 
+## Website (eventride.at)
+
+**Hosting:** World4You (FTP) — NICHT Firebase Hosting  
+**Deployment:** `git push` → GitHub Actions (`.github/workflows/deploy-website.yml`) → FTP nach World4You  
+**Manueller Trigger:** GitHub → Actions → "Deploy Website → World4You" → Run workflow  
+**Dateien bearbeiten:** Immer in `public/` — nie in `web_assets/` (veraltetes Verzeichnis)
+
+| Datei | Inhalt |
+|-------|--------|
+| `public/index.html` | Landing Page + interaktive App-Preview |
+| `public/eventride_manager.html` | Admin-Panel (Events anlegen) |
+| `public/assets/image/` | Event-Hintergrundbilder (kirchtag2.jpg etc.) |
+
+**App-Preview** im `#screenshots`-Abschnitt: iPhone-Mockup mit 3 navigierbaren Screens,  
+lädt echte Events aus Firestore, Design 1:1 wie die App (Gradient `#B79B78→#52A1EF→#406CFB`, Akzent `#F5A04A`).
+
+---
+
 ## Automatischer Build-Loop
 
 Wenn der Nutzer "loop", "fix bis es läuft", "auto-build", "baue durch", "nacht-build" oder ähnliches sagt:
