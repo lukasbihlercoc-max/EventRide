@@ -359,7 +359,7 @@ class _LoggedInViewState extends State<_LoggedInView> {
     );
   }
 
-  void _showPhoneSheet() {
+  void _showPhoneComingSoonSheet() {
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF1A1F2E),
@@ -367,7 +367,45 @@ class _LoggedInViewState extends State<_LoggedInView> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => const _PhoneVerifSheet(),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _SheetHandle(),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: Colors.blueAccent.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.phone_outlined,
+                      color: Colors.blueAccent, size: 20),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  "Telefonverifikation",
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              "Diese Funktion ist bald verfügbar.\nDu wirst benachrichtigt, sobald du deine Telefonnummer verifizieren kannst.",
+              style: TextStyle(color: Colors.white60, fontSize: 14, height: 1.55),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
     );
   }
 
@@ -524,9 +562,9 @@ class _LoggedInViewState extends State<_LoggedInView> {
                           state: user.phoneVerified
                               ? VerifState.done
                               : VerifState.open,
-                          cta: "Verifizieren",
+                          cta: "Bald verfügbar",
                           doneLabel: "Verifiziert",
-                          onTap: user.phoneVerified ? null : _showPhoneSheet,
+                          onTap: user.phoneVerified ? null : _showPhoneComingSoonSheet,
                         ),
                       ),
                     ],

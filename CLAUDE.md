@@ -340,6 +340,24 @@ Gefunden beim ersten Zwei-Nutzer-Test auf iOS (2026-05-21). Priorisiert nach Kri
 
 ---
 
+### 🔵 G – Nach Release (kein Release-Blocker)
+
+**Event absagen / löschen mit Kaskaden-Bereinigung**
+- Wenn ein Event gelöscht oder abgesagt wird, müssen alle abhängigen Daten bereinigt und Nutzer benachrichtigt werden.
+- **Was passieren soll:**
+  1. Admin drückt "Event absagen"-Button in `admin_event_requests_page.dart` (neuer Button, separat von "löschen")
+  2. Cloud Function `cancelEvent(eventId)` läuft durch:
+     - Alle Fahrten mit `eventId` laden → für jede Fahrt alle `anfragen` mit `status == akzeptiert (1)` laden → Push-Notification an jeden Mitfahrer ("Event wurde abgesagt")
+     - Alle Fahrer der betroffenen Fahrten ebenfalls benachrichtigen
+     - Alle `anfragen` auf `status = fahrtGeloescht (4)` setzen
+     - Alle `fahrten` löschen
+     - Event-Dokument löschen (oder `status: 'abgesagt'` setzen statt löschen, damit History erhalten bleibt)
+  3. Alternativ als Batch-Cloud-Function wenn >500 Anfragen möglich
+- **Warum noch nicht:** tritt im Normalfall nicht auf, kein Release-Blocker; Aufwand ~3–4h
+- **Dateien:** `functions/index.js` (neue Cloud Function), `lib/views/pages/admin_event_requests_page.dart`, `lib/data/notification_service.dart`
+
+---
+
 ### Empfohlene Session-Reihenfolge
 
 | Session | Kategorie | Aufwand | Status |
