@@ -22,12 +22,14 @@ class ChatPage extends StatefulWidget {
   final String conversationId;
   final String otherUserName;
   final String otherUserId;
+  final bool isReadOnly;
 
   const ChatPage({
     super.key,
     required this.conversationId,
     required this.otherUserName,
     required this.otherUserId,
+    this.isReadOnly = false,
   });
 
   @override
@@ -277,7 +279,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         },
                       ),
                     ),
-                    _buildInput(context),
+                    widget.isReadOnly ? _buildLockedBar() : _buildInput(context),
                   ],
                   ),
                 ),
@@ -621,6 +623,26 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
+  Widget _buildLockedBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 16),
+      child: AppCard(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.lock_outline, size: 14, color: Colors.white30),
+            SizedBox(width: 8),
+            Text(
+              'Chat gesperrt – Anfrage zurückgezogen',
+              style: TextStyle(color: Colors.white30, fontSize: 13),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showInfoBottomSheet(BuildContext context, _SystemMessageData data) {
     FocusScope.of(context).unfocus();
     showModalBottomSheet(
@@ -913,6 +935,30 @@ class _SystemMessageData {
 
 Widget _buildMessageBubble(ChatMessage msg, String myUserId, {bool isLastInGroup = true}) {
   if (msg.senderId == 'system') {
+    // Personalisierte Storniert-Nachricht: STORNIERT_UID/NAME-Metadaten parsen
+    final lines = msg.text.split('\n');
+    String? storniertUid;
+    String? storniertName;
+    final bodyLines = <String>[];
+    for (final line in lines) {
+      if (line.startsWith('STORNIERT_UID:')) {
+        storniertUid = line.substring('STORNIERT_UID:'.length);
+      } else if (line.startsWith('STORNIERT_NAME:')) {
+        storniertName = line.substring('STORNIERT_NAME:'.length);
+      } else {
+        bodyLines.add(line);
+      }
+    }
+    String displayText;
+    if (storniertUid != null && storniertName != null) {
+      final body = bodyLines.join('\n').trim();
+      displayText = storniertUid == myUserId
+          ? body.replaceFirst('$storniertName hat', 'Du hast')
+          : body;
+    } else {
+      displayText = msg.text;
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 32),
       child: Center(
@@ -923,7 +969,7 @@ Widget _buildMessageBubble(ChatMessage msg, String myUserId, {bool isLastInGroup
             borderRadius: BorderRadius.circular(20),
           ),
           child: Text(
-            msg.text,
+            displayText,
             style: const TextStyle(
               fontSize: 12,
               color: Colors.white60,

@@ -617,50 +617,55 @@ class _AnfrageCardState extends State<_AnfrageCard> {
     return '${a.seatsRequested} Platz${a.seatsRequested > 1 ? 'e' : ''} angefragt';
   }
 
-  void _openChat(BuildContext context) {
+  Future<void> _openChat(BuildContext context) async {
     final chatService = context.read<ChatService>();
+    final nav = Navigator.of(context);
     final conversationId = chatService.buildConversationId(
       fahrtId: widget.fahrt.id,
       userA: widget.fahrt.ownerId,
       userB: widget.anfrage.requesterId,
     );
-    Navigator.push(
-      context,
+    final isStorniert = widget.anfrage.status == AnfrageStatus.storniert;
+
+    try {
+      await chatService.ensureConversation(
+        fahrtId: widget.fahrt.id,
+        ownerId: widget.fahrt.ownerId,
+        requesterId: widget.anfrage.requesterId,
+        eventName: widget.fahrt.eventName,
+        startOrt: widget.fahrt.abfahrtsort,
+        zielOrt: widget.fahrt.standort,
+        seatsRequested: widget.anfrage.seatsRequested,
+      );
+      await chatService.updateSystemMessage(
+        conversationId: conversationId,
+        eventName: widget.fahrt.eventName,
+        startOrt: widget.fahrt.abfahrtsort,
+        zielOrt: widget.fahrt.standort,
+        seatsRequested: widget.anfrage.seatsRequested,
+        seatsAccepted: widget.anfrage.seatsAccepted ?? 0,
+        uhrzeit:
+            '${widget.fahrt.uhrzeitHour.toString().padLeft(2, '0')}:${widget.fahrt.uhrzeitMinute.toString().padLeft(2, '0')}',
+        richtung: switch (widget.fahrt.richtung) {
+          Fahrtrichtung.hinfahrt      => 'Hinfahrt',
+          Fahrtrichtung.rueckfahrt    => 'Rückfahrt',
+          Fahrtrichtung.hinUndZurueck => 'Hin und Zurück',
+        },
+        ownerName: widget.fahrt.ownerName,
+      );
+    } catch (_) {}
+
+    if (!mounted) return;
+    nav.push(
       AppRoute(
         builder: (_) => ChatPage(
           conversationId: conversationId,
           otherUserName: widget.anfrage.requesterName,
           otherUserId: widget.anfrage.requesterId,
+          isReadOnly: isStorniert,
         ),
       ),
     );
-    chatService
-        .ensureConversation(
-          fahrtId: widget.fahrt.id,
-          ownerId: widget.fahrt.ownerId,
-          requesterId: widget.anfrage.requesterId,
-          eventName: widget.fahrt.eventName,
-          startOrt: widget.fahrt.abfahrtsort,
-          zielOrt: widget.fahrt.standort,
-          seatsRequested: widget.anfrage.seatsRequested,
-        )
-        .then((_) => chatService.updateSystemMessage(
-              conversationId: conversationId,
-              eventName: widget.fahrt.eventName,
-              startOrt: widget.fahrt.abfahrtsort,
-              zielOrt: widget.fahrt.standort,
-              seatsRequested: widget.anfrage.seatsRequested,
-              seatsAccepted: widget.anfrage.seatsAccepted ?? 0,
-              uhrzeit:
-                  '${widget.fahrt.uhrzeitHour.toString().padLeft(2, '0')}:${widget.fahrt.uhrzeitMinute.toString().padLeft(2, '0')}',
-              richtung: switch (widget.fahrt.richtung) {
-                Fahrtrichtung.hinfahrt      => 'Hinfahrt',
-                Fahrtrichtung.rueckfahrt    => 'Rückfahrt',
-                Fahrtrichtung.hinUndZurueck => 'Hin und Zurück',
-              },
-              ownerName: widget.fahrt.ownerName,
-            ))
-        .catchError((_) {});
   }
 
   Future<void> _handleAblehnen() async {

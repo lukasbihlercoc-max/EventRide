@@ -1014,14 +1014,19 @@ class _AngefragteFahrtenTabState extends State<_AngefragteFahrtenTab>
   }
 
   Future<void> _stornierenItem(_RequestedRideItem item) async {
+    final wasAkzeptiert = item.anfrage.status == AnfrageStatus.akzeptiert;
     final ok =
         await context.read<AnfrageService>().storniereAnfrage(item.anfrage);
-    if (ok && item.anfrage.status == AnfrageStatus.akzeptiert && mounted) {
+    if (ok && item.fahrt != null && mounted) {
       await context.read<ChatService>().sendStatusNotification(
             fahrtId: item.fahrt!.id,
             ownerId: item.fahrt!.ownerId,
             requesterId: item.anfrage.requesterId,
-            text: 'Anfrage zurückgezogen – Platz wurde wieder freigegeben.',
+            text: 'STORNIERT_UID:${item.anfrage.requesterId}\n'
+                'STORNIERT_NAME:${item.anfrage.requesterName}\n'
+                '${item.anfrage.requesterName} hat die Anfrage zurückgezogen'
+                '${wasAkzeptiert ? " – Platz freigegeben" : ""}.\n'
+                'Der Chat ist nun für beide Seiten gesperrt.',
             eventName: item.fahrt!.eventName,
             startOrt: item.fahrt!.abfahrtsort,
             zielOrt: item.fahrt!.standort,
@@ -1972,10 +1977,11 @@ class _RequestedRideCardState extends State<_RequestedRideCard> {
   FahrtDaten get fahrt => widget.fahrt;
   AnfrageDaten get anfrage => widget.anfrage;
 
-  void _openChat(BuildContext context) {
+  Future<void> _openChat(BuildContext context) async {
     if (!requireVerified(context)) return;
     widget.onInteracted?.call();
     final chatService = context.read<ChatService>();
+    final nav = Navigator.of(context);
 
     final conversationId = chatService.buildConversationId(
       fahrtId: fahrt.id,
@@ -1983,40 +1989,47 @@ class _RequestedRideCardState extends State<_RequestedRideCard> {
       userB: anfrage.requesterId,
     );
 
-    Navigator.of(context).push(
+    final isStorniert = anfrage.status == AnfrageStatus.storniert;
+
+    try {
+      await chatService.ensureConversation(
+        fahrtId: fahrt.id,
+        ownerId: fahrt.ownerId,
+        requesterId: anfrage.requesterId,
+        eventName: fahrt.eventName,
+        startOrt: fahrt.abfahrtsort,
+        zielOrt: fahrt.standort,
+        seatsRequested: anfrage.seatsRequested,
+      );
+      await chatService.updateSystemMessage(
+        conversationId: conversationId,
+        eventName: fahrt.eventName,
+        startOrt: fahrt.abfahrtsort,
+        zielOrt: fahrt.standort,
+        seatsRequested: anfrage.seatsRequested,
+        seatsAccepted: anfrage.seatsAccepted ?? 0,
+        uhrzeit:
+            '${fahrt.uhrzeitHour.toString().padLeft(2, '0')}:${fahrt.uhrzeitMinute.toString().padLeft(2, '0')}',
+        richtung: switch (fahrt.richtung) {
+          Fahrtrichtung.hinfahrt => 'Hinfahrt',
+          Fahrtrichtung.rueckfahrt => 'Rückfahrt',
+          Fahrtrichtung.hinUndZurueck => 'Hin und Zurück',
+        },
+        ownerName: fahrt.ownerName,
+      );
+    } catch (_) {}
+
+    if (!mounted) return;
+    nav.push(
       AppRoute(
         builder: (_) => ChatPage(
           conversationId: conversationId,
           otherUserName: fahrt.ownerName,
           otherUserId: fahrt.ownerId,
+          isReadOnly: isStorniert,
         ),
       ),
     );
-
-    chatService.ensureConversation(
-      fahrtId: fahrt.id,
-      ownerId: fahrt.ownerId,
-      requesterId: anfrage.requesterId,
-      eventName: fahrt.eventName,
-      startOrt: fahrt.abfahrtsort,
-      zielOrt: fahrt.standort,
-      seatsRequested: anfrage.seatsRequested,
-    ).then((_) => chatService.updateSystemMessage(
-      conversationId: conversationId,
-      eventName: fahrt.eventName,
-      startOrt: fahrt.abfahrtsort,
-      zielOrt: fahrt.standort,
-      seatsRequested: anfrage.seatsRequested,
-      seatsAccepted: anfrage.seatsAccepted ?? 0,
-      uhrzeit:
-          '${fahrt.uhrzeitHour.toString().padLeft(2, '0')}:${fahrt.uhrzeitMinute.toString().padLeft(2, '0')}',
-      richtung: switch (fahrt.richtung) {
-        Fahrtrichtung.hinfahrt => 'Hinfahrt',
-        Fahrtrichtung.rueckfahrt => 'Rückfahrt',
-        Fahrtrichtung.hinUndZurueck => 'Hin und Zurück',
-      },
-      ownerName: fahrt.ownerName,
-    ));
   }
 
   @override
@@ -2407,7 +2420,7 @@ class _RequestedRideCardState extends State<_RequestedRideCard> {
     } else {
       // Inaktiv (abgelehnt / storniert) – Farben via _InaktivStyles
       cardChild = Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -2456,7 +2469,7 @@ class _RequestedRideCardState extends State<_RequestedRideCard> {
               ],
             ),
             const Divider(
-                color: _InaktivStyles.dividerFarbe, thickness: 1, height: 20),
+                color: _InaktivStyles.dividerFarbe, thickness: 1, height: 12),
             _FahrerProfilRow(
               userId: fahrt.ownerId,
               name: fahrt.ownerName,
@@ -2465,7 +2478,7 @@ class _RequestedRideCardState extends State<_RequestedRideCard> {
               avatarBg: _InaktivStyles.fahrerAvatarBg,
               avatarRadius: _InaktivStyles.fahrerAvatarRadius,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             aktionenWidget,
           ],
         ),
@@ -2739,8 +2752,55 @@ class _MitfahrerAktionenState extends State<_MitfahrerAktionen> {
           ),
         );
 
-      // ── STORNIERT / FAHRT GELÖSCHT: andere Fahrt finden ─────
+      // ── STORNIERT: Chat (read-only, rechts) + andere Fahrt finden (links) ──
       case AnfrageStatus.storniert:
+        return Row(
+          children: [
+            TextButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                AppRoute(
+                  builder: (_) => FahrtFindenPage(event: widget.event),
+                ),
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: _InaktivStyles.andereFahrtFarbe,
+                overlayColor: Colors.transparent,
+                padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                minimumSize: Size.zero,
+              ),
+              icon: const Icon(Icons.search, size: 15,
+                  color: Color.fromARGB(255, 255, 170, 60)),
+              label: const Text(
+                'Andere Fahrt finden',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+              ),
+            ),
+            const Spacer(),
+            GestureDetector(
+              onTap: widget.openChat,
+              child: Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.blueAccent.withValues(alpha: 0.15),
+                  border: Border.all(
+                    color: Colors.blueAccent.withValues(alpha: 0.45),
+                    width: 1.3,
+                  ),
+                ),
+                child: const Icon(
+                  Icons.chat_bubble_rounded,
+                  color: Colors.white38,
+                  size: 16,
+                ),
+              ),
+            ),
+          ],
+        );
+
+      // ── FAHRT GELÖSCHT: andere Fahrt finden ─────────────────
       case AnfrageStatus.fahrtGeloescht:
         return TextButton.icon(
           onPressed: () => Navigator.of(context).push(

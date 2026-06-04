@@ -56,6 +56,15 @@
 	<string>EventRide möchte das Profilbild in deiner Fotobibliothek speichern.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>EventRide nutzt deinen Standort um ihn auf der Karte anzuzeigen.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.686951435694-49f5o7039gmoqngtc03f8bslcbsu5qoi</string>
+			</array>
+		</dict>
+	</array>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>comgooglemaps</string>
