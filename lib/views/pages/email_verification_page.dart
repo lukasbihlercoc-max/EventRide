@@ -36,9 +36,10 @@ class _EmailVerificationPageState extends State<EmailVerificationPage>
     )..repeat();
     _autoCheckTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
       try {
-        await FirebaseAuth.instance.currentUser?.reload();
+        final verified =
+            await context.read<IAuthRepository>().reloadAndCheckEmailVerified();
         if (!mounted) return;
-        if (FirebaseAuth.instance.currentUser?.emailVerified == true) {
+        if (verified) {
           _autoCheckTimer?.cancel();
           Navigator.of(context).popUntil((route) => route.isFirst);
         }

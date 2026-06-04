@@ -540,7 +540,8 @@ class _SettingsPageState extends State<SettingsPage> {
                               message: 'Account konnte nicht gelöscht werden.');
                         }
                       }
-                    } catch (_) {
+                    } catch (e) {
+                      debugPrint('deleteAccount error: $e');
                       if (ctx.mounted) setSheetState(() => loading = false);
                       if (context.mounted) {
                         AppSnackbar.show(context,
@@ -641,28 +642,41 @@ class _SettingsPageState extends State<SettingsPage> {
                       try {
                         final auth = context.read<IAuthRepository>();
                         await auth.reauthenticate(password);
-                        await auth.deleteAccount();
+                        // Sheet sofort schließen bevor der lange Cleanup startet.
+                        // Sonst kollidiert der Firebase-Auth-State-Change mit
+                        // dem noch offenen TextField/TextEditingController.
                         if (ctx.mounted) Navigator.pop(ctx);
+                        if (!context.mounted) return;
+                        await auth.deleteAccount();
                         if (context.mounted) {
                           Navigator.popUntil(
                               context, (route) => route.isFirst);
                         }
                       } on FirebaseAuthException catch (e) {
-                        if (!ctx.mounted) return;
-                        final msg = e.code == 'wrong-password' ||
-                                e.code == 'invalid-credential'
-                            ? 'Falsches Passwort'
-                            : 'Fehler beim Löschen';
-                        setSheetState(() {
-                          loading = false;
-                          errorText = msg;
-                        });
-                      } catch (_) {
-                        if (!ctx.mounted) return;
-                        setSheetState(() {
-                          loading = false;
-                          errorText = 'Fehler beim Löschen';
-                        });
+                        if (ctx.mounted) {
+                          final msg = e.code == 'wrong-password' ||
+                                  e.code == 'invalid-credential'
+                              ? 'Falsches Passwort'
+                              : 'Fehler beim Löschen';
+                          setSheetState(() {
+                            loading = false;
+                            errorText = msg;
+                          });
+                        } else if (context.mounted) {
+                          AppSnackbar.show(context,
+                              message: 'Fehler beim Löschen des Accounts.');
+                        }
+                      } catch (e) {
+                        debugPrint('deleteAccount (reauth) error: $e');
+                        if (ctx.mounted) {
+                          setSheetState(() {
+                            loading = false;
+                            errorText = 'Fehler beim Löschen';
+                          });
+                        } else if (context.mounted) {
+                          AppSnackbar.show(context,
+                              message: 'Account konnte nicht gelöscht werden.');
+                        }
                       }
                     },
                   ),

@@ -1,164 +1,9 @@
 // calendar_widget.dart
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:my_app/utils/app_route.dart';
 import 'package:intl/intl.dart';
 import 'package:my_app/data/event_daten.dart';
 import 'package:my_app/data/notifiers.dart';
-import 'package:my_app/views/pages/detail_page.dart';
-import 'package:my_app/views/widgets/app_bottom_sheet.dart';
-
-// ---------------------------------------------------------------------------
-// Dialoge
-// ---------------------------------------------------------------------------
-
-void _showEventInfoDialog(BuildContext context, Event event) {
-  showAppSheet<void>(
-    context,
-    (ctx) => AppSheetShell(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF5A04A).withValues(alpha: 0.14),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                      color: const Color(0xFFF5A04A).withValues(alpha: 0.45)),
-                ),
-                child:
-                    const Icon(Icons.event, color: Color(0xFFF5A04A), size: 16),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  event.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700),
-                ),
-              ),
-              GestureDetector(
-                onTap: () {
-                  Navigator.pop(ctx);
-                  Navigator.push(context,
-                      AppRoute(builder: (_) => DetailPage(event: event)));
-                },
-                child: const Icon(Icons.open_in_full,
-                    color: Colors.white54, size: 18),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Padding(
-            padding: const EdgeInsets.only(left: 48, bottom: 8),
-            child: Row(children: [
-              const Icon(Icons.calendar_today, color: Colors.white54, size: 14),
-              const SizedBox(width: 6),
-              Text(
-                DateFormat('dd.MM.yyyy', 'de_DE').format(event.datum.toLocal()),
-                style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.65), fontSize: 13.5),
-              ),
-            ]),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(left: 48),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.place_outlined, color: Colors.white54, size: 14),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(event.adresse,
-                      style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.65),
-                          fontSize: 13.5)),
-                ),
-              ],
-            ),
-          ),
-          if (event.beschreibung.trim().isNotEmpty) ...[
-            Divider(color: Colors.white.withValues(alpha: 0.10), height: 28),
-            Text(event.beschreibung,
-                style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.80),
-                    fontSize: 14,
-                    height: 1.5)),
-            const SizedBox(height: 8),
-          ],
-          const SizedBox(height: 16),
-          AppSheetGhostButton(
-              label: 'Schließen', onTap: () => Navigator.pop(ctx)),
-        ],
-      ),
-    ),
-  );
-}
-
-void _showDayEventsListDialog(BuildContext context, List<Event> events) {
-  final date = events.first.datum.toLocal();
-  final title =
-      '${events.length} Events am ${DateFormat('d. MMMM', 'de_DE').format(date)}';
-
-  showAppSheet<void>(
-    context,
-    (ctx) => AppSheetShell(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AppSheetHeader(
-            icon: Icons.star,
-            iconColor: const Color(0xFFF5A04A),
-            title: title,
-          ),
-          Divider(color: Colors.white.withValues(alpha: 0.10), height: 24),
-          ...events.map((event) => _buildEventListRow(ctx, event)),
-          const SizedBox(height: 12),
-          AppSheetGhostButton(
-              label: 'Schließen', onTap: () => Navigator.pop(ctx)),
-        ],
-      ),
-    ),
-  );
-}
-
-Widget _buildEventListRow(BuildContext context, Event event) {
-  return Padding(
-    padding: const EdgeInsets.symmetric(vertical: 6),
-    child: Row(
-      children: [
-        const Icon(Icons.event, color: Colors.white54, size: 16),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            event.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Colors.white, fontSize: 15),
-          ),
-        ),
-        GestureDetector(
-          onTap: () => _showEventInfoDialog(context, event),
-          child: const Padding(
-            padding: EdgeInsets.only(left: 8),
-            child: Icon(Icons.info_outline, color: Colors.white70, size: 20),
-          ),
-        ),
-      ],
-    ),
-  );
-}
 
 // ---------------------------------------------------------------------------
 // CalendarOverlay Widget
@@ -369,15 +214,13 @@ class _CalendarOverlayState extends State<CalendarOverlay> {
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: hasFav
-          ? () {
-              if (dayEvents.length == 1) {
-                _showEventInfoDialog(context, dayEvents.first);
-              } else {
-                _showDayEventsListDialog(context, dayEvents);
-              }
-            }
-          : null,
+      onTap: () {
+        final tapped = DateTime(_displayedMonth.year, _displayedMonth.month, day);
+        selectedDatumModeNotifier.value = 'datum';
+        selectedDatumNotifier.value = tapped;
+        selectedPageNotifier.value = 0;
+        Navigator.pop(context);
+      },
       child: SizedBox(
         width: 38,
         height: 46,
