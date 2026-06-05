@@ -61,6 +61,7 @@ const _kTypLabels = {
   'e3': 'Disco',
   'e4': 'Ball',
   'e5': 'Krampuslauf',
+  'e6': 'Festival',
 };
 
 class EventsPage extends StatefulWidget {
@@ -92,7 +93,7 @@ class _EventsPageState extends State<EventsPage> {
       nameController.text = widget.event!.name;
       standortController.text = widget.event!.standort;
       datumController.text = DateFormat("dd.MM.yyyy").format(widget.event!.datum.toLocal());
-      typ = widget.event!.typ;
+      typ = _kTypLabels.containsKey(widget.event!.typ) ? widget.event!.typ : "e0";
       beschreibungController.text = widget.event!.beschreibung;
       adresseController.text = widget.event!.adresse;
       _latitude = widget.event!.latitude;
@@ -444,16 +445,12 @@ class _EventsPageState extends State<EventsPage> {
                     contentPadding:
                         EdgeInsets.symmetric(vertical: 20, horizontal: 16),
                   ),
-                  items: const [
-                    DropdownMenuItem(value: "e0", child: Text("Standart")),
-                    DropdownMenuItem(value: "e1", child: Text("Kirchtag")),
-                    DropdownMenuItem(
-                        value: "e2", child: Text("Feuerwehrfest")),
-                    DropdownMenuItem(value: "e3", child: Text("Disco")),
-                    DropdownMenuItem(value: "e4", child: Text("Ball")),
-                    DropdownMenuItem(
-                        value: "e5", child: Text("Krampuslauf")),
-                  ],
+                  items: _kTypLabels.entries
+                      .map((e) => DropdownMenuItem(
+                            value: e.key,
+                            child: Text(e.value),
+                          ))
+                      .toList(),
                   onChanged: (value) => setState(() => typ = value),
                 ),
                 const SizedBox(height: 16),

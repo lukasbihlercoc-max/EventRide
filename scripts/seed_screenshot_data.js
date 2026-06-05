@@ -2,15 +2,18 @@
  * Erstellt Screenshot-Testdaten in Firestore und Firebase Auth.
  *
  * Erstellt:
- *   - 5 Fake-User (Firestore-Dokumente + 2 echte Auth-Accounts zum Einloggen)
- *   - 5 Events (zukünftige Termine in Kärnten)
- *   - 5 Fahrten (diverse Strecken, Richtungen, Uhrzeiten)
- *   - 4 Anfragen (2 akzeptiert, 2 offen)
- *   - 2 Chat-Conversations mit realistischen Nachrichten
+ *   - 4 echte Auth-Accounts (zum Einloggen + Profilbild setzen)
+ *   - 1 Firestore-Only-User (Stefan, für den Chat)
+ *   - 3 Events (Villacher Kirchtag, Feuerwehrfest Paternion, HTL Maturaball)
+ *   - 4 Fahrten zum Villacher Kirchtag (Hin-, Rück-, Hin+Zurück)
+ *   - 1 Chat-Conversation (Max ↔ Lisa) mit System-Message
+ *   - 1 akzeptierte Anfrage (Lisa → Max)
  *
- * Login-Accounts für die App:
+ * Login-Accounts:
  *   max.mueller@eventride-test.at    /  Test1234!
  *   karin.steiner@eventride-test.at  /  Test1234!
+ *   lisa.wagner@eventride-test.at    /  Test1234!
+ *   tom.berger@eventride-test.at     /  Test1234!
  *
  * Alle Dokumente: isTestData: true
  * Bereinigung:
@@ -43,27 +46,24 @@ const auth = admin.auth();
 // ── Feste IDs ────────────────────────────────────────────────────────────────
 
 const U = {
-  MAX:   'screenshot_user_max',
-  KARIN: 'screenshot_user_karin',
-  LISA:  'screenshot_user_lisa',
-  TOM:   'screenshot_user_tom',
-  ANNA:  'screenshot_user_anna',
+  MAX:    'screenshot_user_max',
+  KARIN:  'screenshot_user_karin',
+  LISA:   'screenshot_user_lisa',
+  TOM:    'screenshot_user_tom',
+  STEFAN: 'screenshot_user_stefan',
 };
 
 const EV = {
-  KIRCHTAG:    'screenshot_event_kirchtag',
-  BALL:        'screenshot_event_ball',
-  FESTIVAL:    'screenshot_event_festival',
-  WOLFSBERG:   'screenshot_event_wolfsberg',
-  VOELKERMARKT:'screenshot_event_voelkermarkt',
+  KIRCHTAG:  'screenshot_event_kirchtag',
+  FEUERWEHR: 'screenshot_event_feuerwehr',
+  BALL:      'screenshot_event_ball',
 };
 
 const FA = {
-  KIRCHTAG:    'screenshot_fahrt_kirchtag',
-  BALL:        'screenshot_fahrt_ball',
-  FESTIVAL:    'screenshot_fahrt_festival',
-  WOLFSBERG:   'screenshot_fahrt_wolfsberg',
-  VOELKERMARKT:'screenshot_fahrt_voelkermarkt',
+  MAX:   'screenshot_fahrt_max',
+  KARIN: 'screenshot_fahrt_karin',
+  TOM:   'screenshot_fahrt_tom',
+  LISA:  'screenshot_fahrt_lisa',
 };
 
 // ── Hilfsfunktionen ──────────────────────────────────────────────────────────
@@ -76,11 +76,13 @@ function hoursAgo(h) {
   return admin.firestore.Timestamp.fromDate(new Date(Date.now() - h * 60 * 60 * 1000));
 }
 
-function daysFromNow(n) {
-  const d = new Date();
-  d.setDate(d.getDate() + n);
-  d.setUTCHours(0, 0, 0, 0);
-  return d;
+function isoDate(dateStr) {
+  // festes ISO-8601-Datum (UTC Mitternacht), wie die App es erwartet
+  return new Date(dateStr + 'T00:00:00.000Z').toISOString();
+}
+
+function dateMs(dateStr) {
+  return new Date(dateStr + 'T00:00:00.000Z').getTime();
 }
 
 // ── Kerndaten ─────────────────────────────────────────────────────────────────
@@ -122,13 +124,14 @@ const USERS_DATA = [
     id: U.LISA,
     userId: U.LISA,
     name: 'Lisa Wagner',
-    email: 'lisa.wagner@example.com',
+    email: 'lisa.wagner@eventride-test.at',
     emailVerified: true,
     phoneVerified: false,
-    licenseStatus: 'none',
-    homeTown: 'Klagenfurt',
-    homeTownLat: 46.6228,
-    homeTownLng: 14.3050,
+    licenseStatus: 'verified',
+    homeTown: 'Feldkirchen',
+    homeTownLat: 46.7211,
+    homeTownLng: 14.0989,
+    car: { make: 'Seat', model: 'Ibiza', color: 'Weiß', seats: 4 },
     ratingAvg: 5.0,
     ratingCount: 3,
     isTestData: true,
@@ -137,7 +140,24 @@ const USERS_DATA = [
     id: U.TOM,
     userId: U.TOM,
     name: 'Tom Berger',
-    email: 'tom.berger@example.com',
+    email: 'tom.berger@eventride-test.at',
+    emailVerified: true,
+    phoneVerified: false,
+    licenseStatus: 'verified',
+    homeTown: 'Klagenfurt',
+    homeTownLat: 46.6228,
+    homeTownLng: 14.3050,
+    car: { make: 'Audi', model: 'A3', color: 'Schwarz', seats: 4 },
+    ratingAvg: 4.6,
+    ratingCount: 5,
+    isTestData: true,
+  },
+  {
+    // Firestore-Only: kein Auth-Account, nur für den Chat-Gesprächspartner
+    id: U.STEFAN,
+    userId: U.STEFAN,
+    name: 'Stefan Rainer',
+    email: 'stefan.rainer@example.com',
     emailVerified: true,
     phoneVerified: false,
     licenseStatus: 'none',
@@ -148,271 +168,147 @@ const USERS_DATA = [
     ratingCount: 0,
     isTestData: true,
   },
-  {
-    id: U.ANNA,
-    userId: U.ANNA,
-    name: 'Anna Hofer',
-    email: 'anna.hofer@example.com',
-    emailVerified: true,
-    phoneVerified: true,
-    licenseStatus: 'none',
-    homeTown: 'Feldkirchen',
-    homeTownLat: 46.7211,
-    homeTownLng: 14.0989,
-    ratingAvg: 4.5,
-    ratingCount: 2,
-    isTestData: true,
-  },
 ];
-
-// Datum als UTC-ISO8601 (wie die App es erwartet)
-const E_DATES = {
-  KIRCHTAG:    daysFromNow(23), // ~27. Juni
-  BALL:        daysFromNow(31), // ~5. Juli
-  FESTIVAL:    daysFromNow(38), // ~12. Juli
-  WOLFSBERG:   daysFromNow(45), // ~19. Juli
-  VOELKERMARKT:daysFromNow(59), // ~2. August
-};
 
 const EVENTS_DATA = [
   {
     id: EV.KIRCHTAG,
-    name: 'Klagenfurter Kirchtag 2026',
-    datum: E_DATES.KIRCHTAG.toISOString(),
-    standort: 'Klagenfurt',
-    typ: 'Kirchtag',
-    beschreibung: 'Der größte Kirchtag Kärntens! Fahrgeschäfte, Buden, Live-Musik und gute Stimmung am Neuen Platz.',
-    adresse: 'Neuer Platz 1, 9020 Klagenfurt',
-    latitude: 46.6228,
-    longitude: 14.3050,
-    isTestData: true,
-  },
-  {
-    id: EV.BALL,
-    name: 'Großer Villacher Faschingsball 2026',
-    datum: E_DATES.BALL.toISOString(),
+    name: 'Villacher Kirchtag 2026',
+    datum: isoDate('2026-07-27'),
     standort: 'Villach',
-    typ: 'Ball',
-    beschreibung: 'Der bekannteste Faschingsball Kärntens im Congress Center Villach. Kostüme ausdrücklich erwünscht!',
-    adresse: 'Congress Center, Europaplatz 1, 9500 Villach',
+    typ: 'e1',
+    beschreibung: 'Der Villacher Kirchtag – das größte Volksfest Kärntens! Eine Woche Fahrgeschäfte, Buden, Live-Musik und ausgelassene Stimmung in der Innenstadt.',
+    adresse: 'Hauptplatz, 9500 Villach',
     latitude: 46.6111,
     longitude: 13.8558,
     isTestData: true,
   },
   {
-    id: EV.FESTIVAL,
-    name: 'Wörthersee Festival 2026',
-    datum: E_DATES.FESTIVAL.toISOString(),
+    id: EV.FEUERWEHR,
+    name: 'Feuerwehrfest Paternion 2026',
+    datum: isoDate('2026-08-18'),
+    standort: 'Paternion',
+    typ: 'e2',
+    beschreibung: 'Das traditionelle Sommerfest der Freiwilligen Feuerwehr Paternion. Musik, Grillstand, Tombola und gute Unterhaltung für die ganze Familie.',
+    adresse: 'FF-Gebäude Paternion, 9711 Paternion',
+    latitude: 46.7117,
+    longitude: 13.6247,
+    isTestData: true,
+  },
+  {
+    id: EV.BALL,
+    name: 'HTL Klagenfurt Maturaball 2026',
+    datum: isoDate('2026-11-15'),
     standort: 'Klagenfurt',
-    typ: 'Festival',
-    beschreibung: 'Sommerliches Musikfestival am Wörthersee mit österreichischen und internationalen Künstlern.',
-    adresse: 'Strandbad Klagenfurt, Strandbadstraße 1',
-    latitude: 46.6106,
-    longitude: 14.1225,
-    isTestData: true,
-  },
-  {
-    id: EV.WOLFSBERG,
-    name: 'Wolfsberger Stadtfest 2026',
-    datum: E_DATES.WOLFSBERG.toISOString(),
-    standort: 'Wolfsberg',
-    typ: 'Konzert',
-    beschreibung: 'Jährliches Stadtfest in Wolfsberg mit Livemusik, Kulinarik und Unterhaltung für die ganze Familie.',
-    adresse: 'Hauptplatz, 9400 Wolfsberg',
-    latitude: 46.8394,
-    longitude: 14.8421,
-    isTestData: true,
-  },
-  {
-    id: EV.VOELKERMARKT,
-    name: 'Völkermarkter Stadtfest 2026',
-    datum: E_DATES.VOELKERMARKT.toISOString(),
-    standort: 'Völkermarkt',
-    typ: 'Konzert',
-    beschreibung: 'Traditionsreiches Stadtfest mit Live-Bands, dem bekannten Handwerkermarkt und regionaler Küche.',
-    adresse: 'Hauptplatz, 9100 Völkermarkt',
-    latitude: 46.6572,
-    longitude: 14.6344,
+    typ: 'e4',
+    beschreibung: 'Der Maturaball der HTL Klagenfurt im Casino Velden. Eleganter Abend mit Live-Band, Eröffnungswalzer und großer After-Party.',
+    adresse: 'Casino Velden, Am Corso 17, 9220 Velden',
+    latitude: 46.6160,
+    longitude: 14.0356,
     isTestData: true,
   },
 ];
 
+// Alle 4 Fahrten gehen zum Villacher Kirchtag – unterschiedliche Richtungen und Startpunkte
 const FAHRTEN_DATA = [
   {
-    id: FA.KIRCHTAG,
+    // Max: Nur Hinfahrt – 10:30 Uhr ab Wolfsberg
+    id: FA.MAX,
     eventId: EV.KIRCHTAG,
-    eventName: 'Klagenfurter Kirchtag 2026',
-    standort: 'Klagenfurt',
+    eventName: 'Villacher Kirchtag 2026',
+    standort: 'Villach',
     abfahrtsort: 'Hauptplatz, Wolfsberg',
     abfahrtsortFullAddress: 'Hauptplatz 1, 9400 Wolfsberg',
     abfahrtsortLat: 46.8394,
     abfahrtsortLng: 14.8421,
     uhrzeitHour: 10, uhrzeitMinute: 30,
-    rueckuhrzeitHour: 22, rueckuhrzeitMinute: 0,
+    rueckuhrzeitHour: null, rueckuhrzeitMinute: null,
     freiePlaetze: 2,
-    richtung: 2, // hinUndZurueck
+    richtung: 0, // hinfahrt
     ownerId: U.MAX,
     ownerName: 'Max Müller',
-    eventDatum: E_DATES.KIRCHTAG.getTime(),
+    eventDatum: dateMs('2026-07-27'),
     isTestData: true,
   },
   {
-    id: FA.BALL,
-    eventId: EV.BALL,
-    eventName: 'Großer Villacher Faschingsball 2026',
+    // Tom: Hin- und Rückfahrt – 11:30 / Rück 01:00 ab Klagenfurt
+    id: FA.TOM,
+    eventId: EV.KIRCHTAG,
+    eventName: 'Villacher Kirchtag 2026',
+    standort: 'Villach',
+    abfahrtsort: 'Klagenfurt, Heiligengeistplatz',
+    abfahrtsortFullAddress: 'Heiligengeistplatz, 9020 Klagenfurt',
+    abfahrtsortLat: 46.6228,
+    abfahrtsortLng: 14.3050,
+    uhrzeitHour: 11, uhrzeitMinute: 30,
+    rueckuhrzeitHour: 1, rueckuhrzeitMinute: 0,
+    freiePlaetze: 3,
+    richtung: 2, // hinUndZurueck
+    ownerId: U.TOM,
+    ownerName: 'Tom Berger',
+    eventDatum: dateMs('2026-07-27'),
+    isTestData: true,
+  },
+  {
+    // Karin: Hin- und Rückfahrt – 14:00 / Rück 02:00 ab Spittal
+    id: FA.KARIN,
+    eventId: EV.KIRCHTAG,
+    eventName: 'Villacher Kirchtag 2026',
     standort: 'Villach',
     abfahrtsort: 'Bahnhof Spittal-Millstättersee',
     abfahrtsortFullAddress: 'Bahnhofstraße 5, 9800 Spittal an der Drau',
     abfahrtsortLat: 46.7967,
     abfahrtsortLng: 13.4972,
-    uhrzeitHour: 19, uhrzeitMinute: 0,
-    rueckuhrzeitHour: 2, rueckuhrzeitMinute: 30,
-    freiePlaetze: 3,
-    richtung: 2,
+    uhrzeitHour: 14, uhrzeitMinute: 0,
+    rueckuhrzeitHour: 2, rueckuhrzeitMinute: 0,
+    freiePlaetze: 2,
+    richtung: 2, // hinUndZurueck
     ownerId: U.KARIN,
     ownerName: 'Karin Steiner',
-    eventDatum: E_DATES.BALL.getTime(),
+    eventDatum: dateMs('2026-07-27'),
     isTestData: true,
   },
   {
-    id: FA.FESTIVAL,
-    eventId: EV.FESTIVAL,
-    eventName: 'Wörthersee Festival 2026',
-    standort: 'Klagenfurt',
-    abfahrtsort: 'Völkermarkt Zentrum',
-    abfahrtsortFullAddress: 'Hauptplatz 5, 9100 Völkermarkt',
-    abfahrtsortLat: 46.6572,
-    abfahrtsortLng: 14.6344,
-    uhrzeitHour: 14, uhrzeitMinute: 0,
-    rueckuhrzeitHour: 23, rueckuhrzeitMinute: 30,
-    freiePlaetze: 3,
-    richtung: 2,
-    ownerId: U.MAX,
-    ownerName: 'Max Müller',
-    eventDatum: E_DATES.FESTIVAL.getTime(),
-    isTestData: true,
-  },
-  {
-    id: FA.WOLFSBERG,
-    eventId: EV.WOLFSBERG,
-    eventName: 'Wolfsberger Stadtfest 2026',
-    standort: 'Wolfsberg',
-    abfahrtsort: 'Villach Hauptbahnhof',
-    abfahrtsortFullAddress: 'Bahnhofplatz 1, 9500 Villach',
+    // Lisa: Nur Rückfahrt – 23:30 Uhr ab Villach Richtung Feldkirchen
+    id: FA.LISA,
+    eventId: EV.KIRCHTAG,
+    eventName: 'Villacher Kirchtag 2026',
+    standort: 'Villach',
+    abfahrtsort: 'Villach, Hauptplatz',
+    abfahrtsortFullAddress: 'Hauptplatz, 9500 Villach',
     abfahrtsortLat: 46.6111,
     abfahrtsortLng: 13.8558,
-    uhrzeitHour: 16, uhrzeitMinute: 0,
-    rueckuhrzeitHour: 23, rueckuhrzeitMinute: 0,
-    freiePlaetze: 2,
-    richtung: 2,
-    ownerId: U.TOM,
-    ownerName: 'Tom Berger',
-    eventDatum: E_DATES.WOLFSBERG.getTime(),
-    isTestData: true,
-  },
-  {
-    id: FA.VOELKERMARKT,
-    eventId: EV.VOELKERMARKT,
-    eventName: 'Völkermarkter Stadtfest 2026',
-    standort: 'Völkermarkt',
-    abfahrtsort: 'Klagenfurt, Heiligengeistplatz',
-    abfahrtsortFullAddress: 'Heiligengeistplatz, 9020 Klagenfurt',
-    abfahrtsortLat: 46.6228,
-    abfahrtsortLng: 14.3050,
-    uhrzeitHour: 17, uhrzeitMinute: 30,
+    uhrzeitHour: 23, uhrzeitMinute: 30,
     rueckuhrzeitHour: null, rueckuhrzeitMinute: null,
-    freiePlaetze: 1,
-    richtung: 0, // nur Hinfahrt
-    ownerId: U.KARIN,
-    ownerName: 'Karin Steiner',
-    eventDatum: E_DATES.VOELKERMARKT.getTime(),
+    freiePlaetze: 2,
+    richtung: 1, // rueckfahrt
+    ownerId: U.LISA,
+    ownerName: 'Lisa Wagner',
+    eventDatum: dateMs('2026-07-27'),
     isTestData: true,
   },
 ];
 
 const ANFRAGEN_DATA = [
   {
-    id: 'screenshot_anfrage_lisa_kirchtag',
-    fahrtId: FA.KIRCHTAG,
+    id: 'screenshot_anfrage_stefan_max',
+    fahrtId: FA.MAX,
     eventId: EV.KIRCHTAG,
-    requesterId: U.LISA,
-    requesterName: 'Lisa Wagner',
+    requesterId: U.STEFAN,
+    requesterName: 'Stefan Rainer',
     seatsRequested: 1,
     status: 1, // akzeptiert
-    createdAt: Date.now() - 2 * 24 * 60 * 60 * 1000,
-    updatedAt: Date.now() - 1 * 24 * 60 * 60 * 1000,
+    createdAt: Date.now() - 20 * 60 * 60 * 1000,
+    updatedAt: Date.now() - 18 * 60 * 60 * 1000,
     fahrtOwnerId: U.MAX,
-    message: 'Hallo, hätte gerne einen Mitfahrplatz 😊',
+    message: 'Hallo! Hätte gerne einen Platz, bin zuverlässig 😊',
     seatsAccepted: 1,
-    eventName: 'Klagenfurter Kirchtag 2026',
+    eventName: 'Villacher Kirchtag 2026',
     startOrt: 'Hauptplatz, Wolfsberg',
-    zielOrt: 'Klagenfurt',
-    fahrerName: 'Max Müller',
-    vonFahrer: false,
-    eventDatum: E_DATES.KIRCHTAG.getTime(),
-    isTestData: true,
-  },
-  {
-    id: 'screenshot_anfrage_anna_ball',
-    fahrtId: FA.BALL,
-    eventId: EV.BALL,
-    requesterId: U.ANNA,
-    requesterName: 'Anna Hofer',
-    seatsRequested: 1,
-    status: 1, // akzeptiert
-    createdAt: Date.now() - 3 * 24 * 60 * 60 * 1000,
-    updatedAt: Date.now() - 2 * 24 * 60 * 60 * 1000,
-    fahrtOwnerId: U.KARIN,
-    message: 'Super, ich suche genau eine Mitfahrgelegenheit nach Villach!',
-    seatsAccepted: 1,
-    eventName: 'Großer Villacher Faschingsball 2026',
-    startOrt: 'Bahnhof Spittal-Millstättersee',
     zielOrt: 'Villach',
-    fahrerName: 'Karin Steiner',
-    vonFahrer: false,
-    eventDatum: E_DATES.BALL.getTime(),
-    isTestData: true,
-  },
-  {
-    id: 'screenshot_anfrage_tom_festival',
-    fahrtId: FA.FESTIVAL,
-    eventId: EV.FESTIVAL,
-    requesterId: U.TOM,
-    requesterName: 'Tom Berger',
-    seatsRequested: 2,
-    status: 0, // offen
-    createdAt: Date.now() - 12 * 60 * 60 * 1000,
-    updatedAt: Date.now() - 12 * 60 * 60 * 1000,
-    fahrtOwnerId: U.MAX,
-    message: 'Hallo! Könnten wir 2 Plätze haben? Fahre mit meiner Freundin. 🙏',
-    seatsAccepted: null,
-    eventName: 'Wörthersee Festival 2026',
-    startOrt: 'Völkermarkt Zentrum',
-    zielOrt: 'Klagenfurt',
     fahrerName: 'Max Müller',
     vonFahrer: false,
-    eventDatum: E_DATES.FESTIVAL.getTime(),
-    isTestData: true,
-  },
-  {
-    id: 'screenshot_anfrage_lisa_wolfsberg',
-    fahrtId: FA.WOLFSBERG,
-    eventId: EV.WOLFSBERG,
-    requesterId: U.LISA,
-    requesterName: 'Lisa Wagner',
-    seatsRequested: 1,
-    status: 0, // offen
-    createdAt: Date.now() - 6 * 60 * 60 * 1000,
-    updatedAt: Date.now() - 6 * 60 * 60 * 1000,
-    fahrtOwnerId: U.TOM,
-    message: 'Bitte um einen Platz, bin pünktlich! Danke 🙏',
-    seatsAccepted: null,
-    eventName: 'Wolfsberger Stadtfest 2026',
-    startOrt: 'Villach Hauptbahnhof',
-    zielOrt: 'Wolfsberg',
-    fahrerName: 'Tom Berger',
-    vonFahrer: false,
-    eventDatum: E_DATES.WOLFSBERG.getTime(),
+    eventDatum: dateMs('2026-07-27'),
     isTestData: true,
   },
 ];
@@ -434,12 +330,14 @@ async function createAuthUser(uid, email, password, name) {
 async function seed() {
   console.log('\n📸  Erstelle Screenshot-Testdaten…\n');
 
-  // 1. Firebase Auth Accounts (nur Max + Karin, da die App eine echte Anmeldung braucht)
+  // 1. Firebase Auth Accounts (alle 4 einlogbaren User)
   console.log('🔑  Firebase Auth…');
   await createAuthUser(U.MAX,   'max.mueller@eventride-test.at',   'Test1234!', 'Max Müller');
   await createAuthUser(U.KARIN, 'karin.steiner@eventride-test.at', 'Test1234!', 'Karin Steiner');
+  await createAuthUser(U.LISA,  'lisa.wagner@eventride-test.at',   'Test1234!', 'Lisa Wagner');
+  await createAuthUser(U.TOM,   'tom.berger@eventride-test.at',    'Test1234!', 'Tom Berger');
 
-  // 2. User-Dokumente
+  // 2. User-Dokumente (inkl. Stefan als Firestore-Only)
   console.log('\n👥  User-Dokumente…');
   const b1 = db.batch();
   USERS_DATA.forEach(u => b1.set(db.collection('users').doc(u.id), u, { merge: true }));
@@ -467,109 +365,71 @@ async function seed() {
   await b4.commit();
   console.log(`  ✅  ${ANFRAGEN_DATA.length} Anfragen angelegt`);
 
-  // 6. Chat Conversations
+  // 6. Chat (Max ↔ Stefan – Stefan hat Platz in Max' Hinfahrt gebucht)
   console.log('\n💬  Chat…');
 
-  const conv1 = convId(FA.KIRCHTAG, U.MAX, U.LISA);
-  const conv2 = convId(FA.BALL,     U.KARIN, U.ANNA);
+  const conv = convId(FA.MAX, U.MAX, U.STEFAN);
+  const fa   = FAHRTEN_DATA.find(f => f.id === FA.MAX);
 
-  const fa1 = FAHRTEN_DATA.find(f => f.id === FA.KIRCHTAG);
-  const fa2 = FAHRTEN_DATA.find(f => f.id === FA.BALL);
+  const sysText =
+    `🚗 Fahrt zum ${fa.eventName}\n` +
+    `📍 ${fa.abfahrtsort} → ${fa.standort}\n` +
+    `🕒 ${String(fa.uhrzeitHour).padStart(2,'0')}:${String(fa.uhrzeitMinute).padStart(2,'0')} Uhr\n` +
+    `👤 Fahrer: ${fa.ownerName}`;
 
-  const CHAT_MESSAGES = {
-    [conv1]: [
-      { id: `${conv1}_msg1`, sender: U.MAX,  text: 'Hallo Lisa! Deine Anfrage wurde akzeptiert 😊', hAgo: 25 },
-      { id: `${conv1}_msg2`, sender: U.LISA, text: 'Super, danke! Wo genau ist der Treffpunkt?',    hAgo: 24.5 },
-      { id: `${conv1}_msg3`, sender: U.MAX,  text: 'Am Hauptplatz beim Brunnen. Pünktlich um 10:30 🚗', hAgo: 24 },
-      { id: `${conv1}_msg4`, sender: U.LISA, text: 'Perfekt, ich bin dabei! Danke 🙂',              hAgo: 23 },
-    ],
-    [conv2]: [
-      { id: `${conv2}_msg1`, sender: U.KARIN, text: 'Hallo Anna! Freue mich schon auf die gemeinsame Fahrt 🎊', hAgo: 50 },
-      { id: `${conv2}_msg2`, sender: U.ANNA,  text: 'Ich mich auch! Soll ich etwas mitbringen?',               hAgo: 49 },
-      { id: `${conv2}_msg3`, sender: U.KARIN, text: 'Nein danke 😊 Abfahrt: Bahnhofstraße 5, Spittal. Parkplatz beim Bahnhof.', hAgo: 48 },
-      { id: `${conv2}_msg4`, sender: U.ANNA,  text: 'Top, dann bis Samstag! 🎉',                              hAgo: 47 },
-    ],
-  };
+  const MSGS = [
+    { id: `${conv}_msg1`, sender: U.STEFAN, text: 'Hallo Max! Freue mich schon auf die Fahrt 😊 Wo genau treffen wir uns?', hAgo: 19 },
+    { id: `${conv}_msg2`, sender: U.MAX,    text: 'Hallo Stefan! Am Hauptplatz beim Löwenbrunnen, 10:15 Uhr ☑️',           hAgo: 18.5 },
+    { id: `${conv}_msg3`, sender: U.STEFAN, text: 'Super, erkenne ich dich am Auto?',                                       hAgo: 18 },
+    { id: `${conv}_msg4`, sender: U.MAX,    text: 'Blauer VW Golf, Kennzeichen VB-12 😊',                                   hAgo: 17.5 },
+    { id: `${conv}_msg5`, sender: U.STEFAN, text: 'Perfekt! Danke, bis Sonntag 🙌',                                         hAgo: 17 },
+  ];
 
-  const lastMsg1 = CHAT_MESSAGES[conv1].at(-1);
-  const lastMsg2 = CHAT_MESSAGES[conv2].at(-1);
+  const lastMsg = MSGS.at(-1);
 
-  // Conversation-Dokumente anlegen
-  await db.collection('chat_conversations').doc(conv1).set({
-    id: conv1,
-    fahrtId: FA.KIRCHTAG,
+  await db.collection('chat_conversations').doc(conv).set({
+    id: conv,
+    fahrtId: FA.MAX,
     ownerId: U.MAX,
-    requesterId: U.LISA,
-    participants: [U.MAX, U.LISA],
-    lastMessage: lastMsg1.text,
-    lastSenderId: lastMsg1.sender,
-    lastMessageAt: hoursAgo(lastMsg1.hAgo),
-    createdAt: hoursAgo(CHAT_MESSAGES[conv1][0].hAgo),
+    requesterId: U.STEFAN,
+    participants: [U.MAX, U.STEFAN],
+    lastMessage: lastMsg.text,
+    lastSenderId: lastMsg.sender,
+    lastMessageAt: hoursAgo(lastMsg.hAgo),
+    createdAt: hoursAgo(MSGS[0].hAgo),
     isTestData: true,
   });
 
-  await db.collection('chat_conversations').doc(conv2).set({
-    id: conv2,
-    fahrtId: FA.BALL,
-    ownerId: U.KARIN,
-    requesterId: U.ANNA,
-    participants: [U.KARIN, U.ANNA],
-    lastMessage: lastMsg2.text,
-    lastSenderId: lastMsg2.sender,
-    lastMessageAt: hoursAgo(lastMsg2.hAgo),
-    createdAt: hoursAgo(CHAT_MESSAGES[conv2][0].hAgo),
-    isTestData: true,
-  });
-
-  // System-Nachrichten
-  const sysText1 =
-    `🚗 Fahrt zum ${fa1.eventName}\n` +
-    `📍 ${fa1.abfahrtsort} → ${fa1.standort}\n` +
-    `🕒 ${String(fa1.uhrzeitHour).padStart(2,'0')}:${String(fa1.uhrzeitMinute).padStart(2,'0')} Uhr\n` +
-    `🔄 Rückfahrt: ${String(fa1.rueckuhrzeitHour).padStart(2,'0')}:${String(fa1.rueckuhrzeitMinute).padStart(2,'0')} Uhr\n` +
-    `👤 Fahrer: ${fa1.ownerName}`;
-
-  const sysText2 =
-    `🚗 Fahrt zum ${fa2.eventName}\n` +
-    `📍 ${fa2.abfahrtsort} → ${fa2.standort}\n` +
-    `🕒 ${String(fa2.uhrzeitHour).padStart(2,'0')}:${String(fa2.uhrzeitMinute).padStart(2,'0')} Uhr\n` +
-    `🔄 Rückfahrt: 02:30 Uhr\n` +
-    `👤 Fahrerin: ${fa2.ownerName}`;
-
-  // Alle Messages in einem Batch
   const bMsgs = db.batch();
 
-  // System-Messages (feste ID = ${convId}_system)
+  // System-Message
   bMsgs.set(
-    db.collection('chat_conversations').doc(conv1).collection('messages').doc(`${conv1}_system`),
-    { conversationId: conv1, senderId: 'system', text: sysText1, createdAt: hoursAgo(26), isSystem: true, isTestData: true }
-  );
-  bMsgs.set(
-    db.collection('chat_conversations').doc(conv2).collection('messages').doc(`${conv2}_system`),
-    { conversationId: conv2, senderId: 'system', text: sysText2, createdAt: hoursAgo(51), isSystem: true, isTestData: true }
+    db.collection('chat_conversations').doc(conv).collection('messages').doc(`${conv}_system`),
+    { conversationId: conv, senderId: 'system', text: sysText, createdAt: hoursAgo(20), isSystem: true, isTestData: true }
   );
 
   // Normale Nachrichten
-  for (const [cId, msgs] of Object.entries(CHAT_MESSAGES)) {
-    for (const m of msgs) {
-      bMsgs.set(
-        db.collection('chat_conversations').doc(cId).collection('messages').doc(m.id),
-        { conversationId: cId, senderId: m.sender, text: m.text, createdAt: hoursAgo(m.hAgo), isSystem: false, isTestData: true }
-      );
-    }
+  for (const m of MSGS) {
+    bMsgs.set(
+      db.collection('chat_conversations').doc(conv).collection('messages').doc(m.id),
+      { conversationId: conv, senderId: m.sender, text: m.text, createdAt: hoursAgo(m.hAgo), isSystem: false, isTestData: true }
+    );
   }
 
   await bMsgs.commit();
-  console.log('  ✅  2 Conversations + 10 Nachrichten angelegt');
+  console.log('  ✅  1 Conversation + 6 Nachrichten angelegt');
 
   // ── Zusammenfassung ───────────────────────────────────────────────────────
-  const line = '─'.repeat(56);
+  const line = '─'.repeat(60);
   console.log(`\n${line}`);
   console.log('🎉  Screenshot-Testdaten erfolgreich angelegt!\n');
-  console.log('📱  App-Logins:');
-  console.log('   max.mueller@eventride-test.at    /  Test1234!  (Max, Fahrer)');
-  console.log('   karin.steiner@eventride-test.at  /  Test1234!  (Karin, Fahrerin)\n');
-  console.log('🗑️   Bereinigung: node scripts/delete_screenshot_data.js');
+  console.log('📱  App-Logins (alle: Test1234!):');
+  console.log('   max.mueller@eventride-test.at    →  Max Müller    (Wolfsberg, VW Golf)');
+  console.log('   karin.steiner@eventride-test.at  →  Karin Steiner (Spittal, BMW 3er)');
+  console.log('   lisa.wagner@eventride-test.at    →  Lisa Wagner   (Feldkirchen, Seat Ibiza)');
+  console.log('   tom.berger@eventride-test.at     →  Tom Berger    (Klagenfurt, Audi A3)');
+  console.log('\n💬  Chat: Max Müller ↔ Stefan Rainer (als Max einloggen für Screenshot)');
+  console.log(`\n🗑️   Bereinigung: node scripts/delete_screenshot_data.js`);
   console.log(`${line}\n`);
 
   process.exit(0);

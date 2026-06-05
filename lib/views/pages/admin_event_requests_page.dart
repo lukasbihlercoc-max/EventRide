@@ -27,6 +27,7 @@ const _kTypLabels = {
   'e3': 'Disco',
   'e4': 'Ball',
   'e5': 'Krampuslauf',
+  'e6': 'Festival',
 };
 
 InputDecoration _inputStyle(String label, {Widget? suffixIcon}) {
@@ -278,7 +279,7 @@ class _ReviewSheetState extends State<_ReviewSheet> {
     _datumCtrl = TextEditingController(text: req.datum ?? '');
     _adresseCtrl = TextEditingController(text: req.adresse ?? '');
     _beschreibungCtrl = TextEditingController(text: req.beschreibung ?? '');
-    _typ = req.eventTyp ?? 'e0';
+    _typ = _kTypLabels.containsKey(req.eventTyp) ? req.eventTyp! : 'e0';
     _latitude = req.latitude;
     _longitude = req.longitude;
 
@@ -684,14 +685,12 @@ class _ReviewSheetState extends State<_ReviewSheet> {
             contentPadding:
                 EdgeInsets.symmetric(vertical: 14, horizontal: 14),
           ),
-          items: const [
-            DropdownMenuItem(value: 'e0', child: Text('Standart')),
-            DropdownMenuItem(value: 'e1', child: Text('Kirchtag')),
-            DropdownMenuItem(value: 'e2', child: Text('Feuerwehrfest')),
-            DropdownMenuItem(value: 'e3', child: Text('Disco')),
-            DropdownMenuItem(value: 'e4', child: Text('Ball')),
-            DropdownMenuItem(value: 'e5', child: Text('Krampuslauf')),
-          ],
+          items: _kTypLabels.entries
+              .map((e) => DropdownMenuItem(
+                    value: e.key,
+                    child: Text(e.value),
+                  ))
+              .toList(),
           onChanged: (v) => setState(() => _typ = v ?? 'e0'),
         ),
         const SizedBox(height: 12),

@@ -28,6 +28,9 @@ abstract class IAuthRepository {
   /// Operationen wie Account-Löschung wenn die letzte Anmeldung zu lange zurückliegt.
   Future<void> reauthenticate(String password);
 
+  /// Ändert das Passwort des aktuellen Nutzers. Erfordert Reauthentifizierung.
+  Future<void> changePassword(String currentPassword, String newPassword);
+
   Future<bool> isSignedIn();
 
   bool get isAdmin;

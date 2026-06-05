@@ -1,14 +1,6 @@
 /**
  * Löscht alle Screenshot-Testdaten aus Firestore + Firebase Auth.
  *
- * Löscht:
- *   - users          (IDs: screenshot_user_*)
- *   - events         (IDs: screenshot_event_*)
- *   - fahrten        (IDs: screenshot_fahrt_*)
- *   - anfragen       (IDs: screenshot_anfrage_*)
- *   - chat_conversations + ihre messages Subcollections
- *   - Firebase Auth Accounts (max + karin)
- *
  * Ausführen:
  *   node scripts/delete_screenshot_data.js
  */
@@ -35,23 +27,47 @@ const auth = admin.auth();
 
 // ── Feste IDs (identisch mit seed_screenshot_data.js) ───────────────────────
 
-const USER_IDS  = ['screenshot_user_max', 'screenshot_user_karin', 'screenshot_user_lisa', 'screenshot_user_tom', 'screenshot_user_anna'];
-const EVENT_IDS = ['screenshot_event_kirchtag', 'screenshot_event_ball', 'screenshot_event_festival', 'screenshot_event_wolfsberg', 'screenshot_event_voelkermarkt'];
-const FAHRT_IDS = ['screenshot_fahrt_kirchtag', 'screenshot_fahrt_ball', 'screenshot_fahrt_festival', 'screenshot_fahrt_wolfsberg', 'screenshot_fahrt_voelkermarkt'];
-const ANFRAGE_IDS = ['screenshot_anfrage_lisa_kirchtag', 'screenshot_anfrage_anna_ball', 'screenshot_anfrage_tom_festival', 'screenshot_anfrage_lisa_wolfsberg'];
+const USER_IDS = [
+  'screenshot_user_max',
+  'screenshot_user_karin',
+  'screenshot_user_lisa',
+  'screenshot_user_tom',
+  'screenshot_user_stefan',
+];
 
-const AUTH_EMAILS = ['max.mueller@eventride-test.at', 'karin.steiner@eventride-test.at'];
+const EVENT_IDS = [
+  'screenshot_event_kirchtag',
+  'screenshot_event_feuerwehr',
+  'screenshot_event_ball',
+];
+
+const FAHRT_IDS = [
+  'screenshot_fahrt_max',
+  'screenshot_fahrt_karin',
+  'screenshot_fahrt_tom',
+  'screenshot_fahrt_lisa',
+];
+
+const ANFRAGE_IDS = [
+  'screenshot_anfrage_stefan_max',
+];
+
+const AUTH_EMAILS = [
+  'max.mueller@eventride-test.at',
+  'karin.steiner@eventride-test.at',
+  'lisa.wagner@eventride-test.at',
+  'tom.berger@eventride-test.at',
+];
 
 function convId(fahrtId, uidA, uidB) {
   return `${fahrtId}_${[uidA, uidB].sort().join('_')}`;
 }
 
 const CONV_IDS = [
-  convId('screenshot_fahrt_kirchtag', 'screenshot_user_max',   'screenshot_user_lisa'),
-  convId('screenshot_fahrt_ball',     'screenshot_user_karin', 'screenshot_user_anna'),
+  convId('screenshot_fahrt_max', 'screenshot_user_max', 'screenshot_user_stefan'),
 ];
 
-// ── Hilfsfunktion ─────────────────────────────────────────────────────────────
+// ── Hilfsfunktionen ──────────────────────────────────────────────────────────
 
 async function deleteDocs(collection, ids) {
   const batch = db.batch();
@@ -60,17 +76,15 @@ async function deleteDocs(collection, ids) {
   console.log(`  ✅  ${ids.length} Docs aus '${collection}' gelöscht`);
 }
 
-async function deleteConversationWithMessages(convId) {
-  // Messages-Subcollection auslesen und löschen
-  const msgsSnap = await db.collection('chat_conversations').doc(convId).collection('messages').get();
+async function deleteConversationWithMessages(cId) {
+  const msgsSnap = await db.collection('chat_conversations').doc(cId).collection('messages').get();
   if (!msgsSnap.empty) {
     const batch = db.batch();
     msgsSnap.docs.forEach(d => batch.delete(d.ref));
     await batch.commit();
   }
-  // Conversation selbst löschen
-  await db.collection('chat_conversations').doc(convId).delete();
-  console.log(`  ✅  Conversation '${convId.substring(0, 40)}…' + ${msgsSnap.size} Msgs gelöscht`);
+  await db.collection('chat_conversations').doc(cId).delete();
+  console.log(`  ✅  Conversation '${cId.substring(0, 45)}…' + ${msgsSnap.size} Msgs gelöscht`);
 }
 
 // ── Haupt-Funktion ────────────────────────────────────────────────────────────

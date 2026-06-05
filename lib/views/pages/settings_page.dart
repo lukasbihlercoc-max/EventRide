@@ -299,6 +299,21 @@ class _SettingsPageState extends State<SettingsPage> {
                             color: Colors.white24, size: 18),
                       ),
                       const Divider(color: Colors.white30),
+                      // Passwort ändern
+                      ListTile(
+                        leading: const Icon(
+                          Icons.lock_reset_rounded,
+                          color: Colors.blueAccent,
+                        ),
+                        title: const Text(
+                          "Passwort ändern",
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        trailing: const Icon(Icons.chevron_right_rounded,
+                            color: Colors.white38),
+                        onTap: () => _showChangePasswordSheet(context),
+                      ),
+                      const Divider(color: Colors.white30),
                     ],
 
                     // ── Rechtliches ────────────────────────────────────────
@@ -401,6 +416,214 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
       ],
     );
+  }
+
+  Future<void> _showChangePasswordSheet(BuildContext context) async {
+    final currentPasswordController = TextEditingController();
+    final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+    bool loading = false;
+    bool obscureCurrent = true;
+    bool obscureNew = true;
+    bool obscureConfirm = true;
+    String? errorText;
+
+    await showAppSheet<void>(
+      context,
+      isDismissible: true,
+      (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: AppSheetShell(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppSheetHeader(
+                  icon: Icons.lock_reset_rounded,
+                  iconColor: Colors.blueAccent,
+                  title: 'Passwort ändern',
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: currentPasswordController,
+                  obscureText: obscureCurrent,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: sheetInputDecoration(
+                    label: 'Aktuelles Passwort',
+                    prefixIcon: Icons.lock_outline,
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        obscureCurrent ? Icons.visibility_off : Icons.visibility,
+                        color: Colors.white54,
+                      ),
+                      onPressed: () =>
+                          setSheetState(() => obscureCurrent = !obscureCurrent),
+                    ),
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    onPressed: () async {
+                      final email = context.read<IAuthRepository>().currentUser?.email;
+                      if (email == null) return;
+                      try {
+                        await context.read<IAuthRepository>().resetPassword(email);
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (context.mounted) {
+                          AppSnackbar.show(context,
+                              message: 'Reset-Link wurde an $email gesendet');
+                        }
+                      } catch (_) {
+                        if (context.mounted) {
+                          AppSnackbar.show(context,
+                              message: 'E-Mail konnte nicht gesendet werden',
+                              accentColor: Colors.redAccent);
+                        }
+                      }
+                    },
+                    child: const Text(
+                      'Passwort vergessen?',
+                      style: TextStyle(color: Colors.blueAccent, fontSize: 13),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: newPasswordController,
+                  obscureText: obscureNew,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: sheetInputDecoration(
+                    label: 'Neues Passwort',
+                    prefixIcon: Icons.lock_outline,
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        obscureNew ? Icons.visibility_off : Icons.visibility,
+                        color: Colors.white54,
+                      ),
+                      onPressed: () =>
+                          setSheetState(() => obscureNew = !obscureNew),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: confirmPasswordController,
+                  obscureText: obscureConfirm,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: sheetInputDecoration(
+                    label: 'Passwort bestätigen',
+                    prefixIcon: Icons.lock_outline,
+                    errorText: errorText,
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        obscureConfirm ? Icons.visibility_off : Icons.visibility,
+                        color: Colors.white54,
+                      ),
+                      onPressed: () =>
+                          setSheetState(() => obscureConfirm = !obscureConfirm),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 22),
+                if (loading)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(10),
+                      child: CircularProgressIndicator(
+                          color: Colors.blueAccent, strokeWidth: 2),
+                    ),
+                  )
+                else ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.blueAccent,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () async {
+                        final current = currentPasswordController.text;
+                        final newPw = newPasswordController.text;
+                        final confirm = confirmPasswordController.text;
+
+                        if (current.isEmpty || newPw.isEmpty || confirm.isEmpty) {
+                          setSheetState(
+                              () => errorText = 'Bitte alle Felder ausfüllen');
+                          return;
+                        }
+                        if (newPw.length < 6) {
+                          setSheetState(() =>
+                              errorText = 'Mindestens 6 Zeichen erforderlich');
+                          return;
+                        }
+                        if (newPw != confirm) {
+                          setSheetState(
+                              () => errorText = 'Passwörter stimmen nicht überein');
+                          return;
+                        }
+
+                        setSheetState(() {
+                          loading = true;
+                          errorText = null;
+                        });
+
+                        try {
+                          await context
+                              .read<IAuthRepository>()
+                              .changePassword(current, newPw);
+                          if (ctx.mounted) Navigator.pop(ctx);
+                          if (context.mounted) {
+                            AppSnackbar.show(context,
+                                message: 'Passwort erfolgreich geändert');
+                          }
+                        } on FirebaseAuthException catch (e) {
+                          if (!ctx.mounted) return;
+                          final msg = (e.code == 'wrong-password' ||
+                                  e.code == 'invalid-credential')
+                              ? 'Falsches aktuelles Passwort'
+                              : 'Fehler: ${e.message}';
+                          setSheetState(() {
+                            loading = false;
+                            errorText = msg;
+                          });
+                        } catch (e) {
+                          if (!ctx.mounted) return;
+                          setSheetState(() {
+                            loading = false;
+                            errorText = 'Unbekannter Fehler';
+                          });
+                        }
+                      },
+                      child: const Text('Passwort ändern',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 15)),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  AppSheetGhostButton(
+                    label: 'Abbrechen',
+                    onTap: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    currentPasswordController.dispose();
+    newPasswordController.dispose();
+    confirmPasswordController.dispose();
   }
 
   void _showLogoutDialog(BuildContext context) {

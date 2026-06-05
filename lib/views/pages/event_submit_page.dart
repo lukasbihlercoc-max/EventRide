@@ -28,6 +28,7 @@ const _kTypLabels = {
   'e3': 'Disco',
   'e4': 'Ball',
   'e5': 'Krampuslauf',
+  'e6': 'Festival',
 };
 
 InputDecoration _inputStyle(String label, {Widget? suffixIcon}) {
@@ -438,14 +439,12 @@ class _EventSubmitPageState extends State<EventSubmitPage> {
             contentPadding:
                 EdgeInsets.symmetric(vertical: 20, horizontal: 16),
           ),
-          items: const [
-            DropdownMenuItem(value: 'e0', child: Text('Standart')),
-            DropdownMenuItem(value: 'e1', child: Text('Kirchtag')),
-            DropdownMenuItem(value: 'e2', child: Text('Feuerwehrfest')),
-            DropdownMenuItem(value: 'e3', child: Text('Disco')),
-            DropdownMenuItem(value: 'e4', child: Text('Ball')),
-            DropdownMenuItem(value: 'e5', child: Text('Krampuslauf')),
-          ],
+          items: _kTypLabels.entries
+              .map((e) => DropdownMenuItem(
+                    value: e.key,
+                    child: Text(e.value),
+                  ))
+              .toList(),
           onChanged: (v) => setState(() => _typ = v ?? 'e0'),
         ),
         const SizedBox(height: 16),
