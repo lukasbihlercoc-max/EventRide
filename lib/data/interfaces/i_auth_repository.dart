@@ -68,6 +68,7 @@ abstract class IAuthRepository {
   /// [onError] wird bei Fehlern aufgerufen.
   Future<void> startPhoneVerification(
     String phone, {
+    void Function()? onAutoVerified,
     required void Function(String verificationId) onCodeSent,
     required void Function(String error) onError,
   });

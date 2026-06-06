@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Impressum – EventRide</title>
+  <meta name="theme-color" content="#0A1628" />
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0A1628; --bg-deep: #070B14;
+      --card: linear-gradient(165deg, #1b2942 0%, #172339 60%, #131e33 100%);
+      --orange: #FF9A3C; --blue: #5DA9FF;
+      --text: #EAF0FA; --muted: rgba(234,240,250,.62); --faint: rgba(234,240,250,.40);
+      --border: rgba(255,255,255,.08); --border-2: rgba(255,255,255,.12);
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-deep); color: var(--text); line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--blue); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .topo {
+      position: relative; overflow: hidden;
+      background:
+        radial-gradient(ellipse 120% 90% at 20% -20%, rgba(68,138,255,.18) 0%, transparent 60%),
+        radial-gradient(ellipse 80% 70% at 90% 0%, rgba(255,154,60,.08) 0%, transparent 55%),
+        var(--bg);
+    }
+    .topo > * { position: relative; z-index: 1; }
+
+    header { padding: 64px 24px 56px; text-align: center; }
+    header .logo {
+      display: inline-flex; align-items: center; gap: 11px;
+      text-decoration: none; color: var(--text); margin-bottom: 24px;
+    }
+    header .logo img {
+      width: 40px; height: 40px; border-radius: 11px;
+      box-shadow: 0 6px 20px rgba(68,138,255,.32), 0 0 0 1px rgba(255,255,255,.06);
+    }
+    header .logo span { font-family: 'Poppins', sans-serif; font-weight: 700; font-size: 1.3rem; letter-spacing: -.02em; }
+    header .logo .r { color: var(--orange); }
+    header h1 {
+      font-family: 'Poppins', sans-serif; font-weight: 800;
+      font-size: clamp(1.9rem, 5vw, 2.6rem); letter-spacing: -.03em;
+    }
+    header p { color: var(--muted); font-size: .95rem; margin-top: 8px; }
+
+    .back {
+      display: flex; max-width: 760px; margin: 28px auto 0; padding: 0 24px;
+    }
+    .back a {
+      color: var(--muted); display: inline-flex; align-items: center; gap: 7px;
+      font-size: .88rem; font-weight: 500;
+    }
+    .back a:hover { color: var(--text); text-decoration: none; }
+    .back svg { width: 16px; height: 16px; }
+
+    main { max-width: 760px; margin: 24px auto 56px; padding: 0 24px; }
+    .panel {
+      background: var(--card); border: 1px solid var(--border); border-radius: 22px;
+      padding: 44px 48px; box-shadow: 0 24px 60px rgba(0,0,0,.4);
+    }
+    h2 {
+      font-family: 'Poppins', sans-serif; font-size: 1.08rem; font-weight: 600;
+      margin: 30px 0 10px; color: var(--text); letter-spacing: -.01em;
+    }
+    h2:first-child { margin-top: 0; }
+    p { margin-bottom: 11px; font-size: .96rem; color: var(--muted); }
+    p strong { color: var(--text); font-weight: 600; }
+    hr { border: none; border-top: 1px solid var(--border); margin: 26px 0; }
+
+    footer {
+      text-align: center; padding: 32px 24px; font-size: .84rem; color: var(--faint);
+      border-top: 1px solid var(--border); background: var(--bg-deep);
+    }
+    footer a { color: var(--muted); }
+
+    @media (max-width: 600px) {
+      .panel { padding: 30px 24px; border-radius: 18px; }
+      main { padding: 0 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="topo">
+  <header>
+    <a class="logo" href="index.html">
+      <img src="favicon.png" alt="EventRide" />
+      <span>Event<span class="r">Ride</span></span>
+    </a>
+    <h1>Impressum</h1>
+    <p>Angaben gemäß § 5 ECG und § 25 MedienG</p>
+  </header>
+</div>
+
+<div class="back">
+  <a href="index.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+    Zurück zur Startseite
+  </a>
+</div>
+
+<main>
+  <div class="panel">
+
+    <h2>Medieninhaber &amp; Betreiber</h2>
+    <p>
+      <strong>Lukas Bihler</strong><br>
+      Seestraße 44<br>
+      9873 Döbriach<br>
+      Österreich
+    </p>
+
+    <hr>
+
+    <h2>Kontakt</h2>
+    <p>E-Mail: <a href="mailto:kontakt@eventride.at">kontakt@eventride.at</a></p>
+
+    <hr>
+
+    <h2>Unternehmensgegenstand</h2>
+    <p>
+      Betrieb der App „EventRide" zur Vermittlung von Mitfahrgelegenheiten
+      zu lokalen Veranstaltungen in Kärnten, Österreich.
+    </p>
+
+    <hr>
+
+    <h2>Haftungsausschluss</h2>
+    <p>
+      EventRide ist eine Plattform zur Vermittlung von Mitfahrgelegenheiten.
+      Fahrten werden ausschließlich von Nutzern organisiert. EventRide übernimmt
+      keine Verantwortung für Ablauf, Sicherheit oder Durchführung von Fahrten.
+      Nutzer handeln auf eigene Verantwortung.
+    </p>
+
+    <hr>
+
+    <h2>Urheberrecht</h2>
+    <p>
+      Die auf dieser Website und in der App veröffentlichten Inhalte unterliegen
+      dem österreichischen Urheberrecht. Eine Vervielfältigung oder Verwendung
+      ohne ausdrückliche Zustimmung des Betreibers ist nicht gestattet.
+    </p>
+
+    <hr>
+
+    <h2>Streitschlichtung</h2>
+    <p>
+      Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit:
+      <a href="https://ec.europa.eu/consumers/odr" target="_blank" rel="noopener">ec.europa.eu/consumers/odr</a>.<br>
+      Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer
+      Verbraucherschlichtungsstelle teilzunehmen.
+    </p>
+
+  </div>
+</main>
+
+<footer>
+  © 2026 EventRide ·
+  <a href="datenschutz.html">Datenschutzerklärung</a> ·
+  <a href="mailto:kontakt@eventride.at">kontakt@eventride.at</a>
+</footer>
+
+</body>
+</html>

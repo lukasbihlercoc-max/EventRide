@@ -473,13 +473,14 @@ class FirebaseAuthRepository implements IAuthRepository {
   @override
   Future<void> startPhoneVerification(
     String phone, {
+    void Function()? onAutoVerified,
     required void Function(String verificationId) onCodeSent,
     required void Function(String error) onError,
   }) async {
     await _auth.verifyPhoneNumber(
       phoneNumber: phone,
       verificationCompleted: (PhoneAuthCredential cred) async {
-        // Android: automatisch erkannter Code
+        // Android: Code automatisch erkannt, kein manuelles Eingeben nötig
         try {
           await _auth.currentUser!.linkWithCredential(cred);
           await savePhone(phone);
@@ -487,6 +488,7 @@ class FirebaseAuthRepository implements IAuthRepository {
           await _auth.currentUser!.updatePhoneNumber(cred);
           await savePhone(phone);
         }
+        onAutoVerified?.call();
       },
       verificationFailed: (FirebaseAuthException e) =>
           onError(e.message ?? 'Verifizierung fehlgeschlagen'),

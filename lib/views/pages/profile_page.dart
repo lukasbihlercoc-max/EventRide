@@ -1224,6 +1224,7 @@ class _PhoneVerifSheetState extends State<_PhoneVerifSheet> {
   }
 
   Future<void> _submit() async {
+    FocusScope.of(context).unfocus();
     final phone = _ctrl.text.trim();
     if (phone.length < 8) {
       setState(() => _error = 'Bitte eine gültige Telefonnummer eingeben.');
@@ -1244,8 +1245,14 @@ class _PhoneVerifSheetState extends State<_PhoneVerifSheet> {
       } else {
         await auth.startPhoneVerification(
           phone,
+          onAutoVerified: () {
+            if (!mounted) return;
+            Navigator.pop(context);
+            AppSnackbar.show(context, message: 'Telefon erfolgreich verifiziert!');
+          },
           onCodeSent: (vId) {
             if (!mounted) return;
+            setState(() => _loading = false);
             Navigator.pop(context);
             showModalBottomSheet(
               context: context,
@@ -1261,14 +1268,13 @@ class _PhoneVerifSheetState extends State<_PhoneVerifSheet> {
             );
           },
           onError: (err) {
-            if (mounted) setState(() => _error = err);
+            if (mounted) setState(() { _error = err; _loading = false; });
           },
         );
+        // _loading bleibt true bis onCodeSent oder onError fired
       }
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
-    } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) setState(() { _error = e.toString(); _loading = false; });
     }
   }
 
@@ -1400,6 +1406,7 @@ class _OtpSheetState extends State<_OtpSheet> {
               FilteringTextInputFormatter.digitsOnly,
               LengthLimitingTextInputFormatter(6),
             ],
+            autofillHints: const [AutofillHints.oneTimeCode],
           ),
           if (_error != null) ...[
             const SizedBox(height: 8),
@@ -1955,12 +1962,14 @@ class _SheetTextField extends StatelessWidget {
   final String label;
   final TextInputType? keyboardType;
   final List<TextInputFormatter>? inputFormatters;
+  final List<String>? autofillHints;
 
   const _SheetTextField({
     required this.controller,
     required this.label,
     this.keyboardType,
     this.inputFormatters,
+    this.autofillHints,
   });
 
   @override
@@ -1969,6 +1978,7 @@ class _SheetTextField extends StatelessWidget {
       controller: controller,
       keyboardType: keyboardType,
       inputFormatters: inputFormatters,
+      autofillHints: autofillHints,
       style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
         labelText: label,

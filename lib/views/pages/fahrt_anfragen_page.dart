@@ -921,11 +921,13 @@ class _AnfrageCardState extends State<_AnfrageCard> {
                               const Spacer(),
                               _buildStepper(a),
                               const SizedBox(width: 8),
-                              Text(
-                                'von ${a.seatsRequested} angefragt',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.4),
-                                  fontSize: 11.5,
+                              Flexible(
+                                child: Text(
+                                  'von ${a.seatsRequested} angefragt',
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.4),
+                                    fontSize: 11.5,
+                                  ),
                                 ),
                               ),
                             ],
