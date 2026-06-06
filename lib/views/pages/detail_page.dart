@@ -896,6 +896,7 @@ class _EinladungsBottomSheet extends StatefulWidget {
 class _EinladungsBottomSheetState extends State<_EinladungsBottomSheet> {
   bool _loading = false;
   bool _angenommen = false;
+  bool _openingChat = false;
 
   Future<void> _annehmen() async {
     HapticFeedback.mediumImpact();
@@ -1080,7 +1081,9 @@ class _EinladungsBottomSheetState extends State<_EinladungsBottomSheet> {
       SizedBox(
         width: double.infinity,
         child: ElevatedButton.icon(
-          onPressed: () {
+          onPressed: _openingChat ? null : () {
+            if (_openingChat) return;
+            setState(() => _openingChat = true);
             Navigator.pop(context);
             widget.onChatPressed();
           },
@@ -1228,6 +1231,7 @@ class _EinladungCardState extends State<_EinladungCard> {
   bool _loading = false;
   bool _angenommen = false;
   bool _abgelehnt = false;
+  bool _openingChat = false;
 
   Future<void> _annehmen() async {
     HapticFeedback.mediumImpact();
@@ -1316,7 +1320,9 @@ class _EinladungCardState extends State<_EinladungCard> {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: () {
+                onPressed: _openingChat ? null : () {
+                  if (_openingChat) return;
+                  setState(() => _openingChat = true);
                   Navigator.pop(context);
                   widget.onChatPressed();
                 },

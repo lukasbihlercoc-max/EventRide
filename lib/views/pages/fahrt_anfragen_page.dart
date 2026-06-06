@@ -159,13 +159,8 @@ class FahrtAnfragenPage extends StatelessWidget {
                       )];
 
                   int cmpConvo(AnfrageDaten a, AnfrageDaten b) {
-                    final ca = getConvo(a);
-                    final cb = getConvo(b);
-                    final ua = ca?.isUnreadFor(fahrt.ownerId) ?? false;
-                    final ub = cb?.isUnreadFor(fahrt.ownerId) ?? false;
-                    if (ua != ub) return ua ? -1 : 1;
-                    final ta = ca?.lastUpdated;
-                    final tb = cb?.lastUpdated;
+                    final ta = getConvo(a)?.lastUpdated;
+                    final tb = getConvo(b)?.lastUpdated;
                     if (ta == null && tb == null) return 0;
                     if (ta == null) return 1;
                     if (tb == null) return -1;
@@ -638,18 +633,8 @@ class _AnfrageCardState extends State<_AnfrageCard> {
     final isStorniert = widget.anfrage.status == AnfrageStatus.storniert;
 
     if (!mounted) { _isNavigating = false; return; }
-    await Navigator.of(context).push(
-      AppRoute(
-        builder: (_) => ChatPage(
-          conversationId: conversationId,
-          otherUserName: widget.anfrage.requesterName,
-          otherUserId: widget.anfrage.requesterId,
-          isReadOnly: isStorniert,
-        ),
-      ),
-    );
-    if (mounted) setState(() => _isNavigating = false);
 
+    // Fire-and-forget — läuft im Hintergrund während der Chat offen ist
     chatService.ensureConversation(
       fahrtId: widget.fahrt.id,
       ownerId: widget.fahrt.ownerId,
@@ -674,6 +659,18 @@ class _AnfrageCardState extends State<_AnfrageCard> {
       },
       ownerName: widget.fahrt.ownerName,
     )).catchError((_) {});
+
+    await Navigator.of(context).push(
+      AppRoute(
+        builder: (_) => ChatPage(
+          conversationId: conversationId,
+          otherUserName: widget.anfrage.requesterName,
+          otherUserId: widget.anfrage.requesterId,
+          isReadOnly: isStorniert,
+        ),
+      ),
+    );
+    if (mounted) setState(() => _isNavigating = false);
   }
 
   Future<void> _handleAblehnen() async {
