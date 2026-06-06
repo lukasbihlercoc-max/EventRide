@@ -156,6 +156,58 @@ class DetailPage extends StatelessWidget {
                             ],
                           ),
                           SizedBox(height: height * 0.013),
+                          if (event.latitude != null &&
+                              event.longitude != null) ...[
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(width * 0.032),
+                              clipBehavior: Clip.antiAliasWithSaveLayer,
+                              child: ColoredBox(
+                                color: const Color(0xFFE8EAED),
+                                child: SizedBox(
+                                  height: height * 0.12,
+                                  child: GoogleMap(
+                                    liteModeEnabled: !Platform.isIOS,
+                                    initialCameraPosition: CameraPosition(
+                                      target: LatLng(
+                                          event.latitude!, event.longitude!),
+                                      zoom: 15.5,
+                                    ),
+                                    markers: {
+                                      Marker(
+                                        markerId: const MarkerId('event'),
+                                        position: LatLng(
+                                            event.latitude!, event.longitude!),
+                                        infoWindow:
+                                            InfoWindow(title: event.standort),
+                                      ),
+                                    },
+                                    zoomControlsEnabled: false,
+                                    scrollGesturesEnabled: false,
+                                    zoomGesturesEnabled: false,
+                                    myLocationButtonEnabled: false,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: height * 0.010),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: () => _openEventNavigation(
+                                    event.latitude!, event.longitude!),
+                                icon: const Icon(Icons.navigation, size: 15),
+                                label: const Text('Zum Event navigieren',
+                                    style: TextStyle(fontSize: 13)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.greenAccent.shade700,
+                                  foregroundColor: Colors.white,
+                                  padding: EdgeInsets.symmetric(
+                                      vertical: height * 0.012),
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: height * 0.013),
+                          ],
                           _InteressentenInline(
                               event: event, width: width, height: height),
                           Divider(
@@ -164,6 +216,58 @@ class DetailPage extends StatelessWidget {
                             height: height * 0.043,
                           ),
 
+                          if (event.latitude != null &&
+                              event.longitude != null) ...[
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(width * 0.032),
+                              clipBehavior: Clip.antiAliasWithSaveLayer,
+                              child: ColoredBox(
+                                color: const Color(0xFFE8EAED),
+                                child: SizedBox(
+                                  height: 100,
+                                  child: GoogleMap(
+                                    liteModeEnabled: !Platform.isIOS,
+                                    initialCameraPosition: CameraPosition(
+                                      target: LatLng(
+                                          event.latitude!, event.longitude!),
+                                      zoom: 14,
+                                    ),
+                                    markers: {
+                                      Marker(
+                                        markerId: const MarkerId('event'),
+                                        position: LatLng(
+                                            event.latitude!, event.longitude!),
+                                        infoWindow:
+                                            InfoWindow(title: event.standort),
+                                      ),
+                                    },
+                                    zoomControlsEnabled: false,
+                                    scrollGesturesEnabled: false,
+                                    zoomGesturesEnabled: false,
+                                    myLocationButtonEnabled: false,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: height * 0.010),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: () => _openEventNavigation(
+                                    event.latitude!, event.longitude!),
+                                icon: const Icon(Icons.navigation, size: 15),
+                                label: const Text('Zum Event navigieren',
+                                    style: TextStyle(fontSize: 13)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.greenAccent.shade700,
+                                  foregroundColor: Colors.white,
+                                  padding: EdgeInsets.symmetric(
+                                      vertical: height * 0.012),
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: height * 0.013),
+                          ],
                           Expanded(
                             child: Scrollbar(
                               thumbVisibility: true,
@@ -194,66 +298,6 @@ class DetailPage extends StatelessWidget {
                                         ],
                                       );
                                     }),
-                                    // Mini-Karte + Navigationsbutton
-                                    if (event.latitude != null &&
-                                        event.longitude != null) ...[
-                                      SizedBox(height: height * 0.027),
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(
-                                            width * 0.032),
-                                        child: ColoredBox(
-                                          color: Colors.black,
-                                          child: SizedBox(
-                                          height: 160,
-                                          child: GoogleMap(
-                                            liteModeEnabled: !Platform.isIOS,
-                                            initialCameraPosition:
-                                                CameraPosition(
-                                              target: LatLng(event.latitude!,
-                                                  event.longitude!),
-                                              zoom: 14,
-                                            ),
-                                            markers: {
-                                              Marker(
-                                                markerId:
-                                                    const MarkerId('event'),
-                                                position: LatLng(
-                                                    event.latitude!,
-                                                    event.longitude!),
-                                                infoWindow: InfoWindow(
-                                                    title: event.standort),
-                                              ),
-                                            },
-                                            zoomControlsEnabled: false,
-                                            scrollGesturesEnabled: false,
-                                            zoomGesturesEnabled: false,
-                                            myLocationButtonEnabled: false,
-                                          ),
-                                        ),
-                                        ),
-                                      ),
-                                      SizedBox(height: height * 0.016),
-                                      SizedBox(
-                                        width: double.infinity,
-                                        child: ElevatedButton.icon(
-                                          onPressed: () =>
-                                              _openEventNavigation(
-                                            event.latitude!,
-                                            event.longitude!,
-                                          ),
-                                          icon: const Icon(Icons.navigation),
-                                          label: const Text(
-                                              'Zum Event navigieren'),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor:
-                                                Colors.greenAccent.shade700,
-                                            foregroundColor: Colors.white,
-                                            padding: EdgeInsets.symmetric(
-                                                vertical: height * 0.018),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
                                     SizedBox(height: height * 0.043),
                                     if (context
                                         .read<IAuthRepository>()
@@ -418,7 +462,7 @@ class _InteressentenInlineState extends State<_InteressentenInline>
               : count == 1
                   ? '1 will hin'
                   : '$count wollen hin',
-          subText: 'Tippe um dich einzutragen',
+          subText: count > 0 ? 'Tippe um dich einzutragen' : null,
           right: GestureDetector(
             onTap: () => requiresLogin(context),
             child: Container(
@@ -597,8 +641,9 @@ class _InteressentenInlineState extends State<_InteressentenInline>
             : count == 1
                 ? '1 will hin'
                 : '$count wollen hin',
-        subText:
-            ichBinInteressiert ? 'Du willst hin' : 'Tippe um dich einzutragen',
+        subText: ichBinInteressiert
+            ? 'Du willst hin'
+            : (count == 0 ? null : 'Tippe um dich einzutragen'),
         right: ichBinInteressiert
             ? GestureDetector(
                 onTap: _loading ? null : () => _toggle(currentUser),
