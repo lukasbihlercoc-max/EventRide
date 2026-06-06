@@ -42,12 +42,28 @@ if ! flutter analyze lib/ --fatal-infos 2>&1; then
 fi
 echo "[Check] OK"
 
-# ---- 2. Git: Aenderungen committen und pushen ----------------------
+# ---- 2. Build-Nummer erhoehen (nur erste Iteration) ---------------
+if [ "$iteration" -eq 1 ]; then
+  echo ""
+  echo "[Version] Build-Nummer in pubspec.yaml erhoehen..."
+  _BASE=$(grep '^version:' pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
+  _OLD=$(grep '^version:' pubspec.yaml | sed 's/.*+//')
+  _NEW=$(( _OLD + 1 ))
+  sed -i "s/^version: .*/version: ${_BASE}+${_NEW}/" pubspec.yaml
+  echo "Neue Version: ${_BASE}+${_NEW}"
+fi
+
+# ---- 3. Git: Aenderungen committen und pushen ----------------------
 echo ""
 if [ -n "$(git status --porcelain)" ]; then
   echo "[Git] Aenderungen gefunden – committe und pushe..."
   git add -A
-  git commit -m "fix: auto-fix Iteration $iteration [build-loop]"
+  if [ "$iteration" -eq 1 ]; then
+    VERSION=$(grep '^version:' pubspec.yaml | tr -d ' ' | cut -d: -f2)
+    git commit -m "chore: build $VERSION [build-loop]"
+  else
+    git commit -m "fix: auto-fix Iteration $iteration [build-loop]"
+  fi
   git push
   echo "[Git] Gepusht."
 else

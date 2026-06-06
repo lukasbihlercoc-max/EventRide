@@ -7,36 +7,90 @@ import 'package:provider/provider.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Zeigt 3 Shield-Icons als Vertrauensindikator.
-/// Gefüllte Schilder: blau mit weißem Rahmen. Leere: outline/weiß54.
-class TrustShields extends StatelessWidget {
+/// Gefüllte Schilder: blau mit weißem Rahmen. Leere: outline/weiß38.
+/// Wenn filled steigt, spielt der neu gefüllte Shield eine Bounce+Flash-Animation.
+class TrustShields extends StatefulWidget {
   final int filled;
   final double size;
 
   const TrustShields({super.key, required this.filled, this.size = 14});
 
   @override
+  State<TrustShields> createState() => _TrustShieldsState();
+}
+
+class _TrustShieldsState extends State<TrustShields>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _scale;
+  late final Animation<Color?> _color;
+  int? _animatingIndex;
+
+  static const _blue = Color(0xFF4A80F0);
+  static const _gold = Color(0xFFF5A04A);
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 650),
+    );
+    _scale = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.6), weight: 30),
+      TweenSequenceItem(tween: Tween(begin: 1.6, end: 0.88), weight: 30),
+      TweenSequenceItem(tween: Tween(begin: 0.88, end: 1.05), weight: 20),
+      TweenSequenceItem(tween: Tween(begin: 1.05, end: 1.0), weight: 20),
+    ]).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+    _color = ColorTween(begin: _gold, end: _blue)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeIn));
+  }
+
+  @override
+  void didUpdateWidget(TrustShields old) {
+    super.didUpdateWidget(old);
+    if (widget.filled > old.filled) {
+      _animatingIndex = old.filled; // 0-based index des neu gefüllten Shields
+      _ctrl.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(3, (i) {
-        if (i < filled) {
-          return SizedBox(
-            width: size,
-            height: size,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Icon(Icons.shield_rounded, size: size,
-                    color: const Color(0xFF4A80F0)),
-                Icon(Icons.shield_outlined, size: size,
-                    color: Colors.white70.withValues(alpha: 0.8)),
-              ],
-            ),
-          );
-        }
-        return Icon(Icons.shield_outlined, size: size,
-            color: Colors.white38);
-      }),
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: List.generate(3, (i) {
+          final isFilled = i < widget.filled;
+          final isAnimating = i == _animatingIndex && _ctrl.isAnimating;
+
+          if (isFilled) {
+            return Transform.scale(
+              scale: isAnimating ? _scale.value : 1.0,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Icon(Icons.shield_rounded,
+                      size: widget.size,
+                      color: isAnimating ? _color.value : _blue),
+                  Icon(Icons.shield_outlined,
+                      size: widget.size,
+                      color: Colors.white70.withValues(alpha: 0.8)),
+                ],
+              ),
+            );
+          }
+          return Icon(Icons.shield_outlined,
+              size: widget.size, color: Colors.white38);
+        }),
+      ),
     );
   }
 }
