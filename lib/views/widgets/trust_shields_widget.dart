@@ -116,7 +116,7 @@ class TrustShieldsByUserId extends StatefulWidget {
 
 class _TrustShieldsByUserIdState extends State<TrustShieldsByUserId> {
   static final _cache = <String, int>{};
-  int _trustLevel = 0;
+  int? _trustLevel; // null = noch nicht geladen
 
   @override
   void initState() {
@@ -141,6 +141,12 @@ class _TrustShieldsByUserIdState extends State<TrustShieldsByUserId> {
 
   @override
   Widget build(BuildContext context) {
-    return TrustShields(filled: _trustLevel, size: widget.size);
+    // Key-Wechsel von null → int erzeugt ein frisches TrustShields-Widget
+    // (kein didUpdateWidget → keine Animations-Fehlauslösung beim ersten Laden)
+    return TrustShields(
+      key: ValueKey(_trustLevel),
+      filled: _trustLevel ?? 0,
+      size: widget.size,
+    );
   }
 }

@@ -158,14 +158,22 @@ class FahrtAnfragenPage extends StatelessWidget {
                         userB: a.requesterId,
                       )];
 
-                  int cmpUnread(AnfrageDaten a, AnfrageDaten b) {
-                    final ua = getConvo(a)?.isUnreadFor(fahrt.ownerId) ?? false;
-                    final ub = getConvo(b)?.isUnreadFor(fahrt.ownerId) ?? false;
-                    return ua == ub ? 0 : (ua ? -1 : 1);
+                  int cmpConvo(AnfrageDaten a, AnfrageDaten b) {
+                    final ca = getConvo(a);
+                    final cb = getConvo(b);
+                    final ua = ca?.isUnreadFor(fahrt.ownerId) ?? false;
+                    final ub = cb?.isUnreadFor(fahrt.ownerId) ?? false;
+                    if (ua != ub) return ua ? -1 : 1;
+                    final ta = ca?.lastUpdated;
+                    final tb = cb?.lastUpdated;
+                    if (ta == null && tb == null) return 0;
+                    if (ta == null) return 1;
+                    if (tb == null) return -1;
+                    return tb.compareTo(ta);
                   }
 
-                  final sortedAkzeptierte = [...akzeptierte]..sort(cmpUnread);
-                  final sortedRest = [...restlicheAnfragen]..sort(cmpUnread);
+                  final sortedAkzeptierte = [...akzeptierte]..sort(cmpConvo);
+                  final sortedRest = [...restlicheAnfragen]..sort(cmpConvo);
 
                   return CustomScrollView(
                     slivers: [
@@ -619,7 +627,6 @@ class _AnfrageCardState extends State<_AnfrageCard> {
 
   Future<void> _openChat(BuildContext context) async {
     final chatService = context.read<ChatService>();
-    final nav = Navigator.of(context);
     final conversationId = chatService.buildConversationId(
       fahrtId: widget.fahrt.id,
       userA: widget.fahrt.ownerId,
@@ -627,36 +634,9 @@ class _AnfrageCardState extends State<_AnfrageCard> {
     );
     final isStorniert = widget.anfrage.status == AnfrageStatus.storniert;
 
-    try {
-      await chatService.ensureConversation(
-        fahrtId: widget.fahrt.id,
-        ownerId: widget.fahrt.ownerId,
-        requesterId: widget.anfrage.requesterId,
-        eventName: widget.fahrt.eventName,
-        startOrt: widget.fahrt.abfahrtsort,
-        zielOrt: widget.fahrt.standort,
-        seatsRequested: widget.anfrage.seatsRequested,
-      );
-      await chatService.updateSystemMessage(
-        conversationId: conversationId,
-        eventName: widget.fahrt.eventName,
-        startOrt: widget.fahrt.abfahrtsort,
-        zielOrt: widget.fahrt.standort,
-        seatsRequested: widget.anfrage.seatsRequested,
-        seatsAccepted: widget.anfrage.seatsAccepted ?? 0,
-        uhrzeit:
-            '${widget.fahrt.uhrzeitHour.toString().padLeft(2, '0')}:${widget.fahrt.uhrzeitMinute.toString().padLeft(2, '0')}',
-        richtung: switch (widget.fahrt.richtung) {
-          Fahrtrichtung.hinfahrt      => 'Hinfahrt',
-          Fahrtrichtung.rueckfahrt    => 'Rückfahrt',
-          Fahrtrichtung.hinUndZurueck => 'Hin und Zurück',
-        },
-        ownerName: widget.fahrt.ownerName,
-      );
-    } catch (_) {}
-
+    // Sofort navigieren — Firestore-Operationen laufen im Hintergrund
     if (!mounted) return;
-    nav.push(
+    Navigator.of(context).push(
       AppRoute(
         builder: (_) => ChatPage(
           conversationId: conversationId,
@@ -666,6 +646,31 @@ class _AnfrageCardState extends State<_AnfrageCard> {
         ),
       ),
     );
+
+    chatService.ensureConversation(
+      fahrtId: widget.fahrt.id,
+      ownerId: widget.fahrt.ownerId,
+      requesterId: widget.anfrage.requesterId,
+      eventName: widget.fahrt.eventName,
+      startOrt: widget.fahrt.abfahrtsort,
+      zielOrt: widget.fahrt.standort,
+      seatsRequested: widget.anfrage.seatsRequested,
+    ).then((_) => chatService.updateSystemMessage(
+      conversationId: conversationId,
+      eventName: widget.fahrt.eventName,
+      startOrt: widget.fahrt.abfahrtsort,
+      zielOrt: widget.fahrt.standort,
+      seatsRequested: widget.anfrage.seatsRequested,
+      seatsAccepted: widget.anfrage.seatsAccepted ?? 0,
+      uhrzeit:
+          '${widget.fahrt.uhrzeitHour.toString().padLeft(2, '0')}:${widget.fahrt.uhrzeitMinute.toString().padLeft(2, '0')}',
+      richtung: switch (widget.fahrt.richtung) {
+        Fahrtrichtung.hinfahrt      => 'Hinfahrt',
+        Fahrtrichtung.rueckfahrt    => 'Rückfahrt',
+        Fahrtrichtung.hinUndZurueck => 'Hin und Zurück',
+      },
+      ownerName: widget.fahrt.ownerName,
+    )).catchError((_) {});
   }
 
   Future<void> _handleAblehnen() async {
