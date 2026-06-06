@@ -64,6 +64,12 @@
 				<string>com.googleusercontent.apps.686951435694-49f5o7039gmoqngtc03f8bslcbsu5qoi</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>app-1-686951435694-ios-3bae9b8a7f4f264d7e4c3f</string>
+			</array>
+		</dict>
 	</array>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
