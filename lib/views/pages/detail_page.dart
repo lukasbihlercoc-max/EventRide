@@ -39,10 +39,10 @@ Future<void> _openEventNavigation(double lat, double lng) async {
     }
     return;
   }
-  final mapsUri = Uri.parse('google.navigation:q=$lat,$lng');
-  if (await canLaunchUrl(mapsUri)) {
-    await launchUrl(mapsUri);
-  } else {
+  final mapsUri = Uri.parse('google.navigation:q=$lat,$lng&mode=d');
+  try {
+    await launchUrl(mapsUri, mode: LaunchMode.externalNonBrowserApplication);
+  } catch (_) {
     await launchUrl(
       Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng'),
       mode: LaunchMode.externalApplication,
@@ -80,8 +80,9 @@ class DetailPage extends StatelessWidget {
           body: Column(
             children: [
               Expanded(
-                child: Center(
-                  child: Material(
+                child: SingleChildScrollView(
+                  child: Center(
+                    child: Material(
                     color: Colors.transparent,
                     child: Container(
                       margin: EdgeInsets.fromLTRB(
@@ -165,44 +166,65 @@ class DetailPage extends StatelessWidget {
                                 color: const Color(0xFFE8EAED),
                                 child: SizedBox(
                                   height: height * 0.12,
-                                  child: GoogleMap(
-                                    liteModeEnabled: !Platform.isIOS,
-                                    initialCameraPosition: CameraPosition(
-                                      target: LatLng(
-                                          event.latitude!, event.longitude!),
-                                      zoom: 15.5,
-                                    ),
-                                    markers: {
-                                      Marker(
-                                        markerId: const MarkerId('event'),
-                                        position: LatLng(
+                                  child: IgnorePointer(
+                                    child: GoogleMap(
+                                      liteModeEnabled: !Platform.isIOS,
+                                      initialCameraPosition: CameraPosition(
+                                        target: LatLng(
                                             event.latitude!, event.longitude!),
-                                        infoWindow:
-                                            InfoWindow(title: event.standort),
+                                        zoom: 14.5,
                                       ),
-                                    },
-                                    zoomControlsEnabled: false,
-                                    scrollGesturesEnabled: false,
-                                    zoomGesturesEnabled: false,
-                                    myLocationButtonEnabled: false,
+                                      markers: {
+                                        Marker(
+                                          markerId: const MarkerId('event'),
+                                          position: LatLng(
+                                              event.latitude!, event.longitude!),
+                                          infoWindow:
+                                              InfoWindow(title: event.standort),
+                                        ),
+                                      },
+                                      zoomControlsEnabled: false,
+                                      scrollGesturesEnabled: false,
+                                      zoomGesturesEnabled: false,
+                                      myLocationButtonEnabled: false,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
-                            SizedBox(height: height * 0.010),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                onPressed: () => _openEventNavigation(
-                                    event.latitude!, event.longitude!),
-                                icon: const Icon(Icons.navigation, size: 15),
-                                label: const Text('Zum Event navigieren',
-                                    style: TextStyle(fontSize: 13)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.greenAccent.shade700,
-                                  foregroundColor: Colors.white,
-                                  padding: EdgeInsets.symmetric(
-                                      vertical: height * 0.012),
+                            SizedBox(height: height * 0.008),
+                            GestureDetector(
+                              onTap: () => _openEventNavigation(
+                                  event.latitude!, event.longitude!),
+                              child: Container(
+                                width: double.infinity,
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: height * 0.007),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                      color: Colors.white.withValues(alpha: 0.15)),
+                                  color: Colors.white.withValues(alpha: 0.05),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.navigation_outlined,
+                                        color: Colors.greenAccent.shade400,
+                                        size: 13),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Zum Event navigieren',
+                                      style: TextStyle(
+                                        color: Colors.greenAccent.shade400,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    Icon(Icons.chevron_right,
+                                        color: Colors.white.withValues(alpha: 0.3),
+                                        size: 16),
+                                  ],
                                 ),
                               ),
                             ),
@@ -216,121 +238,52 @@ class DetailPage extends StatelessWidget {
                             height: height * 0.043,
                           ),
 
-                          if (event.latitude != null &&
-                              event.longitude != null) ...[
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(width * 0.032),
-                              clipBehavior: Clip.antiAliasWithSaveLayer,
-                              child: ColoredBox(
-                                color: const Color(0xFFE8EAED),
-                                child: SizedBox(
-                                  height: 100,
-                                  child: GoogleMap(
-                                    liteModeEnabled: !Platform.isIOS,
-                                    initialCameraPosition: CameraPosition(
-                                      target: LatLng(
-                                          event.latitude!, event.longitude!),
-                                      zoom: 14,
+                          Builder(builder: (_) {
+                            final sep = event.beschreibung.indexOf('\n\n');
+                            final textStyle = TextStyle(
+                              fontSize: width * 0.048,
+                              height: 1.4,
+                              color: Colors.white,
+                            );
+                            if (sep <= 0) {
+                              return Text(event.beschreibung, style: textStyle);
+                            }
+                            final eintritt = event.beschreibung.substring(0, sep);
+                            final rest = event.beschreibung.substring(sep + 2);
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(eintritt, style: textStyle),
+                                SizedBox(height: width * 0.035),
+                                Text(rest, style: textStyle),
+                              ],
+                            );
+                          }),
+                          SizedBox(height: height * 0.043),
+                          if (context.read<IAuthRepository>().isAdmin)
+                            Center(
+                              child: OutlinedButton(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    AppRoute(
+                                      builder: (_) => EventsPage(event: event),
                                     ),
-                                    markers: {
-                                      Marker(
-                                        markerId: const MarkerId('event'),
-                                        position: LatLng(
-                                            event.latitude!, event.longitude!),
-                                        infoWindow:
-                                            InfoWindow(title: event.standort),
-                                      ),
-                                    },
-                                    zoomControlsEnabled: false,
-                                    scrollGesturesEnabled: false,
-                                    zoomGesturesEnabled: false,
-                                    myLocationButtonEnabled: false,
-                                  ),
+                                  );
+                                },
+                                child: Text(
+                                  "Bearbeiten",
+                                  style: TextStyle(fontSize: width * 0.043),
                                 ),
                               ),
                             ),
-                            SizedBox(height: height * 0.010),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                onPressed: () => _openEventNavigation(
-                                    event.latitude!, event.longitude!),
-                                icon: const Icon(Icons.navigation, size: 15),
-                                label: const Text('Zum Event navigieren',
-                                    style: TextStyle(fontSize: 13)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.greenAccent.shade700,
-                                  foregroundColor: Colors.white,
-                                  padding: EdgeInsets.symmetric(
-                                      vertical: height * 0.012),
-                                ),
-                              ),
-                            ),
-                            SizedBox(height: height * 0.013),
-                          ],
-                          Expanded(
-                            child: Scrollbar(
-                              thumbVisibility: true,
-                              thickness: width * 0.011,
-                              radius: Radius.circular(width * 0.021),
-                              child: SingleChildScrollView(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Builder(builder: (_) {
-                                      final sep = event.beschreibung.indexOf('\n\n');
-                                      final textStyle = TextStyle(
-                                        fontSize: width * 0.048,
-                                        height: 1.4,
-                                        color: Colors.white,
-                                      );
-                                      if (sep <= 0) {
-                                        return Text(event.beschreibung, style: textStyle);
-                                      }
-                                      final eintritt = event.beschreibung.substring(0, sep);
-                                      final rest = event.beschreibung.substring(sep + 2);
-                                      return Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(eintritt, style: textStyle),
-                                          SizedBox(height: width * 0.035),
-                                          Text(rest, style: textStyle),
-                                        ],
-                                      );
-                                    }),
-                                    SizedBox(height: height * 0.043),
-                                    if (context
-                                        .read<IAuthRepository>()
-                                        .isAdmin)
-                                      Center(
-                                        child: OutlinedButton(
-                                          onPressed: () {
-                                            Navigator.push(
-                                              context,
-                                              AppRoute(
-                                                builder: (_) =>
-                                                    EventsPage(event: event),
-                                              ),
-                                            );
-                                          },
-                                          child: Text(
-                                            "Bearbeiten",
-                                            style: TextStyle(
-                                                fontSize: width * 0.043),
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
                         ],
                       ),
                     ),
                   ),
                 ),
               ),
+            ),
               Padding(
                 padding: EdgeInsets.fromLTRB(
                   width * 0.064,
