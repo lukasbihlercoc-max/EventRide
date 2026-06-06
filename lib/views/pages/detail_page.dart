@@ -39,9 +39,13 @@ Future<void> _openEventNavigation(double lat, double lng) async {
     }
     return;
   }
-  final mapsUri = Uri.parse('google.navigation:q=$lat,$lng&mode=d');
+  // Intent URI mit explizitem Package erzwingt Google Maps ohne Chooser
+  final intentUri = Uri.parse(
+    'intent://maps.google.com/maps?daddr=$lat,$lng'
+    '#Intent;scheme=https;package=com.google.android.apps.maps;end',
+  );
   try {
-    await launchUrl(mapsUri, mode: LaunchMode.externalNonBrowserApplication);
+    await launchUrl(intentUri);
   } catch (_) {
     await launchUrl(
       Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng'),
@@ -80,7 +84,9 @@ class DetailPage extends StatelessWidget {
           body: Column(
             children: [
               Expanded(
-                child: SingleChildScrollView(
+                child: Scrollbar(
+                  thumbVisibility: true,
+                  child: SingleChildScrollView(
                   child: Center(
                     child: Material(
                     color: Colors.transparent,
@@ -159,72 +165,93 @@ class DetailPage extends StatelessWidget {
                           SizedBox(height: height * 0.013),
                           if (event.latitude != null &&
                               event.longitude != null) ...[
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(width * 0.032),
-                              clipBehavior: Clip.antiAliasWithSaveLayer,
-                              child: ColoredBox(
-                                color: const Color(0xFFE8EAED),
-                                child: SizedBox(
-                                  height: height * 0.12,
-                                  child: IgnorePointer(
-                                    child: GoogleMap(
-                                      liteModeEnabled: !Platform.isIOS,
-                                      initialCameraPosition: CameraPosition(
-                                        target: LatLng(
-                                            event.latitude!, event.longitude!),
-                                        zoom: 14.5,
-                                      ),
-                                      markers: {
-                                        Marker(
-                                          markerId: const MarkerId('event'),
-                                          position: LatLng(
-                                              event.latitude!, event.longitude!),
-                                          infoWindow:
-                                              InfoWindow(title: event.standort),
+                            GestureDetector(
+                              onTap: () => _openEventNavigation(
+                                  event.latitude!, event.longitude!),
+                              child: Padding(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: width * 0.04),
+                              child: ClipRRect(
+                                borderRadius:
+                                    BorderRadius.circular(width * 0.032),
+                                clipBehavior: Clip.antiAliasWithSaveLayer,
+                                child: ColoredBox(
+                                  color: const Color(0xFFE8EAED),
+                                  child: SizedBox(
+                                    height: height * 0.12,
+                                    child: IgnorePointer(
+                                      child: GoogleMap(
+                                        liteModeEnabled: false,
+                                        initialCameraPosition: CameraPosition(
+                                          target: LatLng(event.latitude!,
+                                              event.longitude!),
+                                          zoom: 14.5,
                                         ),
-                                      },
-                                      zoomControlsEnabled: false,
-                                      scrollGesturesEnabled: false,
-                                      zoomGesturesEnabled: false,
-                                      myLocationButtonEnabled: false,
+                                        markers: {
+                                          Marker(
+                                            markerId:
+                                                const MarkerId('event'),
+                                            position: LatLng(event.latitude!,
+                                                event.longitude!),
+                                            infoWindow: InfoWindow(
+                                                title: event.standort),
+                                          ),
+                                        },
+                                        zoomControlsEnabled: false,
+                                        scrollGesturesEnabled: false,
+                                        zoomGesturesEnabled: false,
+                                        myLocationButtonEnabled: false,
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
                             ),
+                            ),
                             SizedBox(height: height * 0.008),
-                            GestureDetector(
-                              onTap: () => _openEventNavigation(
-                                  event.latitude!, event.longitude!),
-                              child: Container(
-                                width: double.infinity,
-                                padding: EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: height * 0.007),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                      color: Colors.white.withValues(alpha: 0.15)),
-                                  color: Colors.white.withValues(alpha: 0.05),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.navigation_outlined,
-                                        color: Colors.greenAccent.shade400,
-                                        size: 13),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Zum Event navigieren',
-                                      style: TextStyle(
-                                        color: Colors.greenAccent.shade400,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500,
+                            Padding(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: width * 0.04),
+                              child: GestureDetector(
+                                onTap: () => _openEventNavigation(
+                                    event.latitude!, event.longitude!),
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: height * 0.007),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                        color: Colors.white
+                                            .withValues(alpha: 0.15)),
+                                    color:
+                                        Colors.white.withValues(alpha: 0.05),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.navigation_outlined,
+                                          color: Colors.greenAccent.shade400,
+                                          size: 13),
+                                      const SizedBox(width: 8),
+                                      Flexible(
+                                        child: Text(
+                                          'Zum Event navigieren',
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: Colors.greenAccent.shade400,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                    const Spacer(),
-                                    Icon(Icons.chevron_right,
-                                        color: Colors.white.withValues(alpha: 0.3),
-                                        size: 16),
-                                  ],
+                                      const SizedBox(width: 4),
+                                      Icon(Icons.chevron_right,
+                                          color: Colors.white
+                                              .withValues(alpha: 0.3),
+                                          size: 16),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
@@ -284,10 +311,11 @@ class DetailPage extends StatelessWidget {
                 ),
               ),
             ),
+              ),
               Padding(
                 padding: EdgeInsets.fromLTRB(
                   width * 0.064,
-                  0,
+                  height * 0.012,
                   width * 0.064,
                   height * 0.016,
                 ),
