@@ -1973,12 +1973,15 @@ class _RequestedRideCard extends StatefulWidget {
 
 class _RequestedRideCardState extends State<_RequestedRideCard> {
   bool _expanded = false;
+  bool _isNavigating = false;
 
   FahrtDaten get fahrt => widget.fahrt;
   AnfrageDaten get anfrage => widget.anfrage;
 
   Future<void> _openChat(BuildContext context) async {
-    if (!requireVerified(context)) return;
+    if (_isNavigating) return;
+    _isNavigating = true;
+    if (!requireVerified(context)) { _isNavigating = false; return; }
     widget.onInteracted?.call();
     final chatService = context.read<ChatService>();
     final nav = Navigator.of(context);
@@ -2019,8 +2022,8 @@ class _RequestedRideCardState extends State<_RequestedRideCard> {
       );
     } catch (_) {}
 
-    if (!mounted) return;
-    nav.push(
+    if (!mounted) { _isNavigating = false; return; }
+    await nav.push(
       AppRoute(
         builder: (_) => ChatPage(
           conversationId: conversationId,
@@ -2030,6 +2033,7 @@ class _RequestedRideCardState extends State<_RequestedRideCard> {
         ),
       ),
     );
+    if (mounted) setState(() => _isNavigating = false);
   }
 
   @override

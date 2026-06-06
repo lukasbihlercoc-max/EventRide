@@ -586,6 +586,7 @@ class _AnfrageCard extends StatefulWidget {
 class _AnfrageCardState extends State<_AnfrageCard> {
   late int _acceptedSeats;
   bool _loading = false;
+  bool _isNavigating = false;
 
   static const _stripGreen  = Color(0xFF2FA56A);
   static const _stripRed    = Color(0xFFE05A64);
@@ -626,6 +627,8 @@ class _AnfrageCardState extends State<_AnfrageCard> {
   }
 
   Future<void> _openChat(BuildContext context) async {
+    if (_isNavigating) return;
+    _isNavigating = true;
     final chatService = context.read<ChatService>();
     final conversationId = chatService.buildConversationId(
       fahrtId: widget.fahrt.id,
@@ -634,9 +637,8 @@ class _AnfrageCardState extends State<_AnfrageCard> {
     );
     final isStorniert = widget.anfrage.status == AnfrageStatus.storniert;
 
-    // Sofort navigieren — Firestore-Operationen laufen im Hintergrund
-    if (!mounted) return;
-    Navigator.of(context).push(
+    if (!mounted) { _isNavigating = false; return; }
+    await Navigator.of(context).push(
       AppRoute(
         builder: (_) => ChatPage(
           conversationId: conversationId,
@@ -646,6 +648,7 @@ class _AnfrageCardState extends State<_AnfrageCard> {
         ),
       ),
     );
+    if (mounted) setState(() => _isNavigating = false);
 
     chatService.ensureConversation(
       fahrtId: widget.fahrt.id,
