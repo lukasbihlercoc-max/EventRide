@@ -2252,25 +2252,27 @@ class _RequestedRideCardState extends State<_RequestedRideCard> {
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   color: widget.isUnreadChat
-                                      ? Colors.blueAccent.withValues(alpha: 0.38)
-                                      : Colors.blueAccent.withValues(alpha: 0.18),
+                                      ? const Color(0xFFF5A04A).withValues(alpha: 0.28)
+                                      : Colors.white.withValues(alpha: 0.08),
                                   border: Border.all(
                                     color: widget.isUnreadChat
-                                        ? Colors.blueAccent.withValues(alpha: 0.9)
-                                        : Colors.blueAccent.withValues(alpha: 0.65),
+                                        ? const Color(0xFFF5A04A).withValues(alpha: 0.85)
+                                        : Colors.white.withValues(alpha: 0.22),
                                     width: widget.isUnreadChat ? 1.8 : 1.5,
                                   ),
                                   boxShadow: widget.isUnreadChat
                                       ? [BoxShadow(
-                                          color: Colors.blueAccent.withValues(alpha: 0.35),
-                                          blurRadius: 10,
+                                          color: const Color(0xFFF5A04A).withValues(alpha: 0.3),
+                                          blurRadius: 12,
                                           spreadRadius: 0,
                                         )]
                                       : null,
                                 ),
-                                child: const Icon(
+                                child: Icon(
                                   Icons.chat_bubble_rounded,
-                                  color: Colors.white,
+                                  color: widget.isUnreadChat
+                                      ? const Color(0xFFF5A04A)
+                                      : Colors.white,
                                   size: 22,
                                 ),
                               ),
@@ -2282,10 +2284,10 @@ class _RequestedRideCardState extends State<_RequestedRideCard> {
                                     width: 9,
                                     height: 9,
                                     decoration: BoxDecoration(
-                                      color: Colors.white,
+                                      color: const Color(0xFFF5A04A),
                                       shape: BoxShape.circle,
                                       border: Border.all(
-                                        color: Colors.blueAccent.withValues(alpha: 0.4),
+                                        color: Colors.black.withValues(alpha: 0.25),
                                         width: 1.5,
                                       ),
                                     ),
@@ -2688,43 +2690,62 @@ class _MitfahrerAktionenState extends State<_MitfahrerAktionen> {
       case AnfrageStatus.offen:
         return Align(
           alignment: Alignment.centerRight,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              IconButton(
-                onPressed: widget.openChat,
-                icon: Icon(
-                  Icons.chat_bubble_outline,
-                  color: widget.isUnreadChat
-                      ? Colors.blueAccent.withValues(alpha: 0.9)
-                      : Colors.white38,
-                  size: 18,
+          child: GestureDetector(
+            onTap: widget.openChat,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 350),
+                  curve: Curves.easeOutCubic,
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: widget.isUnreadChat
+                        ? const Color(0xFFF5A04A).withValues(alpha: 0.28)
+                        : Colors.white.withValues(alpha: 0.08),
+                    border: Border.all(
+                      color: widget.isUnreadChat
+                          ? const Color(0xFFF5A04A).withValues(alpha: 0.85)
+                          : Colors.white.withValues(alpha: 0.22),
+                      width: widget.isUnreadChat ? 1.8 : 1.5,
+                    ),
+                    boxShadow: widget.isUnreadChat
+                        ? [BoxShadow(
+                            color: const Color(0xFFF5A04A).withValues(alpha: 0.3),
+                            blurRadius: 12,
+                            spreadRadius: 0,
+                          )]
+                        : null,
+                  ),
+                  child: Icon(
+                    Icons.chat_bubble_rounded,
+                    color: widget.isUnreadChat
+                        ? const Color(0xFFF5A04A)
+                        : Colors.white,
+                    size: 20,
+                  ),
                 ),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                style: IconButton.styleFrom(
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                tooltip: 'Chat öffnen',
-              ),
-              if (widget.isUnreadChat)
-                Positioned(
-                  right: -1,
-                  top: -1,
-                  child: Container(
-                    width: 7,
-                    height: 7,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.blueAccent.withValues(alpha: 0.4),
-                        width: 1.2,
+                if (widget.isUnreadChat)
+                  Positioned(
+                    right: 1,
+                    top: 1,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5A04A),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.black.withValues(alpha: 0.25),
+                          width: 1.2,
+                        ),
                       ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         );
 
