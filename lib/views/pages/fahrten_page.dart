@@ -1994,35 +1994,34 @@ class _RequestedRideCardState extends State<_RequestedRideCard> {
 
     final isStorniert = anfrage.status == AnfrageStatus.storniert;
 
-    try {
-      await chatService.ensureConversation(
-        fahrtId: fahrt.id,
-        ownerId: fahrt.ownerId,
-        requesterId: anfrage.requesterId,
-        eventName: fahrt.eventName,
-        startOrt: fahrt.abfahrtsort,
-        zielOrt: fahrt.standort,
-        seatsRequested: anfrage.seatsRequested,
-      );
-      await chatService.updateSystemMessage(
-        conversationId: conversationId,
-        eventName: fahrt.eventName,
-        startOrt: fahrt.abfahrtsort,
-        zielOrt: fahrt.standort,
-        seatsRequested: anfrage.seatsRequested,
-        seatsAccepted: anfrage.seatsAccepted ?? 0,
-        uhrzeit:
-            '${fahrt.uhrzeitHour.toString().padLeft(2, '0')}:${fahrt.uhrzeitMinute.toString().padLeft(2, '0')}',
-        richtung: switch (fahrt.richtung) {
-          Fahrtrichtung.hinfahrt => 'Hinfahrt',
-          Fahrtrichtung.rueckfahrt => 'Rückfahrt',
-          Fahrtrichtung.hinUndZurueck => 'Hin und Zurück',
-        },
-        ownerName: fahrt.ownerName,
-      );
-    } catch (_) {}
-
     if (!mounted) { _isNavigating = false; return; }
+
+    // Fire-and-forget — läuft im Hintergrund, blockiert Navigation nicht
+    chatService.ensureConversation(
+      fahrtId: fahrt.id,
+      ownerId: fahrt.ownerId,
+      requesterId: anfrage.requesterId,
+      eventName: fahrt.eventName,
+      startOrt: fahrt.abfahrtsort,
+      zielOrt: fahrt.standort,
+      seatsRequested: anfrage.seatsRequested,
+    ).then((_) => chatService.updateSystemMessage(
+      conversationId: conversationId,
+      eventName: fahrt.eventName,
+      startOrt: fahrt.abfahrtsort,
+      zielOrt: fahrt.standort,
+      seatsRequested: anfrage.seatsRequested,
+      seatsAccepted: anfrage.seatsAccepted ?? 0,
+      uhrzeit:
+          '${fahrt.uhrzeitHour.toString().padLeft(2, '0')}:${fahrt.uhrzeitMinute.toString().padLeft(2, '0')}',
+      richtung: switch (fahrt.richtung) {
+        Fahrtrichtung.hinfahrt => 'Hinfahrt',
+        Fahrtrichtung.rueckfahrt => 'Rückfahrt',
+        Fahrtrichtung.hinUndZurueck => 'Hin und Zurück',
+      },
+      ownerName: fahrt.ownerName,
+    )).catchError((_) {});
+
     await nav.push(
       AppRoute(
         builder: (_) => ChatPage(

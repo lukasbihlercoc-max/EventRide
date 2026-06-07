@@ -51,10 +51,19 @@ class ChatConversation {
     }
 
     final rawLastRead = map['lastRead'] as Map<String, dynamic>?;
-    final Map<String, DateTime>? lastRead = rawLastRead?.map((k, v) {
-      final dt = v is DateTime ? v : (v as dynamic).toDate() as DateTime;
-      return MapEntry(k, dt);
-    });
+    Map<String, DateTime>? lastRead;
+    if (rawLastRead != null) {
+      lastRead = {};
+      for (final entry in rawLastRead.entries) {
+        if (entry.value == null) continue;
+        try {
+          final dt = entry.value is DateTime
+              ? entry.value as DateTime
+              : (entry.value as dynamic).toDate() as DateTime;
+          lastRead[entry.key] = dt;
+        } catch (_) {}
+      }
+    }
 
     return ChatConversation(
       id: id,

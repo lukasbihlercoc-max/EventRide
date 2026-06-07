@@ -78,21 +78,23 @@ class FirestoreChatRepository implements IChatRepository {
     }
   }
 
-  /// Legt eine Conversation an oder aktualisiert sie (merge).
-  /// Kein Transaction-Roundtrip → schreibt sofort in den lokalen Cache,
-  /// await löst sofort auf. Das ermöglicht das direkte Chaining mit
-  /// updateSystemMessage ohne Netzwerk-Blockierung.
+  /// Legt eine Conversation an — nur wenn sie noch nicht existiert.
+  /// Kein Überschreiben von lastMessageAt/lastMessage bei erneutem Aufruf.
   @override
   Future<void> ensureConversation(ChatConversation convo) async {
     try {
       final ref = _db.collection(_col).doc(convo.id);
-      final data = convo.toMap()
-        ..['createdAt'] = FieldValue.serverTimestamp()
-        ..['lastMessageAt'] = FieldValue.serverTimestamp()
-        ..['lastMessage'] = '';
-      await ref.set(data, SetOptions(merge: true));
-    } on FirebaseException catch (_) {
-      rethrow;
+      final snap = await ref.get();
+      if (!snap.exists) {
+        await ref.set({
+          ...convo.toMap(),
+          'createdAt': FieldValue.serverTimestamp(),
+          'lastMessageAt': FieldValue.serverTimestamp(),
+          'lastMessage': '',
+        });
+      }
+    } on FirebaseException catch (e) {
+      if (e.code != 'not-found' && e.code != 'permission-denied') rethrow;
     }
   }
 
@@ -101,7 +103,10 @@ class FirestoreChatRepository implements IChatRepository {
       String conversationId, String userId) async {
     try {
       await _db.collection(_col).doc(conversationId).update({
-        'lastRead.$userId': FieldValue.serverTimestamp(),
+        // Clientseitiger Timestamp reicht für lastRead-Vergleiche aus.
+        // FieldValue.serverTimestamp() würde einen Pending-Write mit null erzeugen
+        // → fromMap wirft → Conversation kurz aus der Liste gedroppt → sichtbarer Sprung.
+        'lastRead.$userId': Timestamp.fromDate(DateTime.now()),
       });
     } on FirebaseException catch (e) {
       // not-found: Conversation existiert noch nicht (Race mit ensureConversation)
