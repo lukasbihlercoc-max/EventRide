@@ -408,6 +408,7 @@ class _EventSubmitPageState extends State<EventSubmitPage> {
           controller: _adresseCtrl,
           decoration: _inputStyle('genaue Adresse'),
           textStyle: _kInputTextStyle,
+          localityOnly: false,
           onPlaceSelected: (_, __, lat, lng) {
             setState(() {
               _latitude = lat;

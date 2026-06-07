@@ -656,6 +656,7 @@ class _ReviewSheetState extends State<_ReviewSheet> {
           controller: _adresseCtrl,
           decoration: _inputStyle('genaue Adresse'),
           textStyle: _kInputText,
+          localityOnly: false,
           onPlaceSelected: (_, __, lat, lng) {
             setState(() {
               _latitude = lat;

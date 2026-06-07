@@ -29,6 +29,9 @@ class PlacesAutocompleteField extends StatefulWidget {
   final InputDecoration decoration;
   final TextStyle? textStyle;
   final void Function(String name, String fullAddress, double lat, double lng) onPlaceSelected;
+  // true (Standard): nur Ortschaften/Gemeinden – für Abfahrtsort und Wohnort
+  // false: vollständige Adresssuche inkl. POIs – für Event-Adresse
+  final bool localityOnly;
 
   const PlacesAutocompleteField({
     super.key,
@@ -36,6 +39,7 @@ class PlacesAutocompleteField extends StatefulWidget {
     required this.decoration,
     this.textStyle,
     required this.onPlaceSelected,
+    this.localityOnly = true,
   });
 
   @override
@@ -130,8 +134,8 @@ class _PlacesAutocompleteFieldState extends State<PlacesAutocompleteField> {
           'input': query,
           'includedRegionCodes': ['at'],
           'languageCode': 'de',
-          // Nur Ortschaften/Gemeinden – keine POIs, Schulen, Geschäfte etc.
-          'includedPrimaryTypes': ['locality', 'sublocality'],
+          if (widget.localityOnly)
+            'includedPrimaryTypes': ['locality', 'sublocality'],
         }),
       );
       if (!mounted || gen != _fetchGeneration) return;
