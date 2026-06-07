@@ -179,28 +179,30 @@ class DetailPage extends StatelessWidget {
                                   color: const Color(0xFFE8EAED),
                                   child: SizedBox(
                                     height: height * 0.12,
-                                    child: IgnorePointer(
-                                      child: GoogleMap(
-                                        liteModeEnabled: false,
-                                        initialCameraPosition: CameraPosition(
-                                          target: LatLng(event.latitude!,
-                                              event.longitude!),
-                                          zoom: 14.5,
-                                        ),
-                                        markers: {
-                                          Marker(
-                                            markerId:
-                                                const MarkerId('event'),
-                                            position: LatLng(event.latitude!,
+                                    child: ExcludeFocus(
+                                      child: IgnorePointer(
+                                        child: GoogleMap(
+                                          liteModeEnabled: false,
+                                          initialCameraPosition: CameraPosition(
+                                            target: LatLng(event.latitude!,
                                                 event.longitude!),
-                                            infoWindow: InfoWindow(
-                                                title: event.standort),
+                                            zoom: 14.5,
                                           ),
-                                        },
-                                        zoomControlsEnabled: false,
-                                        scrollGesturesEnabled: false,
-                                        zoomGesturesEnabled: false,
-                                        myLocationButtonEnabled: false,
+                                          markers: {
+                                            Marker(
+                                              markerId:
+                                                  const MarkerId('event'),
+                                              position: LatLng(event.latitude!,
+                                                  event.longitude!),
+                                              infoWindow: InfoWindow(
+                                                  title: event.standort),
+                                            ),
+                                          },
+                                          zoomControlsEnabled: false,
+                                          scrollGesturesEnabled: false,
+                                          zoomGesturesEnabled: false,
+                                          myLocationButtonEnabled: false,
+                                        ),
                                       ),
                                     ),
                                   ),

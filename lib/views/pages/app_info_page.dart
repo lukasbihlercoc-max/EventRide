@@ -261,9 +261,9 @@ class AppInfoPage extends StatelessWidget {
                   _ContactTile(
                     icon: Icons.mail_outline,
                     label: 'E-Mail',
-                    subtitle: 'eventride.25@gmail.com',
+                    subtitle: 'kontakt@eventride.at',
                     onTap: () => _launch(
-                        'mailto:eventride.25@gmail.com?subject=Kontakt'),
+                        'mailto:kontakt@eventride.at?subject=Kontakt'),
                   ),
                 ],
               ),
