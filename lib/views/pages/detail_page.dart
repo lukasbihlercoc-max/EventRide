@@ -165,50 +165,12 @@ class DetailPage extends StatelessWidget {
                           SizedBox(height: height * 0.013),
                           if (event.latitude != null &&
                               event.longitude != null) ...[
-                            GestureDetector(
-                              onTap: () => _openEventNavigation(
-                                  event.latitude!, event.longitude!),
-                              child: Padding(
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: width * 0.04),
-                              child: ClipRRect(
-                                borderRadius:
-                                    BorderRadius.circular(width * 0.032),
-                                clipBehavior: Clip.antiAliasWithSaveLayer,
-                                child: ColoredBox(
-                                  color: const Color(0xFFE8EAED),
-                                  child: SizedBox(
-                                    height: height * 0.12,
-                                    child: ExcludeFocus(
-                                      child: IgnorePointer(
-                                        child: GoogleMap(
-                                          liteModeEnabled: false,
-                                          initialCameraPosition: CameraPosition(
-                                            target: LatLng(event.latitude!,
-                                                event.longitude!),
-                                            zoom: 14.5,
-                                          ),
-                                          markers: {
-                                            Marker(
-                                              markerId:
-                                                  const MarkerId('event'),
-                                              position: LatLng(event.latitude!,
-                                                  event.longitude!),
-                                              infoWindow: InfoWindow(
-                                                  title: event.standort),
-                                            ),
-                                          },
-                                          zoomControlsEnabled: false,
-                                          scrollGesturesEnabled: false,
-                                          zoomGesturesEnabled: false,
-                                          myLocationButtonEnabled: false,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
+                            _MapSection(
+                              lat: event.latitude!,
+                              lng: event.longitude!,
+                              standort: event.standort,
+                              height: height,
+                              width: width,
                             ),
                             SizedBox(height: height * 0.008),
                             Padding(
@@ -1442,6 +1404,108 @@ class _EinladungCardState extends State<_EinladungCard> {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Map-Section mit secondaryAnimation-Guard
+//
+// Solange eine Route über der DetailPage liegt (secondaryAnimation.value > 0),
+// wird die GoogleMap vollständig aus dem Widget-Tree entfernt. Dadurch
+// verschwindet die native UiKitView/UIView aus der iOS-View-Hierarchy und der
+// UIKit-Focus-Ring kann nicht mehr auftreten.
+// ---------------------------------------------------------------------------
+class _MapSection extends StatefulWidget {
+  const _MapSection({
+    required this.lat,
+    required this.lng,
+    required this.standort,
+    required this.height,
+    required this.width,
+  });
+
+  final double lat;
+  final double lng;
+  final String standort;
+  final double height;
+  final double width;
+
+  @override
+  State<_MapSection> createState() => _MapSectionState();
+}
+
+class _MapSectionState extends State<_MapSection> {
+  Animation<double>? _secondary;
+  bool _covered = false;
+  bool _initialized = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initialized) return;
+    _initialized = true;
+    _secondary = ModalRoute.of(context)?.secondaryAnimation;
+    _secondary?.addListener(_onSecondaryChanged);
+  }
+
+  @override
+  void dispose() {
+    _secondary?.removeListener(_onSecondaryChanged);
+    super.dispose();
+  }
+
+  void _onSecondaryChanged() {
+    final nowCovered = (_secondary?.value ?? 0) > 0;
+    if (nowCovered == _covered) return;
+    setState(() => _covered = nowCovered);
+    debugPrint(nowCovered
+        ? '[DetailPage] Map detached because route covered'
+        : '[DetailPage] Map attached because route visible');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => _openEventNavigation(widget.lat, widget.lng),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: widget.width * 0.04),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(widget.width * 0.032),
+          clipBehavior: Clip.antiAliasWithSaveLayer,
+          child: ColoredBox(
+            color: const Color(0xFFE8EAED),
+            child: SizedBox(
+              height: widget.height * 0.12,
+              child: _covered
+                  ? null
+                  : ExcludeFocus(
+                      child: IgnorePointer(
+                        child: GoogleMap(
+                          liteModeEnabled: false,
+                          initialCameraPosition: CameraPosition(
+                            target: LatLng(widget.lat, widget.lng),
+                            zoom: 14.5,
+                          ),
+                          markers: {
+                            Marker(
+                              markerId: const MarkerId('event'),
+                              position: LatLng(widget.lat, widget.lng),
+                              infoWindow:
+                                  InfoWindow(title: widget.standort),
+                            ),
+                          },
+                          zoomControlsEnabled: false,
+                          scrollGesturesEnabled: false,
+                          zoomGesturesEnabled: false,
+                          myLocationButtonEnabled: false,
+                        ),
+                      ),
+                    ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
