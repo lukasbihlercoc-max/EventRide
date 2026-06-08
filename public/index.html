@@ -727,6 +727,60 @@
       .hero-btns { flex-direction: column; }
       .btn-p, .btn-s { width: 100%; justify-content: center; }
     }
+
+    /* ── Real Screenshots Section ── */
+    .shots-section {
+      padding: 80px 20px 100px;
+      background: linear-gradient(180deg, var(--bg-deep) 0%, #08122e 100%);
+      overflow: hidden;
+    }
+    .shots-inner { max-width: 1100px; margin: 0 auto; text-align: center; }
+    .shots-sub { color: rgba(255,255,255,.6); font-size: 1.05rem; margin-bottom: 56px; }
+    .shots-row {
+      display: flex; gap: 28px;
+      justify-content: center; align-items: flex-end;
+      overflow-x: auto; padding-bottom: 24px;
+      -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    }
+    .shots-row::-webkit-scrollbar { display: none; }
+    .shot-phone { flex-shrink: 0; transition: transform .3s ease; }
+    .shot-phone:hover { filter: brightness(1.08); }
+    .shot-frame {
+      width: 220px; height: 476px;
+      border-radius: 40px; overflow: hidden;
+      background: #000;
+      border: 8px solid rgba(255,255,255,.14);
+      box-shadow: 0 28px 64px rgba(0,0,0,.55), 0 4px 16px rgba(0,0,0,.35),
+                  inset 0 0 0 1px rgba(255,255,255,.07);
+      position: relative;
+    }
+    .shot-frame img {
+      width: 100%; height: 100%;
+      object-fit: cover; object-position: top;
+      display: block;
+    }
+    .shot-frame::before {
+      content: ''; position: absolute;
+      top: 9px; left: 50%; transform: translateX(-50%);
+      width: 88px; height: 26px;
+      background: #000; border-radius: 13px; z-index: 10;
+    }
+    .shot-tilt-1 { transform: rotate(-4deg) translateY(22px); }
+    .shot-tilt-2 { transform: rotate(-1.5deg) translateY(8px); }
+    .shot-tilt-3 { transform: rotate(1.5deg) translateY(8px); }
+    .shot-tilt-4 { transform: rotate(4deg) translateY(22px); }
+    .shot-label {
+      margin-top: 14px; font-size: .78rem;
+      color: rgba(255,255,255,.4); font-weight: 500; text-align: center;
+    }
+    @media (max-width: 900px) {
+      .shots-row { justify-content: flex-start; padding: 0 16px 24px; }
+      .shot-frame { width: 175px; height: 379px; border-radius: 32px; }
+    }
+    @media (max-width: 480px) {
+      .shot-frame { width: 155px; height: 336px; border-radius: 28px; }
+      .shots-row { gap: 18px; }
+    }
   </style>
 </head>
 <body>
@@ -1004,6 +1058,41 @@
       </div>
 
     </div><!-- /preview-layout -->
+  </div>
+</section>
+
+<!-- REAL SCREENSHOTS -->
+<section class="shots-section" id="app-screenshots">
+  <div class="shots-inner">
+    <p class="s-eyebrow">Echte Screenshots</p>
+    <h2 class="s-title">Die App in Aktion</h2>
+    <p class="shots-sub">So sieht EventRide auf deinem iPhone aus</p>
+    <div class="shots-row">
+      <div class="shot-phone shot-tilt-1">
+        <div class="shot-frame">
+          <img src="assets/screenshots/IMG_0170.PNG" alt="EventRide Events" loading="lazy" />
+        </div>
+        <p class="shot-label">Events entdecken</p>
+      </div>
+      <div class="shot-phone shot-tilt-2">
+        <div class="shot-frame">
+          <img src="assets/screenshots/IMG_0158.PNG" alt="Fahrten finden" loading="lazy" />
+        </div>
+        <p class="shot-label">Fahrten finden</p>
+      </div>
+      <div class="shot-phone shot-tilt-3">
+        <div class="shot-frame">
+          <img src="assets/screenshots/IMG_0161.PNG" alt="Chat" loading="lazy" />
+        </div>
+        <p class="shot-label">Direkt chatten</p>
+      </div>
+      <div class="shot-phone shot-tilt-4">
+        <div class="shot-frame">
+          <img src="assets/screenshots/IMG_0162.PNG" alt="Anfragen verwalten" loading="lazy" />
+        </div>
+        <p class="shot-label">Anfragen verwalten</p>
+      </div>
+    </div>
   </div>
 </section>
 
