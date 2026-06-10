@@ -480,12 +480,12 @@ class _HomePageState extends State<HomePage> {
   final _typKey    = GlobalKey();
 
   static const _typOptionen = {
-    'e1': 'Kirchtag',
+    'e1': 'Kirchtage/Feste',
     'e2': 'Feuerwehrfest',
     'e3': 'Disco',
     'e4': 'Ball',
     'e5': 'Krampus',
-    'e6': 'Festival',
+    'e6': 'Festival/Open-Air',
   };
 
   String _radiusLabel(int? value) {

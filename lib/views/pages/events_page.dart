@@ -56,12 +56,12 @@ const inputTextStyle = TextStyle(
 
 const _kTypLabels = {
   'e0': 'Standart',
-  'e1': 'Kirchtag',
+  'e1': 'Kirchtage/Feste',
   'e2': 'Feuerwehrfest',
   'e3': 'Disco',
   'e4': 'Ball',
   'e5': 'Krampuslauf',
-  'e6': 'Festival',
+  'e6': 'Festival/Open-Air',
 };
 
 class EventsPage extends StatefulWidget {
