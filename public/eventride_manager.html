@@ -1145,7 +1145,7 @@ function renderCSV() {
     <h3 style="font-size:15px;font-weight:700;margin-bottom:.5rem">CSV Import (Copilot-Recherche)</h3>
     <p style="font-size:13px;color:#888;margin-bottom:1rem;line-height:1.6">Copilot-Tabelle hier einfügen. Pflicht: <code>Eventname</code>, <code>Datum</code>. Optional: Uhrzeit, Gemeinde, Bezirk, Adresse, Veranstalter, Eintritt, Typ, Quelle. Duplikate werden automatisch erkannt und übersprungen. Events landen in der Recherche-Liste zur manuellen Prüfung.</p>
     <div style="background:#f7f7f5;border-radius:8px;padding:8px 12px;font-family:monospace;font-size:11px;color:#888;margin-bottom:1rem">
-      Eventname,Datum,Uhrzeit,Gemeinde,Bezirk,Adresse,Veranstalter,Eintritt,Typ,Quelle
+      Eventname,Datum,Uhrzeit,Gemeinde,Bezirk,Adresse,Veranstalter,Eintritt,Beschreibung,Typ,Quelle
     </div>
     <textarea id="csv-input" rows="12" placeholder="CSV hier einfügen…" style="font-family:monospace;font-size:12px;margin-bottom:1rem"></textarea>
     <div style="display:flex;align-items:center;gap:12px">
@@ -1164,7 +1164,7 @@ function renderFlyer() {
       <h3 style="font-size:15px;font-weight:700;margin-bottom:.5rem">Flyer-Import</h3>
       <p style="font-size:13px;color:#888;margin-bottom:1rem;line-height:1.6">Copilot-Ausgabe aus Flyer-Screenshots einfügen. Pflicht: <code>Eventname</code>, <code>Datum</code>. Optionale Spalte <code>Adresse</code> für die genaue Venue-Adresse (z.B. "Feuerwehrhaus Seeboden, Hauptstraße 1"). Events landen direkt im Upload-Flow.</p>
       <div style="background:#f7f7f5;border-radius:8px;padding:8px 12px;font-family:monospace;font-size:11px;color:#888;margin-bottom:1rem">
-        Eventname,Datum,Uhrzeit,Gemeinde,Bezirk,Adresse,Veranstalter,Eintritt,Typ,Quelle
+        Eventname,Datum,Uhrzeit,Gemeinde,Bezirk,Adresse,Veranstalter,Eintritt,Beschreibung,Typ,Quelle
       </div>
       <textarea id="flyer-csv-input" rows="7" placeholder="CSV hier einfügen…" style="font-family:monospace;font-size:12px;margin-bottom:1rem"></textarea>
       <button class="primary" onclick="importFlyerCSV()">↑ Flyer importieren</button>
@@ -1200,7 +1200,7 @@ function importCSV() {
   const sep = lines[0].includes(";") ? ";" : ",";
   const hdrs = splitCSVLine(lines[0], sep).map(h=>h.toLowerCase());
   const idx = k => hdrs.findIndex(h=>h.includes(k));
-  const iN=idx("name"),iD=idx("datum"),iU=idx("uhrzeit"),iG=idx("gemeinde"),iB=idx("bezirk"),iA=idx("adresse"),iV=idx("veranstalter"),iE=idx("eintritt"),iT=idx("typ"),iQ=idx("quelle");
+  const iN=idx("name"),iD=idx("datum"),iU=idx("uhrzeit"),iG=idx("gemeinde"),iB=idx("bezirk"),iA=idx("adresse"),iV=idx("veranstalter"),iE=idx("eintritt"),iT=idx("typ"),iQ=idx("quelle"),iDesc=idx("beschreibung");
   if(iN<0||iD<0){setCsvMsg("Spalten 'Eventname' und 'Datum' fehlen.","red");return;}
 
   const total = lines.length - 1;
@@ -1238,6 +1238,7 @@ function importCSV() {
         gemeinde:iG>=0?c[iG]:"", bezirk:bezRaw,
         adresse:iA>=0?(c[iA]||""):"",
         veranstalter:iV>=0?c[iV]:"örtlich", eintritt:iE>=0?c[iE]:"k.A.",
+        beschreibung:iDesc>=0?(c[iDesc]||""):"",
         typ:normalizeTyp(typRaw), quelle:iQ>=0?c[iQ]:"", quelle2:"",
         status:yr>=2026?"confirmed":"check", geprueft:false, inApp:false,
         createdAt:firebase.firestore.FieldValue.serverTimestamp()
@@ -1329,7 +1330,7 @@ function importFlyerCSV() {
   const hdrs = splitCSVLine(lines[0], sep).map(h => h.toLowerCase());
   const idx = k => hdrs.findIndex(h => h.includes(k));
   const iN=idx("name"),iD=idx("datum"),iU=idx("uhrzeit"),iG=idx("gemeinde"),
-        iB=idx("bezirk"),iA=idx("adresse"),iV=idx("veranstalter"),iE=idx("eintritt"),iT=idx("typ"),iQ=idx("quelle");
+        iB=idx("bezirk"),iA=idx("adresse"),iV=idx("veranstalter"),iE=idx("eintritt"),iT=idx("typ"),iQ=idx("quelle"),iDesc=idx("beschreibung");
   if (iN < 0 || iD < 0) { showToast("Spalten 'Eventname' und 'Datum' fehlen.", false); return; }
 
   let imported = 0, dupes = 0;
@@ -1365,6 +1366,7 @@ function importFlyerCSV() {
       adresse: iA >= 0 ? (c[iA] || "").trim() : "",
       veranstalter: iV >= 0 ? (c[iV] || "").trim() : "örtlich",
       eintritt: iE >= 0 ? (c[iE] || "").trim() : "k.A.",
+      beschreibung: iDesc >= 0 ? (c[iDesc] || "").trim() : "",
       typ: typRaw,
       quelle: iQ >= 0 ? (c[iQ] || "").trim() : "",
       status: "offen"
