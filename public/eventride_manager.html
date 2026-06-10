@@ -790,6 +790,7 @@ function detailPanel(ev) {
 function editFormHTML(d) {
   const bezSelect = BEZIRKE.map(b=>`<option ${d.bezirk===b?"selected":""}>${b}</option>`).join("");
   const typSelect = TYPEN.map(t=>`<option ${d.typ===t?"selected":""}>${t}</option>`).join("");
+  const hasCoords = d.lat != null && d.lng != null;
   return `<div class="edit-grid">
     <span class="edit-label">Name *</span><input value="${esc(d.name||"")}" onchange="editData.name=this.value">
     <span class="edit-label">Datum *</span><input value="${esc(d.datum||"")}" placeholder="TT.MM.JJJJ" onchange="editData.datum=this.value">
@@ -800,6 +801,13 @@ function editFormHTML(d) {
     <span class="edit-label">Veranstalter</span><input value="${esc(d.veranstalter||"")}" onchange="editData.veranstalter=this.value">
     <span class="edit-label">Eintritt</span><input value="${esc(d.eintritt||"")}" onchange="editData.eintritt=this.value">
     <span class="edit-label">Quelle</span><input value="${esc(d.quelle||"")}" onchange="editData.quelle=this.value">
+    <span class="edit-label">Adresse</span><input id="ed-adresse" value="${esc(d.adresse||"")}" placeholder="Adresse suchen…" oninput="editData.adresse=this.value">
+    <span class="edit-label">Koordinaten</span>
+    <div>
+      <input placeholder="46.7513, 14.0364 (aus Google Maps)" style="width:100%;box-sizing:border-box" oninput="handleCoordsInput(this.value,editData,'ed-coords','ed-coords-text','ed-no-coords-warn')">
+      <div id="ed-coords" style="display:${hasCoords?'block':'none'};font-size:11px;color:#52A1EF;margin-top:2px">📍 <span id="ed-coords-text">${hasCoords?d.lat.toFixed(5)+', '+d.lng.toFixed(5):''}</span></div>
+      <div id="ed-no-coords-warn" style="display:${hasCoords?'none':'block'};font-size:11px;color:#e67e22;margin-top:2px">⚠ Keine Koordinaten – kein Map-Pin in der App</div>
+    </div>
   </div>`;
 }
 
@@ -809,6 +817,7 @@ function startEdit(id) {
   editData = {...ev};
   editMode = true;
   render();
+  setTimeout(() => setupAutocomplete('ed-adresse', editData, 'ed-coords', 'ed-coords-text', 'ed-no-coords-warn'), 100);
 }
 
 function cancelEdit() { editMode=false; render(); }
@@ -816,7 +825,11 @@ function cancelEdit() { editMode=false; render(); }
 function saveEdit(id) {
   if(!editData.name||!editData.datum){alert("Name und Datum sind Pflicht.");return;}
   const yr = getYear(editData.datum);
-  const patch = {...editData};
+  const patch = {...editData,
+    adresse: editData.adresse || editData.gemeinde || '',
+    latitude: editData.lat || null,
+    longitude: editData.lng || null,
+  };
   if(yr>=2026) patch.status="confirmed";
   db.collection("pending_events").doc(id).update(patch).catch(e=>alert("Fehler: "+e.message));
   editMode=false;
@@ -841,7 +854,7 @@ function confirm2026(id) {
 
 // ---- ADD MODAL ----
 function openAdd() {
-  addFormData = {name:"",datum:"",uhrzeit:"20:00",gemeinde:"",bezirk:"Spittal",veranstalter:"örtlich",eintritt:"kostenlos",typ:"Kirchtage/Feste",quelle:""};
+  addFormData = {name:"",datum:"",uhrzeit:"20:00",gemeinde:"",bezirk:"Spittal",veranstalter:"örtlich",eintritt:"kostenlos",typ:"Kirchtage/Feste",quelle:"",adresse:"",lat:null,lng:null};
   const bezSelect = BEZIRKE.map(b=>`<option ${b==="Spittal"?"selected":""}>${b}</option>`).join("");
   const typSelect = TYPEN.map(t=>`<option ${t==="Kirchtage/Feste"?"selected":""}>${t}</option>`).join("");
   document.getElementById("add-form").innerHTML = `<div class="edit-grid">
@@ -854,8 +867,16 @@ function openAdd() {
     <span class="edit-label">Veranstalter</span><input value="örtlich" oninput="addFormData.veranstalter=this.value">
     <span class="edit-label">Eintritt</span><input value="kostenlos" oninput="addFormData.eintritt=this.value">
     <span class="edit-label">Quelle</span><input placeholder="URL oder Quelle" oninput="addFormData.quelle=this.value">
+    <span class="edit-label">Adresse</span><input id="add-adresse" placeholder="Adresse suchen…" oninput="addFormData.adresse=this.value">
+    <span class="edit-label">Koordinaten</span>
+    <div>
+      <input placeholder="46.7513, 14.0364 (aus Google Maps)" style="width:100%;box-sizing:border-box" oninput="handleCoordsInput(this.value,addFormData,'add-coords','add-coords-text','add-no-coords-warn')">
+      <div id="add-coords" style="display:none;font-size:11px;color:#52A1EF;margin-top:2px">📍 <span id="add-coords-text"></span></div>
+      <div id="add-no-coords-warn" style="font-size:11px;color:#e67e22;margin-top:2px">⚠ Keine Koordinaten – kein Map-Pin in der App</div>
+    </div>
   </div>`;
   document.getElementById("modal-add").style.display="flex";
+  setTimeout(() => setupAutocomplete('add-adresse', addFormData, 'add-coords', 'add-coords-text', 'add-no-coords-warn'), 100);
 }
 
 function closeAdd() { document.getElementById("modal-add").style.display="none"; }
@@ -867,7 +888,11 @@ function submitAdd() {
   }
   const yr = getYear(addFormData.datum);
   db.collection("pending_events").add({
-    ...addFormData, status:yr>=2026?"confirmed":"check",
+    ...addFormData,
+    adresse: addFormData.adresse || addFormData.gemeinde || '',
+    latitude: addFormData.lat || null,
+    longitude: addFormData.lng || null,
+    status:yr>=2026?"confirmed":"check",
     geprueft:false, inApp:false,
     createdAt:firebase.firestore.FieldValue.serverTimestamp()
   }).then(()=>closeAdd()).catch(e=>alert("Fehler: "+e.message));
@@ -1581,8 +1606,28 @@ function uploadFormHTML() {
 }
 
 function initUploadAutocomplete() {
-  const input = document.getElementById('up-adresse');
-  if (!input) return;
+  const dataObj = appEditMode ? appEditData : uploadData;
+  setupAutocomplete('up-adresse', dataObj, 'up-coords', 'up-coords-text', 'up-no-coords-warn');
+}
+
+// Allgemeine Koordinaten-Eingabe: setzt lat/lng in dataObj, zeigt Koordinaten an
+function handleCoordsInput(val, dataObj, coordsDisplayId, coordsTextId, warnId) {
+  const m = val.trim().match(/^(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)$/);
+  if (!m) return;
+  dataObj.lat = parseFloat(m[1]);
+  dataObj.lng = parseFloat(m[2]);
+  const el = document.getElementById(coordsDisplayId);
+  if (el) el.style.display = 'block';
+  const txt = document.getElementById(coordsTextId);
+  if (txt) txt.textContent = `${dataObj.lat.toFixed(5)}, ${dataObj.lng.toFixed(5)}`;
+  const warn = document.getElementById(warnId);
+  if (warn) warn.style.display = 'none';
+}
+
+// Allgemeines Autocomplete-Setup für jedes Adressfeld
+function setupAutocomplete(inputId, dataObj, coordsDisplayId, coordsTextId, warnId) {
+  const input = document.getElementById(inputId);
+  if (!input || !window.google || !google.maps || !google.maps.places) return;
   const ac = new google.maps.places.Autocomplete(input, {
     componentRestrictions: { country: 'at' },
     fields: ['formatted_address', 'geometry'],
@@ -1590,45 +1635,22 @@ function initUploadAutocomplete() {
   ac.addListener('place_changed', () => {
     const place = ac.getPlace();
     if (!place.geometry) return;
-    const lat = place.geometry.location.lat();
-    const lng = place.geometry.location.lng();
-    if (appEditMode) {
-      appEditData.lat = lat; appEditData.lng = lng;
-      appEditData.adresse = place.formatted_address;
-    } else {
-      uploadData.lat = lat; uploadData.lng = lng;
-      uploadData.adresse = place.formatted_address;
-    }
-    document.getElementById('up-coords').style.display = 'block';
-    document.getElementById('up-coords-text').textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-    const warn = document.getElementById('up-no-coords-warn');
+    dataObj.lat = place.geometry.location.lat();
+    dataObj.lng = place.geometry.location.lng();
+    dataObj.adresse = place.formatted_address;
+    input.value = place.formatted_address;
+    const el = document.getElementById(coordsDisplayId);
+    if (el) el.style.display = 'block';
+    const txt = document.getElementById(coordsTextId);
+    if (txt) txt.textContent = `${dataObj.lat.toFixed(5)}, ${dataObj.lng.toFixed(5)}`;
+    const warn = document.getElementById(warnId);
     if (warn) warn.style.display = 'none';
   });
 }
 
 function parseCoordsInput(val) {
-  const m = val.trim().match(/^(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)$/);
-  if (!m) return;
-  const lat = parseFloat(m[1]), lng = parseFloat(m[2]);
-  if (appEditMode) { appEditData.lat = lat; appEditData.lng = lng; }
-  else { uploadData.lat = lat; uploadData.lng = lng; }
-  document.getElementById('up-coords').style.display = 'block';
-  document.getElementById('up-coords-text').textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-  const warn = document.getElementById('up-no-coords-warn');
-  if (warn) warn.style.display = 'none';
-  // Reverse Geocoding: Adresse automatisch befüllen wenn noch leer
-  const addrEl = document.getElementById('up-adresse');
-  if (addrEl && !addrEl.value && window.google && google.maps && google.maps.Geocoder) {
-    new google.maps.Geocoder().geocode({location: {lat, lng}}, (results, status) => {
-      if (status !== 'OK' || !results[0]) return;
-      const addr = results[0].formatted_address;
-      addrEl.value = addr;
-      if (appEditMode) appEditData.adresse = addr;
-      else uploadData.adresse = addr;
-      const w = document.getElementById('up-no-coords-warn');
-      if (w) w.style.display = 'none';
-    });
-  }
+  const dataObj = appEditMode ? appEditData : uploadData;
+  handleCoordsInput(val, dataObj, 'up-coords', 'up-coords-text', 'up-no-coords-warn');
 }
 
 function submitUpload() {
