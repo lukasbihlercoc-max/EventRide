@@ -1159,6 +1159,12 @@ function deleteAppEvent(id) {
 }
 
 // ---- BEZIRKE TAB ----
+function goToRecherche(bez, gem) {
+  fBez = bez || 'Alle';
+  fSearch = gem || '';
+  switchTab('recherche');
+}
+
 function renderBezirke() {
   let html = "";
   for(const bez of BEZIRKE) {
@@ -1172,14 +1178,17 @@ function renderBezirke() {
 
     html += `<div class="bez-card">
       <div class="bez-header" onclick="expandBez['${bez}']=!expandBez['${bez}'];render()">
-        <div style="display:flex;align-items:center;gap:10px">
+        <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
           <span style="font-weight:600;font-size:14px">${bez}</span>
           ${appBezEvs.length?`<span class="badge badge-inapp">${appBezEvs.length} in App</span>`:""}
           ${conf?`<span class="badge badge-confirmed">${conf} bestätigt</span>`:""}
           ${chk?`<span class="badge badge-check">${chk} prüfen</span>`:""}
-          ${total===0?`<span style="font-size:11px;color:#ccc">keine Events</span>`:""}
+          ${total===0?`<span style="font-size:11px;color:var(--text-3)">keine Events</span>`:""}
         </div>
-        <span style="color:#bbb;font-size:12px">${isOpen?"▲":"▼"}</span>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+          <button class="small" style="font-size:11px;padding:3px 9px;color:var(--accent);border-color:var(--accent-soft);background:var(--accent-soft)" onclick="event.stopPropagation();goToRecherche('${bez}','')">Recherche →</button>
+          <span style="color:var(--text-3);font-size:11px">${isOpen?"▲":"▼"}</span>
+        </div>
       </div>`;
 
     if(isOpen) {
@@ -1190,20 +1199,31 @@ function renderBezirke() {
         const gKey = bez+"_"+gem;
         const gOpen = expandGem[gKey];
         const gTotal = gEvs.length + gAppEvs.length;
+
+        // Count display: App = normal, Recherche = blasser
+        const countParts = [];
+        if(gAppEvs.length) countParts.push(`<span style="font-weight:600;color:var(--text)">${gAppEvs.length} App</span>`);
+        if(gEvs.length) countParts.push(`<span style="color:var(--text-3)">${gEvs.length} Recherche</span>`);
+        const countHtml = gTotal===0 ? `<span style="color:var(--border)">—</span>` : countParts.join(`<span style="color:var(--border);margin:0 2px">·</span>`);
+
         html += `<div class="gem-row ${gTotal===0?"no-events":""}" onclick="${gTotal?`expandGem['${gKey}']=!expandGem['${gKey}'];render()`:""}" style="cursor:${gTotal?"pointer":"default"}">
-          <span style="font-size:12px">${gem}</span>
-          <span class="gem-count">
-            ${gTotal===0?"—":`${gEvs.length} Recherche${gAppEvs.length?` · ${gAppEvs.length} App`:""}`}
-          </span>
+          <span style="font-size:12px;flex:1">${gem}</span>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="gem-count" style="display:flex;align-items:center;gap:3px">${countHtml}</span>
+            ${gTotal>0?`<button class="small" style="font-size:10px;padding:2px 8px;color:var(--accent);border-color:var(--accent-soft);background:var(--accent-soft);flex-shrink:0" onclick="event.stopPropagation();goToRecherche('${bez}','${gem.replace(/'/g,"\\'")}')">↗</button>`:""}
+          </div>
         </div>`;
+
         if(gOpen&&gTotal>0) {
-          gEvs.concat(gAppEvs).sort((a,b)=>monthDay(a.datum)-monthDay(b.datum)).forEach(ev=>{
+          // App-Events zuerst (vollständig), dann Recherche-Events (blasser) — sortiert nach Datum
+          const allEvs = gEvs.concat(gAppEvs).sort((a,b)=>monthDay(a.datum)-monthDay(b.datum));
+          allEvs.forEach(ev=>{
             const isAppEv = ev._src==="app";
-            html += `<div class="gem-event" onclick="${isAppEv?`selId='${ev._id}';switchTab('inapp')`:`selId='${ev._id}';switchTab('recherche')`}">
+            html += `<div class="gem-event" style="${isAppEv?'':'opacity:.55'}" onclick="${isAppEv?`selId='${ev._id}';switchTab('inapp')`:`selId='${ev._id}';switchTab('recherche')`}">
               ${typBadge(ev.typ)}
-              <span style="flex:1;font-size:12px">${esc(ev.name)}</span>
-              <span style="font-size:11px;color:#bbb">${fmt(ev.datum)}</span>
-              ${isAppEv?`<span class="badge badge-inapp" style="font-size:10px">App</span>`:""}
+              <span style="flex:1;font-size:12px;font-weight:${isAppEv?'500':'400'};color:${isAppEv?'var(--text)':'var(--text-2)'}">${esc(ev.name)}</span>
+              <span style="font-size:11px;color:var(--text-3)">${fmt(ev.datum)}</span>
+              ${isAppEv?`<span class="badge badge-inapp" style="font-size:10px">App</span>`:`<span style="font-size:10px;color:var(--text-3)">Recherche</span>`}
             </div>`;
           });
         }
