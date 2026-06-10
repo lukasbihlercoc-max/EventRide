@@ -34,6 +34,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#E88C2E;box-sh
 .badge-ball{background:#FBEAF0;color:#72243E}
 .badge-krampus{background:#EEEDFE;color:#3C3489}
 .badge-disco{background:#E6F1FB;color:#0C447C}
+.badge-festival{background:#FFF0DB;color:#8B4600}
 .badge-confirmed{background:#EAF3DE;color:#27500A}
 .badge-check{background:#FFF3D6;color:#7A4A00}
 .badge-inapp{background:#E6F1FB;color:#0C447C}
@@ -276,9 +277,9 @@ const GEMEINDEN = {
   "Völkermarkt":["Bleiburg","Diex","Eberndorf","Eisenkappel-Vellach","Feistritz ob Bleiburg","Gallizien","Globasnitz","Griffen","Neuhaus","Ruden","St. Kanzian am Klopeiner See","Sittersdorf","Völkermarkt"],
   "Wolfsberg":["Bad St. Leonhard im Lavanttal","Frantschach-St. Gertraud","Lavamünd","Preitenegg","Reichenfels","St. Andrä","St. Georgen im Lavanttal","St. Paul im Lavanttal","Wolfsberg"]
 };
-const TYP_CODE = {"Kirchtag":"e1","Feuerwehr":"e2","Disco/Party":"e3","Ball":"e4","Krampus":"e5"};
-const TYP_FROM_CODE = {"e1":"Kirchtag","e2":"Feuerwehr","e3":"Disco/Party","e4":"Ball","e5":"Krampus"};
-const TYPEN = ["Kirchtag","Feuerwehr","Ball","Krampus","Disco/Party"];
+const TYP_CODE = {"Kirchtage/Feste":"e1","Feuerwehr":"e2","Disco/Party":"e3","Ball":"e4","Krampus":"e5","Festival/Open-Air":"e6"};
+const TYP_FROM_CODE = {"e1":"Kirchtage/Feste","e2":"Feuerwehr","e3":"Disco/Party","e4":"Ball","e5":"Krampus","e6":"Festival/Open-Air"};
+const TYPEN = ["Kirchtage/Feste","Feuerwehr","Ball","Krampus","Disco/Party","Festival/Open-Air"];
 
 let appEvents = [];
 let pending = [];
@@ -297,6 +298,8 @@ let uploadPendingId = null;
 let flyerEvents = [];
 let flyerUploadIndex = 0;
 let isFlyerMode = false;
+let appEditMode = false;
+let appEditData = {};
 
 // ---- AUTH ----
 const ALLOWED_EMAILS = ['lukas.bihler.coc@gmail.com', 'matzematze666@gmail.com', 'chiara.bihler.cb@gmail.com'];
@@ -355,7 +358,10 @@ function initFS() {
         name: data.name || "", datum: data.datum || "", uhrzeit: data.uhrzeit || "",
         gemeinde: data.standort || data.gemeinde || "", bezirk: data.bezirk || "",
         typ, eintritt: data.eintritt != null ? String(data.eintritt) : "k.A.",
-        beschreibung: data.beschreibung || "", lat: data.lat, lng: data.lng
+        beschreibung: data.beschreibung || "",
+        lat: data.latitude ?? data.lat ?? null,
+        lng: data.longitude ?? data.lng ?? null,
+        adresse: data.adresse || ""
       };
     });
     render();
@@ -416,7 +422,7 @@ function buildAdminUrl(ev) {
 }
 
 function typBadge(typ) {
-  const map = {Kirchtag:"kirchtag",Feuerwehr:"feuerwehr",Ball:"ball",Krampus:"krampus","Disco/Party":"disco"};
+  const map = {"Kirchtage/Feste":"kirchtag",Feuerwehr:"feuerwehr",Ball:"ball",Krampus:"krampus","Disco/Party":"disco","Festival/Open-Air":"festival"};
   return `<span class="badge badge-${map[typ]||"kirchtag"}">${typ||"?"}</span>`;
 }
 
@@ -833,9 +839,9 @@ function confirm2026(id) {
 
 // ---- ADD MODAL ----
 function openAdd() {
-  addFormData = {name:"",datum:"",uhrzeit:"20:00",gemeinde:"",bezirk:"Spittal",veranstalter:"örtlich",eintritt:"kostenlos",typ:"Kirchtag",quelle:""};
+  addFormData = {name:"",datum:"",uhrzeit:"20:00",gemeinde:"",bezirk:"Spittal",veranstalter:"örtlich",eintritt:"kostenlos",typ:"Kirchtage/Feste",quelle:""};
   const bezSelect = BEZIRKE.map(b=>`<option ${b==="Spittal"?"selected":""}>${b}</option>`).join("");
-  const typSelect = TYPEN.map(t=>`<option ${t==="Kirchtag"?"selected":""}>${t}</option>`).join("");
+  const typSelect = TYPEN.map(t=>`<option ${t==="Kirchtage/Feste"?"selected":""}>${t}</option>`).join("");
   document.getElementById("add-form").innerHTML = `<div class="edit-grid">
     <span class="edit-label">Name *</span><input placeholder="Eventname" oninput="addFormData.name=this.value">
     <span class="edit-label">Datum *</span><input placeholder="TT.MM.JJJJ" oninput="addFormData.datum=this.value">
@@ -895,6 +901,49 @@ function renderInApp() {
 }
 
 function appEventDetail(ev) {
+  if (appEditMode) {
+    const d = appEditData;
+    const bezOpts = BEZIRKE.map(b=>`<option value="${b}" ${d.bezirk===b?'selected':''}>${b}</option>`).join('');
+    const typOpts = [['e1','Kirchtag/Fest'],['e2','Feuerwehr'],['e3','Disco/Party'],['e4','Ball'],['e5','Krampus']]
+      .map(([v,l])=>`<option value="${v}" ${d.typ===v?'selected':''}>  ${l}</option>`).join('');
+    const hasCoords = d.lat && d.lng;
+    return `<div class="detail-panel">
+      <div class="detail-top">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-weight:700;font-size:14px">In App bearbeiten</span>
+          <button class="icon-btn" onclick="cancelAppEdit()">×</button>
+        </div>
+      </div>
+      <div class="detail-body">
+        <div class="edit-grid">
+          <span class="edit-label">Name *</span><input value="${esc(d.name||'')}" oninput="appEditData.name=this.value">
+          <span class="edit-label">Datum *</span><input type="date" value="${d.datumISO||''}" onchange="appEditData.datumISO=this.value">
+          <span class="edit-label">Uhrzeit</span><input type="time" value="${esc(d.uhrzeit||'')}" onchange="appEditData.uhrzeit=this.value">
+          <span class="edit-label">Standort *</span><input value="${esc(d.gemeinde||'')}" oninput="appEditData.gemeinde=this.value">
+          <span class="edit-label">Bezirk</span><select onchange="appEditData.bezirk=this.value"><option value="">–</option>${bezOpts}</select>
+          <span class="edit-label">Typ</span><select onchange="appEditData.typ=this.value">${typOpts}</select>
+          <span class="edit-label">Eintritt</span><textarea rows="2" oninput="appEditData.eintritt=this.value" style="font-size:12px;padding:7px 10px">${esc(d.eintritt||'')}</textarea>
+          <span class="edit-label">Beschreibung</span><textarea rows="2" oninput="appEditData.beschreibung=this.value" style="font-size:12px;padding:7px 10px">${esc(d.beschreibung||'')}</textarea>
+          <span class="edit-label">Adresse</span>
+          <div>
+            <input id="up-adresse" value="${esc(d.adresse||'')}" placeholder="Adresse (Google-Vorschläge)" oninput="appEditData.adresse=this.value">
+            <div id="up-coords" style="font-size:11px;color:#27AE60;margin-top:3px;display:${hasCoords?'block':'none'}">📍 <span id="up-coords-text">${hasCoords?d.lat.toFixed(5)+', '+d.lng.toFixed(5):''}</span></div>
+          </div>
+          <span class="edit-label" style="color:#bbb;font-size:11px">oder Koord.</span>
+          <div><input id="up-coords-paste" placeholder="46.7513, 14.0364" style="font-size:12px" oninput="parseCoordsInput(this.value)"></div>
+        </div>
+        <div class="btn-row">
+          <button onclick="cancelAppEdit()">Abbrechen</button>
+          <button class="primary" onclick="saveAppEdit('${ev._id}')">Speichern</button>
+        </div>
+        <div class="section-div"></div>
+        <div class="detail-section-title" style="margin-bottom:4px">Firestore-ID</div>
+        <span class="inapp-id">${ev._id}</span>
+      </div>
+    </div>`;
+  }
+
+  const hasCoords = ev.lat && ev.lng;
   return `<div class="detail-panel">
     <div class="detail-top">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
@@ -902,7 +951,10 @@ function appEventDetail(ev) {
           <div class="detail-name">${esc(ev.name)}</div>
           <div class="detail-badges">${typBadge(ev.typ)}<span class="badge badge-inapp">In App</span></div>
         </div>
-        <button class="icon-btn" onclick="selId=null;render()">×</button>
+        <div style="display:flex;gap:4px;flex-shrink:0">
+          <button class="small" onclick="startAppEdit('${ev._id}')">✏ Bearbeiten</button>
+          <button class="icon-btn" onclick="selId=null;appEditMode=false;render()">×</button>
+        </div>
       </div>
     </div>
     <div class="detail-body">
@@ -914,6 +966,7 @@ function appEventDetail(ev) {
           <span class="field-lbl">Ort</span><span class="field-val">${ev.gemeinde||"—"}</span>
           <span class="field-lbl">Bezirk</span><span class="field-val">${ev.bezirk||"—"}</span>
           <span class="field-lbl">Eintritt</span><span class="field-val">${ev.eintritt||"—"}</span>
+          <span class="field-lbl">Koordinaten</span><span class="field-val" style="font-size:11px;color:${hasCoords?'#27AE60':'#e74c3c'}">${hasCoords?'📍 '+ev.lat.toFixed(4)+', '+ev.lng.toFixed(4):'Nicht gesetzt'}</span>
         </div>
       </div>
       ${ev.beschreibung?`<div class="detail-section">
@@ -921,10 +974,51 @@ function appEventDetail(ev) {
         <div style="font-size:12px;color:#555;line-height:1.6">${esc(ev.beschreibung)}</div>
       </div>`:""}
       <div class="section-div"></div>
-      <div class="detail-section-title">Firestore-ID</div>
+      <div class="detail-section-title" style="margin-bottom:4px">Firestore-ID</div>
       <span class="inapp-id">${ev._id}</span>
     </div>
   </div>`;
+}
+
+function startAppEdit(id) {
+  const ev = appEvents.find(e => e._id === id);
+  if (!ev) return;
+  const d = parseDatum(ev.datum);
+  const datumISO = d
+    ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+    : '';
+  appEditData = { ...ev, datumISO };
+  appEditMode = true;
+  render();
+  setTimeout(() => {
+    if (window.google && window.google.maps && window.google.maps.places) initUploadAutocomplete();
+  }, 50);
+}
+
+function cancelAppEdit() { appEditMode = false; render(); }
+
+function saveAppEdit(id) {
+  if (!appEditData.name || !appEditData.gemeinde) { alert('Name und Standort sind Pflichtfelder.'); return; }
+  if (!appEditData.datumISO) { alert('Bitte ein Datum eingeben.'); return; }
+  const uhr = appEditData.uhrzeit || '20:00';
+  const datumISO = `${appEditData.datumISO}T${uhr}:00.000Z`;
+  db.collection('events').doc(id).update({
+    name: appEditData.name,
+    datum: datumISO,
+    uhrzeit: uhr,
+    standort: appEditData.gemeinde,
+    gemeinde: appEditData.gemeinde,
+    adresse: appEditData.adresse || '',
+    bezirk: appEditData.bezirk || '',
+    eintritt: appEditData.eintritt || '',
+    beschreibung: appEditData.beschreibung || '',
+    typ: appEditData.typ || 'e1',
+    latitude: appEditData.lat || null,
+    longitude: appEditData.lng || null,
+  }).then(() => {
+    appEditMode = false;
+    showToast('✓ ' + appEditData.name + ' aktualisiert');
+  }).catch(e => alert('Fehler: ' + e.message));
 }
 
 // ---- BEZIRKE TAB ----
@@ -1076,7 +1170,7 @@ function importCSV() {
       if(isHardDupe(name,bezRaw,datRaw,addedKeys)){dupes++;continue;}
       const d=parseDatum(datRaw);
       if(d) addedKeys.add(`${normalizeName(name)}|${bezRaw}|${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`);
-      const typRaw = (iT>=0?c[iT]||"":"").trim().split(" ")[0]||"Kirchtag";
+      const typRaw = (iT>=0?c[iT]||"":"").trim().split(" ")[0]||"Kirchtage/Feste";
       const yr = getYear(datRaw);
       const ref = db.collection("pending_events").doc();
       batch.set(ref, {
@@ -1202,7 +1296,7 @@ function importFlyerCSV() {
       addedKeys.add(`${normalizeName(name)}|${bezRaw}|${dKey}`);
     }
 
-    const typRaw = (iT >= 0 ? c[iT] || "" : "").trim().split(" ")[0] || "Kirchtag";
+    const typRaw = (iT >= 0 ? c[iT] || "" : "").trim().split(" ")[0] || "Kirchtage/Feste";
     flyerEvents.push({
       name, datum: datRaw,
       uhrzeit: (iU >= 0 ? c[iU] || "" : "").trim() || "20:00",
@@ -1353,7 +1447,7 @@ function submitFlyerUpload() {
     standort: uploadData.standort, gemeinde: uploadData.standort,
     adresse: uploadData.adresse || '', bezirk: uploadData.bezirk || '',
     beschreibung: combinedBeschreibung, eintritt: uploadData.eintritt || '',
-    typ: uploadData.typ || 'e1', lat: uploadData.lat || null, lng: uploadData.lng || null,
+    typ: uploadData.typ || 'e1', latitude: uploadData.lat || null, longitude: uploadData.lng || null,
     id: Date.now().toString(), createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   }).then(() => {
     flyerEvents[flyerUploadIndex].status = "hochgeladen";
@@ -1429,7 +1523,7 @@ function closeUpload() {
 
 function uploadFormHTML() {
   const bezOpts = BEZIRKE.map(b => `<option value="${b}" ${uploadData.bezirk===b?'selected':''}>${b}</option>`).join('');
-  const typOpts = [['e1','Kirchtag'],['e2','Feuerwehr'],['e3','Disco/Party'],['e4','Ball'],['e5','Krampus']]
+  const typOpts = [['e1','Kirchtage/Feste'],['e2','Feuerwehr'],['e3','Disco/Party'],['e4','Ball'],['e5','Krampus'],['e6','Festival/Open-Air']]
     .map(([v,l]) => `<option value="${v}" ${uploadData.typ===v?'selected':''}>${l}</option>`).join('');
   const similar = similarInApp(uploadData.name, uploadData.bezirk);
   const warnHtml = similar.length > 0 ? `
@@ -1483,12 +1577,17 @@ function initUploadAutocomplete() {
   ac.addListener('place_changed', () => {
     const place = ac.getPlace();
     if (!place.geometry) return;
-    uploadData.lat = place.geometry.location.lat();
-    uploadData.lng = place.geometry.location.lng();
-    uploadData.adresse = place.formatted_address;
+    const lat = place.geometry.location.lat();
+    const lng = place.geometry.location.lng();
+    if (appEditMode) {
+      appEditData.lat = lat; appEditData.lng = lng;
+      appEditData.adresse = place.formatted_address;
+    } else {
+      uploadData.lat = lat; uploadData.lng = lng;
+      uploadData.adresse = place.formatted_address;
+    }
     document.getElementById('up-coords').style.display = 'block';
-    document.getElementById('up-coords-text').textContent =
-      `${uploadData.lat.toFixed(5)}, ${uploadData.lng.toFixed(5)}`;
+    document.getElementById('up-coords-text').textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
     const warn = document.getElementById('up-no-coords-warn');
     if (warn) warn.style.display = 'none';
   });
@@ -1497,11 +1596,14 @@ function initUploadAutocomplete() {
 function parseCoordsInput(val) {
   const m = val.trim().match(/^(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)$/);
   if (!m) return;
-  uploadData.lat = parseFloat(m[1]);
-  uploadData.lng = parseFloat(m[2]);
+  const lat = parseFloat(m[1]), lng = parseFloat(m[2]);
+  if (appEditMode) {
+    appEditData.lat = lat; appEditData.lng = lng;
+  } else {
+    uploadData.lat = lat; uploadData.lng = lng;
+  }
   document.getElementById('up-coords').style.display = 'block';
-  document.getElementById('up-coords-text').textContent =
-    `${uploadData.lat.toFixed(5)}, ${uploadData.lng.toFixed(5)}`;
+  document.getElementById('up-coords-text').textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
   const warn = document.getElementById('up-no-coords-warn');
   if (warn) warn.style.display = 'none';
 }
@@ -1531,8 +1633,8 @@ function submitUpload() {
     beschreibung: combinedBeschreibung,
     eintritt: uploadData.eintritt || '',
     typ: uploadData.typ || 'e1',
-    lat: uploadData.lat || null,
-    lng: uploadData.lng || null,
+    latitude: uploadData.lat || null,
+    longitude: uploadData.lng || null,
     id: Date.now().toString(),
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   }).then(() => db.collection('pending_events').doc(uploadPendingId).update({ inApp: true }))
