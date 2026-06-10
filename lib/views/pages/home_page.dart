@@ -560,6 +560,7 @@ class _HomePageState extends State<HomePage> {
       'assets/image/Ball.png',
       'assets/image/krampus.jpg',
       'assets/image/kirchtag.jpg',
+      'assets/image/festival4.png',
     ];
     for (final path in images) {
       precacheImage(AssetImage(path), context);

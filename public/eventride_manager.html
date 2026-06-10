@@ -277,9 +277,11 @@ const GEMEINDEN = {
   "Völkermarkt":["Bleiburg","Diex","Eberndorf","Eisenkappel-Vellach","Feistritz ob Bleiburg","Gallizien","Globasnitz","Griffen","Neuhaus","Ruden","St. Kanzian am Klopeiner See","Sittersdorf","Völkermarkt"],
   "Wolfsberg":["Bad St. Leonhard im Lavanttal","Frantschach-St. Gertraud","Lavamünd","Preitenegg","Reichenfels","St. Andrä","St. Georgen im Lavanttal","St. Paul im Lavanttal","Wolfsberg"]
 };
-const TYP_CODE = {"Kirchtage/Feste":"e1","Feuerwehr":"e2","Disco/Party":"e3","Ball":"e4","Krampus":"e5","Festival/Open-Air":"e6"};
+const TYP_CODE = {"Kirchtage/Feste":"e1","Kirchtag":"e1","Feuerwehr":"e2","Feuerwehrfest":"e2","Disco/Party":"e3","Disco":"e3","Ball":"e4","Krampus":"e5","Krampuslauf":"e5","Festival/Open-Air":"e6","Festival":"e6"};
 const TYP_FROM_CODE = {"e1":"Kirchtage/Feste","e2":"Feuerwehr","e3":"Disco/Party","e4":"Ball","e5":"Krampus","e6":"Festival/Open-Air"};
 const TYPEN = ["Kirchtage/Feste","Feuerwehr","Ball","Krampus","Disco/Party","Festival/Open-Air"];
+const VALID_TYP_CODES = new Set(['e0','e1','e2','e3','e4','e5','e6']);
+function normalizeTyp(v) { return VALID_TYP_CODES.has(v) ? v : (TYP_CODE[v] || 'e1'); }
 
 let appEvents = [];
 let pending = [];
@@ -988,7 +990,7 @@ function startAppEdit(id) {
   const datumISO = d
     ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
     : '';
-  appEditData = { ...ev, datumISO };
+  appEditData = { ...ev, datumISO, typ: normalizeTyp(ev.typ) };
   appEditMode = true;
   render();
   setTimeout(() => {
@@ -1013,7 +1015,7 @@ function saveAppEdit(id) {
     bezirk: appEditData.bezirk || '',
     eintritt: appEditData.eintritt || '',
     beschreibung: appEditData.beschreibung || '',
-    typ: appEditData.typ || 'e1',
+    typ: normalizeTyp(appEditData.typ),
     latitude: appEditData.lat || null,
     longitude: appEditData.lng || null,
   }).then(() => {
@@ -1189,7 +1191,7 @@ function importCSV() {
         gemeinde:iG>=0?c[iG]:"", bezirk:bezRaw,
         adresse:iA>=0?(c[iA]||""):"",
         veranstalter:iV>=0?c[iV]:"örtlich", eintritt:iE>=0?c[iE]:"k.A.",
-        typ:typRaw, quelle:iQ>=0?c[iQ]:"", quelle2:"",
+        typ:normalizeTyp(typRaw), quelle:iQ>=0?c[iQ]:"", quelle2:"",
         status:yr>=2026?"confirmed":"check", geprueft:false, inApp:false,
         createdAt:firebase.firestore.FieldValue.serverTimestamp()
       });
@@ -1458,7 +1460,7 @@ function submitFlyerUpload() {
     standort: uploadData.standort, gemeinde: uploadData.standort,
     adresse: uploadData.adresse || uploadData.standort || '', bezirk: uploadData.bezirk || '',
     beschreibung: combinedBeschreibung, eintritt: uploadData.eintritt || '',
-    typ: uploadData.typ || 'e1', latitude: uploadData.lat || null, longitude: uploadData.lng || null,
+    typ: normalizeTyp(uploadData.typ), latitude: uploadData.lat || null, longitude: uploadData.lng || null,
     id: Date.now().toString(), createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   }).then(() => {
     flyerEvents[flyerUploadIndex].status = "hochgeladen";
@@ -1653,7 +1655,7 @@ function submitUpload() {
     bezirk: uploadData.bezirk || '',
     beschreibung: combinedBeschreibung,
     eintritt: uploadData.eintritt || '',
-    typ: uploadData.typ || 'e1',
+    typ: normalizeTyp(uploadData.typ),
     latitude: uploadData.lat || null,
     longitude: uploadData.lng || null,
     id: Date.now().toString(),
