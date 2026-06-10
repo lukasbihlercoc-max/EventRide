@@ -990,7 +990,7 @@ function renderCSV() {
       <h3 style="font-size:15px;font-weight:700;margin-bottom:.5rem">CSV Import (Copilot-Recherche)</h3>
       <p style="font-size:13px;color:#888;margin-bottom:1rem;line-height:1.6">Copilot-Tabelle hier einfügen. Pflicht: <code>Eventname</code>, <code>Datum</code>. Optional: Uhrzeit, Gemeinde, Bezirk, Veranstalter, Eintritt, Typ, Quelle. Duplikate werden automatisch erkannt und übersprungen. Events landen in der Recherche-Liste zur manuellen Prüfung.</p>
       <div style="background:#f7f7f5;border-radius:8px;padding:8px 12px;font-family:monospace;font-size:11px;color:#888;margin-bottom:1rem">
-        Eventname,Datum,Uhrzeit,Gemeinde,Bezirk,Veranstalter,Eintritt,Typ,Quelle
+        Eventname,Datum,Uhrzeit,Gemeinde,Bezirk,Adresse,Veranstalter,Eintritt,Typ,Quelle
       </div>
       <textarea id="csv-input" rows="10" placeholder="CSV hier einfügen…" style="font-family:monospace;font-size:12px;margin-bottom:1rem"></textarea>
       <div style="display:flex;align-items:center;gap:12px">
@@ -1002,7 +1002,7 @@ function renderCSV() {
 
     <div class="card" style="padding:1.5rem">
       <h3 style="font-size:15px;font-weight:700;margin-bottom:.5rem">Flyer-Import</h3>
-      <p style="font-size:13px;color:#888;margin-bottom:1rem;line-height:1.6">Copilot-Ausgabe aus Flyer-Screenshots einfügen. Gleiches CSV-Format. Events landen direkt im Upload-Flow – keine manuelle Vorprüfung nötig. Duplikate werden beim Import erkannt und übersprungen.</p>
+      <p style="font-size:13px;color:#888;margin-bottom:1rem;line-height:1.6">Copilot-Ausgabe aus Flyer-Screenshots einfügen. Gleiches CSV-Format wie oben inkl. optionaler <code>Adresse</code>-Spalte (z.B. "Feuerwehrhaus Seeboden, Hauptstraße 1"). Events landen direkt im Upload-Flow – keine manuelle Vorprüfung nötig.</p>
       <textarea id="flyer-csv-input" rows="6" placeholder="CSV hier einfügen…" style="font-family:monospace;font-size:12px;margin-bottom:1rem"></textarea>
       <div style="display:flex;align-items:center;gap:12px">
         <button class="primary" onclick="importFlyerCSV()">↑ Flyer importieren</button>
@@ -1039,7 +1039,7 @@ function importCSV() {
   const sep = lines[0].includes(";") ? ";" : ",";
   const hdrs = splitCSVLine(lines[0], sep).map(h=>h.toLowerCase());
   const idx = k => hdrs.findIndex(h=>h.includes(k));
-  const iN=idx("name"),iD=idx("datum"),iU=idx("uhrzeit"),iG=idx("gemeinde"),iB=idx("bezirk"),iV=idx("veranstalter"),iE=idx("eintritt"),iT=idx("typ"),iQ=idx("quelle");
+  const iN=idx("name"),iD=idx("datum"),iU=idx("uhrzeit"),iG=idx("gemeinde"),iB=idx("bezirk"),iA=idx("adresse"),iV=idx("veranstalter"),iE=idx("eintritt"),iT=idx("typ"),iQ=idx("quelle");
   if(iN<0||iD<0){setCsvMsg("Spalten 'Eventname' und 'Datum' fehlen.","red");return;}
 
   const total = lines.length - 1;
@@ -1075,6 +1075,7 @@ function importCSV() {
       batch.set(ref, {
         name, datum:datRaw, uhrzeit:iU>=0?c[iU]:"20:00",
         gemeinde:iG>=0?c[iG]:"", bezirk:bezRaw,
+        adresse:iA>=0?(c[iA]||""):"",
         veranstalter:iV>=0?c[iV]:"örtlich", eintritt:iE>=0?c[iE]:"k.A.",
         typ:typRaw, quelle:iQ>=0?c[iQ]:"", quelle2:"",
         status:yr>=2026?"confirmed":"check", geprueft:false, inApp:false,
@@ -1167,7 +1168,7 @@ function importFlyerCSV() {
   const hdrs = splitCSVLine(lines[0], sep).map(h => h.toLowerCase());
   const idx = k => hdrs.findIndex(h => h.includes(k));
   const iN=idx("name"),iD=idx("datum"),iU=idx("uhrzeit"),iG=idx("gemeinde"),
-        iB=idx("bezirk"),iV=idx("veranstalter"),iE=idx("eintritt"),iT=idx("typ"),iQ=idx("quelle");
+        iB=idx("bezirk"),iA=idx("adresse"),iV=idx("veranstalter"),iE=idx("eintritt"),iT=idx("typ"),iQ=idx("quelle");
   if (iN < 0 || iD < 0) { showToast("Spalten 'Eventname' und 'Datum' fehlen.", false); return; }
 
   let imported = 0, dupes = 0;
@@ -1200,6 +1201,7 @@ function importFlyerCSV() {
       uhrzeit: (iU >= 0 ? c[iU] || "" : "").trim() || "20:00",
       gemeinde: iG >= 0 ? (c[iG] || "").trim() : "",
       bezirk: bezRaw,
+      adresse: iA >= 0 ? (c[iA] || "").trim() : "",
       veranstalter: iV >= 0 ? (c[iV] || "").trim() : "örtlich",
       eintritt: iE >= 0 ? (c[iE] || "").trim() : "k.A.",
       typ: typRaw,
@@ -1291,7 +1293,7 @@ function openFlyerUpload(index) {
   const uhr = ev.uhrzeit === 'ganztags' ? '20:00' : (ev.uhrzeit || '20:00');
   uploadData = {
     name: ev.name || '', datum: datumISO, uhrzeit: uhr,
-    standort: ev.gemeinde || '', adresse: '',
+    standort: ev.gemeinde || '', adresse: ev.adresse || '',
     bezirk: ev.bezirk || '', typ: TYP_CODE[ev.typ] || 'e1',
     eintritt: (ev.eintritt === 'k.A.' ? '' : ev.eintritt) || '',
     beschreibung: '', lat: null, lng: null,
@@ -1392,7 +1394,7 @@ function openUpload(id) {
     datum: datumISO,
     uhrzeit: uhr,
     standort: ev.gemeinde || '',
-    adresse: '',
+    adresse: ev.adresse || '',
     bezirk: ev.bezirk || '',
     typ: TYP_CODE[ev.typ] || 'e1',
     eintritt: (ev.eintritt === 'k.A.' ? '' : ev.eintritt) || '',
@@ -1443,8 +1445,9 @@ function uploadFormHTML() {
     <input id="up-standort" value="${esc(uploadData.standort)}" oninput="uploadData.standort=this.value">
     <span class="edit-label">Adresse</span>
     <div>
-      <input id="up-adresse" placeholder="Adresse eingeben (Maps-Vorschläge)" oninput="uploadData.adresse=this.value">
+      <input id="up-adresse" value="${esc(uploadData.adresse)}" placeholder="Adresse eingeben (Maps-Vorschläge)" oninput="uploadData.adresse=this.value;document.getElementById('up-no-coords-warn').style.display=this.value?'block':'none'">
       <div id="up-coords" style="font-size:11px;color:#27AE60;margin-top:3px;display:none">📍 <span id="up-coords-text"></span></div>
+      <div id="up-no-coords-warn" style="font-size:11px;color:#7A4A00;background:#FFFBF0;border:1px solid #FAC775;border-radius:6px;padding:5px 8px;margin-top:4px;display:${uploadData.adresse?'block':'none'}">⚠ Einen Vorschlag aus der Liste auswählen – erst dann werden Koordinaten gesetzt</div>
     </div>
     <span class="edit-label">Bezirk</span>
     <select id="up-bezirk" onchange="uploadData.bezirk=this.value"><option value="">–</option>${bezOpts}</select>
@@ -1473,6 +1476,8 @@ function initUploadAutocomplete() {
     document.getElementById('up-coords').style.display = 'block';
     document.getElementById('up-coords-text').textContent =
       `${uploadData.lat.toFixed(5)}, ${uploadData.lng.toFixed(5)}`;
+    const warn = document.getElementById('up-no-coords-warn');
+    if (warn) warn.style.display = 'none';
   });
 }
 
