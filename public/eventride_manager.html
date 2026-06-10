@@ -236,11 +236,11 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#E88C2E;box-sh
 <div id="modal-upload" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeUpload()">
   <div class="modal" style="width:520px;max-width:95vw">
     <div class="modal-header">
-      <h3 style="margin:0">In App hochladen</h3>
+      <h3 id="upload-modal-title" style="margin:0">In App hochladen</h3>
       <button class="icon-btn" onclick="closeUpload()">×</button>
     </div>
     <div id="upload-form-content"></div>
-    <div class="btn-row" style="margin-top:1rem">
+    <div class="btn-row" id="upload-btn-row" style="margin-top:1rem">
       <button onclick="closeUpload()">Abbrechen</button>
       <button class="primary" id="btn-upload-submit" onclick="submitUpload()">↑ In App speichern</button>
     </div>
@@ -293,6 +293,9 @@ let showPast = false;
 let addFormData = {};
 let uploadData = {};
 let uploadPendingId = null;
+let flyerEvents = [];
+let flyerUploadIndex = 0;
+let isFlyerMode = false;
 
 // ---- AUTH ----
 const ALLOWED_EMAILS = ['lukas.bihler.coc@gmail.com', 'matzematze666@gmail.com', 'chiara.bihler.cb@gmail.com'];
@@ -615,11 +618,13 @@ function eventRow(ev, hasDupes=false) {
   const past = isPast(ev.datum);
   const isSel = selId===ev._id;
   const inApp = ev.inApp || appEvents.some(a=>a.name.trim().toLowerCase()===ev.name.trim().toLowerCase());
+  const similarApp = !inApp && similarInApp(ev.name, ev.bezirk).length > 0;
   let statusClass = check ? "status-check" : (inApp ? "status-inapp" : "status-confirmed");
 
   const icons = [];
   if(ev.geprueft) icons.push(`<span class="icon-check" title="Manuell geprüft">✓</span>`);
   if(inApp) icons.push(`<span class="icon-upload" title="In App">↑</span>`);
+  if(similarApp) icons.push(`<span style="font-size:10px;background:#E6F1FB;color:#0C447C;padding:1px 6px;border-radius:8px;font-weight:600" title="Ähnliches Event möglicherweise bereits in App">~App</span>`);
   if(hasDupes) icons.push(`<span style="font-size:10px;background:#FFF3D6;color:#7A4A00;padding:1px 6px;border-radius:8px;font-weight:600">ähnlich</span>`);
 
   return `<div class="event-row ${statusClass} ${isSel?"selected":""} ${past&&!inApp?"past":""} ${hasDupes?"has-dupes":""}" onclick="selectEv('${ev._id}')">
@@ -980,18 +985,30 @@ function renderBezirke() {
 // ---- CSV TAB ----
 function renderCSV() {
   document.getElementById("content").innerHTML = `
-  <div class="card" style="padding:1.5rem;max-width:700px">
-    <h3 style="font-size:15px;font-weight:700;margin-bottom:.5rem">CSV Import (Copilot-Ausgabe)</h3>
-    <p style="font-size:13px;color:#888;margin-bottom:1rem;line-height:1.6">Copilot-Tabelle hier einfügen. Pflicht: <code>Eventname</code>, <code>Datum</code>. Optional: Uhrzeit, Gemeinde, Bezirk, Veranstalter, Eintritt, Typ, Quelle. Duplikate werden automatisch erkannt und übersprungen.</p>
-    <div style="background:#f7f7f5;border-radius:8px;padding:8px 12px;font-family:monospace;font-size:11px;color:#888;margin-bottom:1rem">
-      Eventname,Datum,Uhrzeit,Gemeinde,Bezirk,Veranstalter,Eintritt,Typ,Quelle
+  <div style="max-width:700px;display:flex;flex-direction:column;gap:1rem">
+    <div class="card" style="padding:1.5rem">
+      <h3 style="font-size:15px;font-weight:700;margin-bottom:.5rem">CSV Import (Copilot-Recherche)</h3>
+      <p style="font-size:13px;color:#888;margin-bottom:1rem;line-height:1.6">Copilot-Tabelle hier einfügen. Pflicht: <code>Eventname</code>, <code>Datum</code>. Optional: Uhrzeit, Gemeinde, Bezirk, Veranstalter, Eintritt, Typ, Quelle. Duplikate werden automatisch erkannt und übersprungen. Events landen in der Recherche-Liste zur manuellen Prüfung.</p>
+      <div style="background:#f7f7f5;border-radius:8px;padding:8px 12px;font-family:monospace;font-size:11px;color:#888;margin-bottom:1rem">
+        Eventname,Datum,Uhrzeit,Gemeinde,Bezirk,Veranstalter,Eintritt,Typ,Quelle
+      </div>
+      <textarea id="csv-input" rows="10" placeholder="CSV hier einfügen…" style="font-family:monospace;font-size:12px;margin-bottom:1rem"></textarea>
+      <div style="display:flex;align-items:center;gap:12px">
+        <button class="primary" id="csv-import-btn" onclick="importCSV()">↑ In Recherche importieren</button>
+        <span id="csv-msg" style="font-size:13px"></span>
+      </div>
+      <div id="csv-progress" style="display:none"></div>
     </div>
-    <textarea id="csv-input" rows="12" placeholder="CSV hier einfügen…" style="font-family:monospace;font-size:12px;margin-bottom:1rem"></textarea>
-    <div style="display:flex;align-items:center;gap:12px">
-      <button class="primary" id="csv-import-btn" onclick="importCSV()">↑ Importieren</button>
-      <span id="csv-msg" style="font-size:13px"></span>
+
+    <div class="card" style="padding:1.5rem">
+      <h3 style="font-size:15px;font-weight:700;margin-bottom:.5rem">Flyer-Import</h3>
+      <p style="font-size:13px;color:#888;margin-bottom:1rem;line-height:1.6">Copilot-Ausgabe aus Flyer-Screenshots einfügen. Gleiches CSV-Format. Events landen direkt im Upload-Flow – keine manuelle Vorprüfung nötig. Duplikate werden beim Import erkannt und übersprungen.</p>
+      <textarea id="flyer-csv-input" rows="6" placeholder="CSV hier einfügen…" style="font-family:monospace;font-size:12px;margin-bottom:1rem"></textarea>
+      <div style="display:flex;align-items:center;gap:12px">
+        <button class="primary" onclick="importFlyerCSV()">↑ Flyer importieren</button>
+      </div>
+      <div id="flyer-list-section">${flyerListHTML()}</div>
     </div>
-    <div id="csv-progress" style="display:none"></div>
   </div>`;
 }
 
@@ -1140,8 +1157,228 @@ function setCsvMsg(msg,color) {
   setTimeout(()=>{if(el)el.textContent="";},5000);
 }
 
+// ---- FLYER IMPORT ----
+function importFlyerCSV() {
+  const text = (document.getElementById("flyer-csv-input").value || "").trim();
+  const lines = text.split("\n").filter(l => l.trim());
+  if (lines.length < 2) { showToast("Mind. Header + 1 Zeile nötig.", false); return; }
+
+  const sep = lines[0].includes(";") ? ";" : ",";
+  const hdrs = splitCSVLine(lines[0], sep).map(h => h.toLowerCase());
+  const idx = k => hdrs.findIndex(h => h.includes(k));
+  const iN=idx("name"),iD=idx("datum"),iU=idx("uhrzeit"),iG=idx("gemeinde"),
+        iB=idx("bezirk"),iV=idx("veranstalter"),iE=idx("eintritt"),iT=idx("typ"),iQ=idx("quelle");
+  if (iN < 0 || iD < 0) { showToast("Spalten 'Eventname' und 'Datum' fehlen.", false); return; }
+
+  let imported = 0, dupes = 0;
+  const addedKeys = new Set();
+
+  for (let i = 1; i < lines.length; i++) {
+    const c = splitCSVLine(lines[i], sep);
+    const name = (c[iN] || "").trim();
+    if (!name) continue;
+    const datRaw = c[iD] || "";
+    const bezRaw = iB >= 0 ? (c[iB] || "").trim() : "";
+
+    if (isHardDupe(name, bezRaw, datRaw, addedKeys)) { dupes++; continue; }
+    const d = parseDatum(datRaw);
+    if (d) {
+      const dKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      const inFlyer = flyerEvents.some(fe => {
+        const fd = parseDatum(fe.datum);
+        if (!fd) return false;
+        return normalizeName(fe.name) === normalizeName(name) && fe.bezirk === bezRaw &&
+          `${fd.getFullYear()}-${fd.getMonth()}-${fd.getDate()}` === dKey;
+      });
+      if (inFlyer) { dupes++; continue; }
+      addedKeys.add(`${normalizeName(name)}|${bezRaw}|${dKey}`);
+    }
+
+    const typRaw = (iT >= 0 ? c[iT] || "" : "").trim().split(" ")[0] || "Kirchtag";
+    flyerEvents.push({
+      name, datum: datRaw,
+      uhrzeit: (iU >= 0 ? c[iU] || "" : "").trim() || "20:00",
+      gemeinde: iG >= 0 ? (c[iG] || "").trim() : "",
+      bezirk: bezRaw,
+      veranstalter: iV >= 0 ? (c[iV] || "").trim() : "örtlich",
+      eintritt: iE >= 0 ? (c[iE] || "").trim() : "k.A.",
+      typ: typRaw,
+      quelle: iQ >= 0 ? (c[iQ] || "").trim() : "",
+      status: "offen"
+    });
+    imported++;
+  }
+
+  flyerEvents.sort((a, b) => {
+    const da = parseDatum(a.datum), db2 = parseDatum(b.datum);
+    if (!da && !db2) return 0; if (!da) return 1; if (!db2) return -1;
+    return da - db2;
+  });
+
+  const el = document.getElementById("flyer-csv-input");
+  if (el) el.value = "";
+
+  if (imported === 0) {
+    showToast(`Keine neuen Events – ${dupes} Duplikat${dupes !== 1 ? "e" : ""} übersprungen`, false);
+  } else {
+    showToast(`✓ ${imported} importiert${dupes ? " · " + dupes + " übersprungen" : ""}`);
+  }
+  updateFlyerList();
+}
+
+function flyerListHTML() {
+  if (flyerEvents.length === 0) return "";
+  const offen = flyerEvents.filter(e => e.status === "offen").length;
+  const hochgeladen = flyerEvents.filter(e => e.status === "hochgeladen").length;
+  const uebersprungen = flyerEvents.filter(e => e.status === "übersprungen").length;
+
+  const rows = flyerEvents.map((ev, i) => {
+    const past = isPast(ev.datum);
+    const statusColor = ev.status === "hochgeladen" ? "#27AE60" : ev.status === "übersprungen" ? "#bbb" : "#E88C2E";
+    return `<div class="event-row" style="opacity:${ev.status !== "offen" ? "0.55" : "1"}">
+      ${typBadge(ev.typ)}
+      <div style="flex:1;min-width:0">
+        <div class="event-name">${esc(ev.name)}</div>
+        <div class="event-meta">${esc(ev.gemeinde)}${ev.bezirk ? " · " + esc(ev.bezirk) : ""}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <div class="event-date" style="color:${past && ev.status==="offen" ? "#e74c3c" : "#555"}">${fmt(ev.datum)}</div>
+        <span style="font-size:11px;font-weight:600;color:${statusColor};min-width:78px;text-align:right">${ev.status}</span>
+        ${ev.status === "offen" ? `<button class="small primary" onclick="openFlyerUpload(${i})">↑</button>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+
+  return `<div style="border-top:2px solid #e2e2df;padding-top:1.25rem;margin-top:1.25rem">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div>
+        <span style="font-size:14px;font-weight:700">Flyer-Events</span>
+        <span style="font-size:12px;color:#aaa;margin-left:10px">
+          ${offen > 0 ? `<span style="color:#E88C2E;font-weight:600">${offen} offen</span>` : ""}
+          ${hochgeladen > 0 ? `${offen > 0 ? " · " : ""}<span style="color:#27AE60;font-weight:600">${hochgeladen} hochgeladen</span>` : ""}
+          ${uebersprungen > 0 ? ` · <span style="color:#bbb">${uebersprungen} übersprungen</span>` : ""}
+        </span>
+      </div>
+      <div style="display:flex;gap:8px">
+        ${offen > 0 ? `<button class="primary" onclick="openFlyerUploadFlow()">↑ Alle hochladen (${offen})</button>` : ""}
+        <button class="small danger" onclick="if(confirm('Alle Flyer-Events löschen?')){flyerEvents=[];updateFlyerList();}">Leeren</button>
+      </div>
+    </div>
+    <div class="event-list-wrap">${rows}</div>
+  </div>`;
+}
+
+function updateFlyerList() {
+  const el = document.getElementById("flyer-list-section");
+  if (el) el.innerHTML = flyerListHTML();
+}
+
+function openFlyerUploadFlow() {
+  const firstIdx = flyerEvents.findIndex(e => e.status === "offen");
+  if (firstIdx >= 0) openFlyerUpload(firstIdx);
+}
+
+function openFlyerUpload(index) {
+  flyerUploadIndex = index;
+  isFlyerMode = true;
+  const ev = flyerEvents[index];
+  if (!ev) return;
+
+  const d = parseDatum(ev.datum);
+  const datumISO = d
+    ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+    : '';
+  const uhr = ev.uhrzeit === 'ganztags' ? '20:00' : (ev.uhrzeit || '20:00');
+  uploadData = {
+    name: ev.name || '', datum: datumISO, uhrzeit: uhr,
+    standort: ev.gemeinde || '', adresse: '',
+    bezirk: ev.bezirk || '', typ: TYP_CODE[ev.typ] || 'e1',
+    eintritt: (ev.eintritt === 'k.A.' ? '' : ev.eintritt) || '',
+    beschreibung: '', lat: null, lng: null,
+  };
+
+  const allOffen = flyerEvents.filter(e => e.status === "offen");
+  const pos = allOffen.indexOf(ev) + 1;
+  document.getElementById('upload-modal-title').textContent =
+    `Flyer hochladen (${pos} von ${allOffen.length})`;
+
+  document.getElementById('upload-form-content').innerHTML = uploadFormHTML();
+  document.getElementById('up-eintritt').value = uploadData.eintritt;
+  document.getElementById('up-beschreibung').value = uploadData.beschreibung;
+
+  document.getElementById('upload-btn-row').innerHTML =
+    '<button onclick="closeUpload()">Schließen</button>' +
+    '<button onclick="skipFlyerEvent()">→ Überspringen</button>' +
+    '<button class="primary" id="btn-upload-submit" onclick="submitFlyerUpload()">↑ In App speichern</button>';
+
+  document.getElementById('modal-upload').style.display = 'flex';
+  if (window.google && window.google.maps && window.google.maps.places) initUploadAutocomplete();
+}
+
+function skipFlyerEvent() {
+  flyerEvents[flyerUploadIndex].status = "übersprungen";
+  updateFlyerList();
+  const nextIdx = flyerEvents.findIndex((e, i) => i > flyerUploadIndex && e.status === "offen");
+  if (nextIdx >= 0) { openFlyerUpload(nextIdx); return; }
+  const anyOffen = flyerEvents.findIndex(e => e.status === "offen");
+  if (anyOffen >= 0) { openFlyerUpload(anyOffen); return; }
+  showFlyerCompletion();
+}
+
+function submitFlyerUpload() {
+  if (!uploadData.name || !uploadData.standort) { alert('Name und Standort sind Pflichtfelder.'); return; }
+  if (!uploadData.datum) { alert('Bitte ein Datum eingeben.'); return; }
+  const uhr = uploadData.uhrzeit || '20:00';
+  const datumISO = `${uploadData.datum}T${uhr}:00.000Z`;
+  const btn = document.getElementById('btn-upload-submit');
+  btn.disabled = true; btn.textContent = '⏳ Speichert…';
+  const eintrittText = uploadData.eintritt.trim();
+  const beschreibungText = uploadData.beschreibung.trim();
+  const combinedBeschreibung = eintrittText && beschreibungText
+    ? eintrittText + '\n\n' + beschreibungText : eintrittText || beschreibungText;
+
+  db.collection('events').add({
+    name: uploadData.name, datum: datumISO, uhrzeit: uhr,
+    standort: uploadData.standort, gemeinde: uploadData.standort,
+    adresse: uploadData.adresse || '', bezirk: uploadData.bezirk || '',
+    beschreibung: combinedBeschreibung, eintritt: uploadData.eintritt || '',
+    typ: uploadData.typ || 'e1', lat: uploadData.lat || null, lng: uploadData.lng || null,
+    id: Date.now().toString(), createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+  }).then(() => {
+    flyerEvents[flyerUploadIndex].status = "hochgeladen";
+    updateFlyerList();
+    showToast('✓ ' + uploadData.name + ' in App gespeichert');
+    const nextIdx = flyerEvents.findIndex((e, i) => i > flyerUploadIndex && e.status === "offen");
+    if (nextIdx >= 0) { openFlyerUpload(nextIdx); return; }
+    const anyOffen = flyerEvents.findIndex(e => e.status === "offen");
+    if (anyOffen >= 0) { openFlyerUpload(anyOffen); return; }
+    showFlyerCompletion();
+  }).catch(e => {
+    btn.disabled = false; btn.textContent = '↑ In App speichern';
+    alert('Fehler: ' + e.message);
+  });
+}
+
+function showFlyerCompletion() {
+  const hochgeladen = flyerEvents.filter(e => e.status === "hochgeladen").length;
+  const uebersprungen = flyerEvents.filter(e => e.status === "übersprungen").length;
+  document.getElementById('upload-modal-title').textContent = 'Flyer-Import abgeschlossen';
+  document.getElementById('upload-form-content').innerHTML = `
+    <div style="text-align:center;padding:2rem 1rem">
+      <div style="font-size:40px;margin-bottom:1rem">✅</div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:10px">Alle Events verarbeitet</div>
+      <div style="font-size:13px;color:#888;line-height:2">
+        ${hochgeladen > 0 ? `<span style="color:#27AE60;font-weight:600">${hochgeladen} hochgeladen</span>` : ""}
+        ${uebersprungen > 0 ? `${hochgeladen > 0 ? " · " : ""}<span style="color:#bbb">${uebersprungen} übersprungen</span>` : ""}
+      </div>
+    </div>`;
+  document.getElementById('upload-btn-row').innerHTML =
+    '<button class="primary" style="flex:1" onclick="closeUpload()">Schließen</button>';
+}
+
 // ---- UPLOAD MODAL ----
 function openUpload(id) {
+  isFlyerMode = false;
   const ev = pending.find(e => e._id === id);
   if (!ev) return;
   uploadPendingId = id;
@@ -1172,8 +1409,11 @@ function openUpload(id) {
 
 function closeUpload() {
   document.getElementById('modal-upload').style.display = 'none';
-  const btn = document.getElementById('btn-upload-submit');
-  if (btn) { btn.disabled = false; btn.textContent = '↑ In App speichern'; }
+  isFlyerMode = false;
+  document.getElementById('upload-modal-title').textContent = 'In App hochladen';
+  document.getElementById('upload-btn-row').innerHTML =
+    '<button onclick="closeUpload()">Abbrechen</button>' +
+    '<button class="primary" id="btn-upload-submit" onclick="submitUpload()">↑ In App speichern</button>';
 }
 
 function uploadFormHTML() {
