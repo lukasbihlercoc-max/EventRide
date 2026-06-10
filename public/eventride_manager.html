@@ -904,7 +904,7 @@ function appEventDetail(ev) {
   if (appEditMode) {
     const d = appEditData;
     const bezOpts = BEZIRKE.map(b=>`<option value="${b}" ${d.bezirk===b?'selected':''}>${b}</option>`).join('');
-    const typOpts = [['e1','Kirchtag/Fest'],['e2','Feuerwehr'],['e3','Disco/Party'],['e4','Ball'],['e5','Krampus']]
+    const typOpts = [['e1','Kirchtage/Feste'],['e2','Feuerwehr'],['e3','Disco/Party'],['e4','Ball'],['e5','Krampus'],['e6','Festival/Open-Air']]
       .map(([v,l])=>`<option value="${v}" ${d.typ===v?'selected':''}>  ${l}</option>`).join('');
     const hasCoords = d.lat && d.lng;
     return `<div class="detail-panel">
@@ -951,8 +951,9 @@ function appEventDetail(ev) {
           <div class="detail-name">${esc(ev.name)}</div>
           <div class="detail-badges">${typBadge(ev.typ)}<span class="badge badge-inapp">In App</span></div>
         </div>
-        <div style="display:flex;gap:4px;flex-shrink:0">
-          <button class="small" onclick="startAppEdit('${ev._id}')">✏ Bearbeiten</button>
+        <div style="display:flex;gap:5px;flex-shrink:0;align-items:center">
+          <button class="small primary" onclick="startAppEdit('${ev._id}')">✏ Bearbeiten</button>
+          <button class="small danger" onclick="deleteAppEvent('${ev._id}')">🗑 Löschen</button>
           <button class="icon-btn" onclick="selId=null;appEditMode=false;render()">×</button>
         </div>
       </div>
@@ -1008,7 +1009,7 @@ function saveAppEdit(id) {
     uhrzeit: uhr,
     standort: appEditData.gemeinde,
     gemeinde: appEditData.gemeinde,
-    adresse: appEditData.adresse || '',
+    adresse: appEditData.adresse || appEditData.gemeinde || '',
     bezirk: appEditData.bezirk || '',
     eintritt: appEditData.eintritt || '',
     beschreibung: appEditData.beschreibung || '',
@@ -1018,6 +1019,16 @@ function saveAppEdit(id) {
   }).then(() => {
     appEditMode = false;
     showToast('✓ ' + appEditData.name + ' aktualisiert');
+  }).catch(e => alert('Fehler: ' + e.message));
+}
+
+function deleteAppEvent(id) {
+  const ev = appEvents.find(e => e._id === id);
+  if (!ev) return;
+  if (!confirm(`"${ev.name}" wirklich aus der App löschen?\n\nDiese Aktion kann nicht rückgängig gemacht werden.`)) return;
+  db.collection('events').doc(id).delete().then(() => {
+    selId = null; appEditMode = false;
+    showToast('🗑 ' + ev.name + ' gelöscht');
   }).catch(e => alert('Fehler: ' + e.message));
 }
 
@@ -1445,7 +1456,7 @@ function submitFlyerUpload() {
   db.collection('events').add({
     name: uploadData.name, datum: datumISO, uhrzeit: uhr,
     standort: uploadData.standort, gemeinde: uploadData.standort,
-    adresse: uploadData.adresse || '', bezirk: uploadData.bezirk || '',
+    adresse: uploadData.adresse || uploadData.standort || '', bezirk: uploadData.bezirk || '',
     beschreibung: combinedBeschreibung, eintritt: uploadData.eintritt || '',
     typ: uploadData.typ || 'e1', latitude: uploadData.lat || null, longitude: uploadData.lng || null,
     id: Date.now().toString(), createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -1597,15 +1608,25 @@ function parseCoordsInput(val) {
   const m = val.trim().match(/^(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)$/);
   if (!m) return;
   const lat = parseFloat(m[1]), lng = parseFloat(m[2]);
-  if (appEditMode) {
-    appEditData.lat = lat; appEditData.lng = lng;
-  } else {
-    uploadData.lat = lat; uploadData.lng = lng;
-  }
+  if (appEditMode) { appEditData.lat = lat; appEditData.lng = lng; }
+  else { uploadData.lat = lat; uploadData.lng = lng; }
   document.getElementById('up-coords').style.display = 'block';
   document.getElementById('up-coords-text').textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
   const warn = document.getElementById('up-no-coords-warn');
   if (warn) warn.style.display = 'none';
+  // Reverse Geocoding: Adresse automatisch befüllen wenn noch leer
+  const addrEl = document.getElementById('up-adresse');
+  if (addrEl && !addrEl.value && window.google && google.maps && google.maps.Geocoder) {
+    new google.maps.Geocoder().geocode({location: {lat, lng}}, (results, status) => {
+      if (status !== 'OK' || !results[0]) return;
+      const addr = results[0].formatted_address;
+      addrEl.value = addr;
+      if (appEditMode) appEditData.adresse = addr;
+      else uploadData.adresse = addr;
+      const w = document.getElementById('up-no-coords-warn');
+      if (w) w.style.display = 'none';
+    });
+  }
 }
 
 function submitUpload() {
@@ -1628,7 +1649,7 @@ function submitUpload() {
     uhrzeit: uhr,
     standort: uploadData.standort,
     gemeinde: uploadData.standort,
-    adresse: uploadData.adresse || '',
+    adresse: uploadData.adresse || uploadData.standort || '',
     bezirk: uploadData.bezirk || '',
     beschreibung: combinedBeschreibung,
     eintritt: uploadData.eintritt || '',
