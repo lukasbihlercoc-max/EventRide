@@ -424,8 +424,10 @@ function buildAdminUrl(ev) {
 }
 
 function typBadge(typ) {
-  const map = {"Kirchtage/Feste":"kirchtag",Feuerwehr:"feuerwehr",Ball:"ball",Krampus:"krampus","Disco/Party":"disco","Festival/Open-Air":"festival"};
-  return `<span class="badge badge-${map[typ]||"kirchtag"}">${typ||"?"}</span>`;
+  const toHuman = {"e1":"Kirchtage/Feste","e2":"Feuerwehr","e3":"Disco/Party","e4":"Ball","e5":"Krampus","e6":"Festival/Open-Air"};
+  const toClass = {"Kirchtage/Feste":"kirchtag","Feuerwehr":"feuerwehr","Ball":"ball","Krampus":"krampus","Disco/Party":"disco","Festival/Open-Air":"festival"};
+  const label = toHuman[typ] || typ || "?";
+  return `<span class="badge badge-${toClass[label]||"kirchtag"}">${label}</span>`;
 }
 
 function isDupe(name) {
@@ -789,23 +791,25 @@ function detailPanel(ev) {
 // ---- EDIT ----
 function editFormHTML(d) {
   const bezSelect = BEZIRKE.map(b=>`<option ${d.bezirk===b?"selected":""}>${b}</option>`).join("");
-  const typSelect = TYPEN.map(t=>`<option ${d.typ===t?"selected":""}>${t}</option>`).join("");
+  const typSelect = [['e1','Kirchtage/Feste'],['e2','Feuerwehr'],['e3','Disco/Party'],['e4','Ball'],['e5','Krampus'],['e6','Festival/Open-Air']]
+    .map(([v,l])=>`<option value="${v}" ${d.typ===v?"selected":""}>${l}</option>`).join("");
   const hasCoords = d.lat != null && d.lng != null;
   return `<div class="edit-grid">
     <span class="edit-label">Name *</span><input value="${esc(d.name||"")}" onchange="editData.name=this.value">
     <span class="edit-label">Datum *</span><input value="${esc(d.datum||"")}" placeholder="TT.MM.JJJJ" onchange="editData.datum=this.value">
     <span class="edit-label">Uhrzeit</span><input value="${esc(d.uhrzeit||"")}" onchange="editData.uhrzeit=this.value">
-    <span class="edit-label">Gemeinde</span><input value="${esc(d.gemeinde||"")}" onchange="editData.gemeinde=this.value">
+    <span class="edit-label">Gemeinde *</span><input value="${esc(d.gemeinde||"")}" onchange="editData.gemeinde=this.value">
     <span class="edit-label">Bezirk</span><select onchange="editData.bezirk=this.value">${bezSelect}</select>
     <span class="edit-label">Typ</span><select onchange="editData.typ=this.value">${typSelect}</select>
     <span class="edit-label">Veranstalter</span><input value="${esc(d.veranstalter||"")}" onchange="editData.veranstalter=this.value">
     <span class="edit-label">Eintritt</span><input value="${esc(d.eintritt||"")}" onchange="editData.eintritt=this.value">
+    <span class="edit-label">Beschreibung</span><textarea onchange="editData.beschreibung=this.value" style="font-size:12px;padding:7px 10px;resize:vertical" rows="2">${esc(d.beschreibung||"")}</textarea>
     <span class="edit-label">Quelle</span><input value="${esc(d.quelle||"")}" onchange="editData.quelle=this.value">
     <span class="edit-label">Adresse</span><input id="ed-adresse" value="${esc(d.adresse||"")}" placeholder="Adresse suchen…" oninput="editData.adresse=this.value">
     <span class="edit-label">Koordinaten</span>
     <div>
-      <input placeholder="46.7513, 14.0364 (aus Google Maps)" style="width:100%;box-sizing:border-box" oninput="handleCoordsInput(this.value,editData,'ed-coords','ed-coords-text','ed-no-coords-warn')">
-      <div id="ed-coords" style="display:${hasCoords?'block':'none'};font-size:11px;color:#52A1EF;margin-top:2px">📍 <span id="ed-coords-text">${hasCoords?d.lat.toFixed(5)+', '+d.lng.toFixed(5):''}</span></div>
+      <input placeholder="46.7513, 14.0364 (aus Google Maps)" style="width:100%;box-sizing:border-box" oninput="handleCoordsInput(this.value,editData,'ed-coords','ed-coords-text','ed-no-coords-warn','ed-adresse')">
+      <div id="ed-coords" style="display:${hasCoords?'block':'none'};font-size:11px;color:#27AE60;margin-top:2px">📍 <span id="ed-coords-text">${hasCoords?d.lat.toFixed(5)+', '+d.lng.toFixed(5):''}</span></div>
       <div id="ed-no-coords-warn" style="display:${hasCoords?'none':'block'};font-size:11px;color:#e67e22;margin-top:2px">⚠ Keine Koordinaten – kein Map-Pin in der App</div>
     </div>
   </div>`;
@@ -814,7 +818,11 @@ function editFormHTML(d) {
 function startEdit(id) {
   const ev = pending.find(e=>e._id===id);
   if(!ev) return;
-  editData = {...ev};
+  editData = {...ev,
+    typ: normalizeTyp(ev.typ),
+    lat: ev.latitude ?? ev.lat ?? null,
+    lng: ev.longitude ?? ev.lng ?? null,
+  };
   editMode = true;
   render();
   setTimeout(() => setupAutocomplete('ed-adresse', editData, 'ed-coords', 'ed-coords-text', 'ed-no-coords-warn'), 100);
@@ -829,6 +837,7 @@ function saveEdit(id) {
     adresse: editData.adresse || editData.gemeinde || '',
     latitude: editData.lat || null,
     longitude: editData.lng || null,
+    typ: normalizeTyp(editData.typ),
   };
   if(yr>=2026) patch.status="confirmed";
   db.collection("pending_events").doc(id).update(patch).catch(e=>alert("Fehler: "+e.message));
@@ -854,24 +863,26 @@ function confirm2026(id) {
 
 // ---- ADD MODAL ----
 function openAdd() {
-  addFormData = {name:"",datum:"",uhrzeit:"20:00",gemeinde:"",bezirk:"Spittal",veranstalter:"örtlich",eintritt:"kostenlos",typ:"Kirchtage/Feste",quelle:"",adresse:"",lat:null,lng:null};
+  addFormData = {name:"",datum:"",uhrzeit:"20:00",gemeinde:"",bezirk:"Spittal",veranstalter:"örtlich",eintritt:"",beschreibung:"",typ:"e1",quelle:"",adresse:"",lat:null,lng:null};
   const bezSelect = BEZIRKE.map(b=>`<option ${b==="Spittal"?"selected":""}>${b}</option>`).join("");
-  const typSelect = TYPEN.map(t=>`<option ${t==="Kirchtage/Feste"?"selected":""}>${t}</option>`).join("");
+  const typSelect = [['e1','Kirchtage/Feste'],['e2','Feuerwehr'],['e3','Disco/Party'],['e4','Ball'],['e5','Krampus'],['e6','Festival/Open-Air']]
+    .map(([v,l])=>`<option value="${v}" ${v==="e1"?"selected":""}>${l}</option>`).join("");
   document.getElementById("add-form").innerHTML = `<div class="edit-grid">
     <span class="edit-label">Name *</span><input placeholder="Eventname" oninput="addFormData.name=this.value">
     <span class="edit-label">Datum *</span><input placeholder="TT.MM.JJJJ" oninput="addFormData.datum=this.value">
     <span class="edit-label">Uhrzeit</span><input value="20:00" oninput="addFormData.uhrzeit=this.value">
-    <span class="edit-label">Gemeinde</span><input placeholder="z.B. Seeboden" oninput="addFormData.gemeinde=this.value">
+    <span class="edit-label">Gemeinde *</span><input placeholder="z.B. Seeboden" oninput="addFormData.gemeinde=this.value">
     <span class="edit-label">Bezirk</span><select onchange="addFormData.bezirk=this.value">${bezSelect}</select>
     <span class="edit-label">Typ</span><select onchange="addFormData.typ=this.value">${typSelect}</select>
     <span class="edit-label">Veranstalter</span><input value="örtlich" oninput="addFormData.veranstalter=this.value">
-    <span class="edit-label">Eintritt</span><input value="kostenlos" oninput="addFormData.eintritt=this.value">
+    <span class="edit-label">Eintritt</span><input placeholder="z.B. kostenlos / 12 €" oninput="addFormData.eintritt=this.value">
+    <span class="edit-label">Beschreibung</span><textarea oninput="addFormData.beschreibung=this.value" style="font-size:12px;padding:7px 10px;resize:vertical" rows="2" placeholder="Kurzbeschreibung (optional)"></textarea>
     <span class="edit-label">Quelle</span><input placeholder="URL oder Quelle" oninput="addFormData.quelle=this.value">
     <span class="edit-label">Adresse</span><input id="add-adresse" placeholder="Adresse suchen…" oninput="addFormData.adresse=this.value">
     <span class="edit-label">Koordinaten</span>
     <div>
-      <input placeholder="46.7513, 14.0364 (aus Google Maps)" style="width:100%;box-sizing:border-box" oninput="handleCoordsInput(this.value,addFormData,'add-coords','add-coords-text','add-no-coords-warn')">
-      <div id="add-coords" style="display:none;font-size:11px;color:#52A1EF;margin-top:2px">📍 <span id="add-coords-text"></span></div>
+      <input placeholder="46.7513, 14.0364 (aus Google Maps)" style="width:100%;box-sizing:border-box" oninput="handleCoordsInput(this.value,addFormData,'add-coords','add-coords-text','add-no-coords-warn','add-adresse')">
+      <div id="add-coords" style="display:none;font-size:11px;color:#27AE60;margin-top:2px">📍 <span id="add-coords-text"></span></div>
       <div id="add-no-coords-warn" style="font-size:11px;color:#e67e22;margin-top:2px">⚠ Keine Koordinaten – kein Map-Pin in der App</div>
     </div>
   </div>`;
@@ -883,18 +894,29 @@ function closeAdd() { document.getElementById("modal-add").style.display="none";
 
 function submitAdd() {
   if(!addFormData.name||!addFormData.datum){alert("Name und Datum Pflicht.");return;}
+  if(!addFormData.gemeinde){alert("Gemeinde ist ein Pflichtfeld.");return;}
   if(isDupe(addFormData.name)){
     if(!confirm(`"${addFormData.name}" scheint bereits zu existieren. Trotzdem hinzufügen?`)) return;
   }
   const yr = getYear(addFormData.datum);
   db.collection("pending_events").add({
-    ...addFormData,
-    adresse: addFormData.adresse || addFormData.gemeinde || '',
+    name: addFormData.name,
+    datum: addFormData.datum,
+    uhrzeit: addFormData.uhrzeit || '',
+    gemeinde: addFormData.gemeinde,
+    bezirk: addFormData.bezirk || '',
+    typ: normalizeTyp(addFormData.typ),
+    veranstalter: addFormData.veranstalter || '',
+    eintritt: addFormData.eintritt || '',
+    beschreibung: addFormData.beschreibung || '',
+    quelle: addFormData.quelle || '',
+    quelle2: '',
+    adresse: addFormData.adresse || addFormData.gemeinde,
     latitude: addFormData.lat || null,
     longitude: addFormData.lng || null,
-    status:yr>=2026?"confirmed":"check",
-    geprueft:false, inApp:false,
-    createdAt:firebase.firestore.FieldValue.serverTimestamp()
+    status: yr>=2026?"confirmed":"check",
+    geprueft: false, inApp: false,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
   }).then(()=>closeAdd()).catch(e=>alert("Fehler: "+e.message));
 }
 
@@ -1435,9 +1457,11 @@ function openFlyerUpload(index) {
   uploadData = {
     name: ev.name || '', datum: datumISO, uhrzeit: uhr,
     standort: ev.gemeinde || '', adresse: ev.adresse || '',
-    bezirk: ev.bezirk || '', typ: TYP_CODE[ev.typ] || 'e1',
+    bezirk: ev.bezirk || '', typ: normalizeTyp(ev.typ),
     eintritt: (ev.eintritt === 'k.A.' ? '' : ev.eintritt) || '',
-    beschreibung: '', lat: null, lng: null,
+    beschreibung: ev.beschreibung || '',
+    lat: ev.latitude ?? ev.lat ?? null,
+    lng: ev.longitude ?? ev.lng ?? null,
   };
 
   const allOffen = flyerEvents.filter(e => e.status === "offen");
@@ -1537,11 +1561,11 @@ function openUpload(id) {
     standort: ev.gemeinde || '',
     adresse: ev.adresse || '',
     bezirk: ev.bezirk || '',
-    typ: TYP_CODE[ev.typ] || 'e1',
+    typ: normalizeTyp(ev.typ),
     eintritt: (ev.eintritt === 'k.A.' ? '' : ev.eintritt) || '',
     beschreibung: ev.beschreibung || '',
-    lat: null,
-    lng: null,
+    lat: ev.latitude ?? ev.lat ?? null,
+    lng: ev.longitude ?? ev.lng ?? null,
   };
   document.getElementById('upload-form-content').innerHTML = uploadFormHTML();
   document.getElementById('up-eintritt').value = uploadData.eintritt;
@@ -1587,8 +1611,8 @@ function uploadFormHTML() {
     <span class="edit-label">Adresse</span>
     <div>
       <input id="up-adresse" value="${esc(uploadData.adresse)}" placeholder="Adresse eingeben (Maps-Vorschläge)" oninput="uploadData.adresse=this.value;document.getElementById('up-no-coords-warn').style.display=this.value?'block':'none'">
-      <div id="up-coords" style="font-size:11px;color:#27AE60;margin-top:3px;display:none">📍 <span id="up-coords-text"></span></div>
-      <div id="up-no-coords-warn" style="font-size:11px;color:#7A4A00;background:#FFFBF0;border:1px solid #FAC775;border-radius:6px;padding:5px 8px;margin-top:4px;display:${uploadData.adresse?'block':'none'}">⚠ Einen Vorschlag aus der Liste auswählen – erst dann werden Koordinaten gesetzt</div>
+      <div id="up-coords" style="font-size:11px;color:#27AE60;margin-top:3px;display:${uploadData.lat?'block':'none'}">📍 <span id="up-coords-text">${uploadData.lat?uploadData.lat.toFixed(5)+', '+uploadData.lng.toFixed(5):''}</span></div>
+      <div id="up-no-coords-warn" style="font-size:11px;color:#7A4A00;background:#FFFBF0;border:1px solid #FAC775;border-radius:6px;padding:5px 8px;margin-top:4px;display:${uploadData.adresse&&!uploadData.lat?'block':'none'}">⚠ Einen Vorschlag aus der Liste auswählen – erst dann werden Koordinaten gesetzt</div>
     </div>
     <span class="edit-label" style="color:#bbb;font-size:11px">oder Koord.</span>
     <div>
@@ -1611,7 +1635,8 @@ function initUploadAutocomplete() {
 }
 
 // Allgemeine Koordinaten-Eingabe: setzt lat/lng in dataObj, zeigt Koordinaten an
-function handleCoordsInput(val, dataObj, coordsDisplayId, coordsTextId, warnId) {
+// adresseInputId (optional): wenn angegeben, wird per Reverse Geocoding eine Adresse vorgeschlagen
+function handleCoordsInput(val, dataObj, coordsDisplayId, coordsTextId, warnId, adresseInputId) {
   const m = val.trim().match(/^(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)$/);
   if (!m) return;
   dataObj.lat = parseFloat(m[1]);
@@ -1622,6 +1647,16 @@ function handleCoordsInput(val, dataObj, coordsDisplayId, coordsTextId, warnId) 
   if (txt) txt.textContent = `${dataObj.lat.toFixed(5)}, ${dataObj.lng.toFixed(5)}`;
   const warn = document.getElementById(warnId);
   if (warn) warn.style.display = 'none';
+  if (adresseInputId && window.google && google.maps) {
+    const geocoder = new google.maps.Geocoder();
+    geocoder.geocode({ location: { lat: dataObj.lat, lng: dataObj.lng } }, (results, status) => {
+      if (status === 'OK' && results[0]) {
+        dataObj.adresse = results[0].formatted_address;
+        const inp = document.getElementById(adresseInputId);
+        if (inp && !inp.value) inp.value = results[0].formatted_address;
+      }
+    });
+  }
 }
 
 // Allgemeines Autocomplete-Setup für jedes Adressfeld
@@ -1650,7 +1685,7 @@ function setupAutocomplete(inputId, dataObj, coordsDisplayId, coordsTextId, warn
 
 function parseCoordsInput(val) {
   const dataObj = appEditMode ? appEditData : uploadData;
-  handleCoordsInput(val, dataObj, 'up-coords', 'up-coords-text', 'up-no-coords-warn');
+  handleCoordsInput(val, dataObj, 'up-coords', 'up-coords-text', 'up-no-coords-warn', 'up-adresse');
 }
 
 function submitUpload() {
