@@ -1790,18 +1790,21 @@ function handleCoordsInput(val, dataObj, coordsDisplayId, coordsTextId, warnId, 
   }
 }
 
-// Allgemeines Autocomplete-Setup — custom dropdown (kein Google PAC, iOS-kompatibel)
-function setupAutocomplete(inputId, dataObj, coordsDisplayId, coordsTextId, warnId) {
+// Allgemeines Autocomplete-Setup — Places API (New), custom dropdown
+async function setupAutocomplete(inputId, dataObj, coordsDisplayId, coordsTextId, warnId) {
   const input = document.getElementById(inputId);
-  if (!input || !window.google || !google.maps || !google.maps.places) return;
-  // Prevent duplicate setup
+  if (!input || !window.google || !google.maps) return;
   if (input._acSetup) return;
   input._acSetup = true;
 
-  const svc = new google.maps.places.AutocompleteService();
-  const detailSvc = new google.maps.places.PlacesService(document.createElement('div'));
+  let AutocompleteSuggestion;
+  try {
+    ({ AutocompleteSuggestion } = await google.maps.importLibrary('places'));
+  } catch(e) {
+    _showMapsStatus('✗ Places API nicht verfügbar: ' + e.message, 'red');
+    return;
+  }
 
-  // Build custom dropdown container
   const wrap = input.parentNode;
   wrap.style.position = 'relative';
   const drop = document.createElement('div');
@@ -1813,22 +1816,23 @@ function setupAutocomplete(inputId, dataObj, coordsDisplayId, coordsTextId, warn
   ].join(';');
   wrap.appendChild(drop);
 
-  function selectPlace(placeId, description) {
+  async function selectSuggestion(suggestion) {
     drop.style.display = 'none';
-    input.value = description;
-    detailSvc.getDetails({ placeId, fields: ['formatted_address','geometry'] }, (place, st) => {
-      if (st !== google.maps.places.PlacesServiceStatus.OK || !place.geometry) return;
-      dataObj.lat = place.geometry.location.lat();
-      dataObj.lng = place.geometry.location.lng();
-      dataObj.adresse = place.formatted_address;
-      input.value = place.formatted_address;
+    input.value = suggestion.placePrediction.text.text;
+    try {
+      const place = suggestion.placePrediction.toPlace();
+      await place.fetchFields({ fields: ['formattedAddress', 'location'] });
+      dataObj.lat = place.location.lat();
+      dataObj.lng = place.location.lng();
+      dataObj.adresse = place.formattedAddress;
+      input.value = place.formattedAddress;
       const el = document.getElementById(coordsDisplayId);
       if (el) el.style.display = 'block';
       const txt = document.getElementById(coordsTextId);
       if (txt) txt.textContent = `${dataObj.lat.toFixed(5)}, ${dataObj.lng.toFixed(5)}`;
       const warn = document.getElementById(warnId);
       if (warn) warn.style.display = 'none';
-    });
+    } catch(e) { console.error('place details error', e); }
   }
 
   let timer;
@@ -1836,29 +1840,32 @@ function setupAutocomplete(inputId, dataObj, coordsDisplayId, coordsTextId, warn
     clearTimeout(timer);
     const val = input.value.trim();
     if (val.length < 2) { drop.style.display = 'none'; return; }
-    drop.innerHTML = `<div style="padding:10px 14px;font-size:12px;color:var(--text-2)">⏳ Suche nach "${val}"…</div>`;
+    drop.innerHTML = `<div style="padding:10px 14px;font-size:12px;color:var(--text-2)">⏳ Suche…</div>`;
     drop.style.display = 'block';
-    timer = setTimeout(() => {
-      drop.innerHTML = `<div style="padding:10px 14px;font-size:12px;color:var(--text-2)">🌐 API-Anfrage läuft…</div>`;
-      svc.getPlacePredictions({ input: val, componentRestrictions: { country: 'at' } }, (preds, st) => {
+    timer = setTimeout(async () => {
+      try {
+        const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
+          input: val, includedRegionCodes: ['at']
+        });
         drop.innerHTML = '';
-        if (st !== google.maps.places.PlacesServiceStatus.OK || !preds) {
-          drop.innerHTML = `<div style="padding:10px 14px;font-size:12px;color:var(--red)">Fehler: ${st}</div>`;
-          drop.style.display = 'block';
+        if (!suggestions || suggestions.length === 0) {
+          drop.innerHTML = `<div style="padding:10px 14px;font-size:12px;color:var(--text-3)">Keine Ergebnisse</div>`;
           return;
         }
-        preds.forEach(p => {
+        suggestions.forEach(s => {
           const item = document.createElement('div');
-          item.textContent = p.description;
+          item.textContent = s.placePrediction.text.text;
           item.style.cssText = 'padding:11px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border-sub);color:var(--text)';
           item.addEventListener('mouseover', () => item.style.background = 'var(--surface-2)');
           item.addEventListener('mouseout',  () => item.style.background = '');
-          // pointerdown fires before blur — prevents keyboard dismissal on iOS
-          item.addEventListener('pointerdown', e => { e.preventDefault(); selectPlace(p.place_id, p.description); });
+          item.addEventListener('pointerdown', e => { e.preventDefault(); selectSuggestion(s); });
           drop.appendChild(item);
         });
         drop.style.display = 'block';
-      });
+      } catch(e) {
+        drop.innerHTML = `<div style="padding:10px 14px;font-size:12px;color:var(--red)">Fehler: ${e.message}</div>`;
+        drop.style.display = 'block';
+      }
     }, 300);
   });
 
@@ -1921,7 +1928,7 @@ function showToast(msg, ok) {
 // ---- UTILS ----
 function esc(s){if(!s)return"";return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 
-// ---- GOOGLE MAPS READY MECHANISM ----
+// ---- GOOGLE MAPS READY MECHANISM (Places API New) ----
 let _gmapsPending = [];
 function _onGmapsReady() {
   _gmapsPending.forEach(fn => fn());
@@ -1940,10 +1947,9 @@ function _showMapsStatus(msg, color) {
   el.style.background = color === 'green' ? '#1a7f37' : '#cf222e';
   el.style.display = 'block';
 }
-// Show error if Maps fails to load after 8 seconds
 setTimeout(() => {
-  if (!window.google || !google.maps || !google.maps.places) {
-    _showMapsStatus('✗ Google Maps nicht geladen – Adress-Vorschläge deaktiviert', 'red');
+  if (!window.google || !google.maps) {
+    _showMapsStatus('✗ Google Maps nicht geladen', 'red');
   }
 }, 8000);
 function setupAutocompleteWhenReady(inputId, dataObj, coordsDisplayId, coordsTextId, warnId) {
@@ -1951,13 +1957,10 @@ function setupAutocompleteWhenReady(inputId, dataObj, coordsDisplayId, coordsTex
     const input = document.getElementById(inputId);
     if (input) setupAutocomplete(inputId, dataObj, coordsDisplayId, coordsTextId, warnId);
   };
-  if (window.google && google.maps && google.maps.places) {
-    run();
-  } else {
-    _gmapsPending.push(run);
-  }
+  if (window.google && google.maps) run();
+  else _gmapsPending.push(run);
 }
 </script>
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDxfF8EafFfT2jyoDHQ22c8n_kSnvDTUVk&libraries=places&callback=_onGmapsReady" async defer></script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDxfF8EafFfT2jyoDHQ22c8n_kSnvDTUVk&callback=_onGmapsReady&v=weekly" async defer></script>
 </body>
 </html>
