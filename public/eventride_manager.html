@@ -934,7 +934,7 @@ function startEdit(id) {
   };
   editMode = true;
   render();
-  setTimeout(() => setupAutocomplete('ed-adresse', editData, 'ed-coords', 'ed-coords-text', 'ed-no-coords-warn'), 100);
+  setupAutocompleteWhenReady('ed-adresse', editData, 'ed-coords', 'ed-coords-text', 'ed-no-coords-warn');
 }
 
 function cancelEdit() { editMode=false; render(); }
@@ -996,7 +996,7 @@ function openAdd() {
     </div>
   </div>`;
   document.getElementById("modal-add").style.display="flex";
-  setTimeout(() => setupAutocomplete('add-adresse', addFormData, 'add-coords', 'add-coords-text', 'add-no-coords-warn'), 100);
+  setupAutocompleteWhenReady('add-adresse', addFormData, 'add-coords', 'add-coords-text', 'add-no-coords-warn');
 }
 
 function closeAdd() { document.getElementById("modal-add").style.display="none"; }
@@ -1149,9 +1149,7 @@ function startAppEdit(id) {
   appEditData = { ...ev, datumISO, typ: normalizeTyp(ev.typ) };
   appEditMode = true;
   render();
-  setTimeout(() => {
-    if (window.google && window.google.maps && window.google.maps.places) initUploadAutocomplete();
-  }, 50);
+  initUploadAutocomplete();
 }
 
 function cancelAppEdit() { appEditMode = false; render(); }
@@ -1610,7 +1608,7 @@ function openFlyerUpload(index) {
     '<button class="primary" id="btn-upload-submit" onclick="submitFlyerUpload()">↑ In App speichern</button>';
 
   document.getElementById('modal-upload').style.display = 'flex';
-  setTimeout(() => { if (window.google && window.google.maps && window.google.maps.places) initUploadAutocomplete(); }, 100);
+  initUploadAutocomplete();
 }
 
 function skipFlyerEvent() {
@@ -1702,7 +1700,7 @@ function openUpload(id) {
   document.getElementById('up-eintritt').value = uploadData.eintritt;
   document.getElementById('up-beschreibung').value = uploadData.beschreibung;
   document.getElementById('modal-upload').style.display = 'flex';
-  setTimeout(() => { if (window.google && window.google.maps && window.google.maps.places) initUploadAutocomplete(); }, 100);
+  initUploadAutocomplete();
 }
 
 function closeUpload() {
@@ -1762,7 +1760,7 @@ function uploadFormHTML() {
 
 function initUploadAutocomplete() {
   const dataObj = appEditMode ? appEditData : uploadData;
-  setupAutocomplete('up-adresse', dataObj, 'up-coords', 'up-coords-text', 'up-no-coords-warn');
+  setupAutocompleteWhenReady('up-adresse', dataObj, 'up-coords', 'up-coords-text', 'up-no-coords-warn');
 }
 
 // Allgemeine Koordinaten-Eingabe: setzt lat/lng in dataObj, zeigt Koordinaten an
@@ -1867,7 +1865,27 @@ function showToast(msg, ok) {
 
 // ---- UTILS ----
 function esc(s){if(!s)return"";return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+
+// ---- GOOGLE MAPS READY MECHANISM ----
+// Queue for autocomplete setups that run before Google Maps has loaded
+let _gmapsPending = [];
+function _onGmapsReady() {
+  _gmapsPending.forEach(fn => fn());
+  _gmapsPending = [];
+}
+// Call this instead of setTimeout(()=>setupAutocomplete(...))
+function setupAutocompleteWhenReady(inputId, dataObj, coordsDisplayId, coordsTextId, warnId) {
+  const run = () => {
+    const input = document.getElementById(inputId);
+    if (input) setupAutocomplete(inputId, dataObj, coordsDisplayId, coordsTextId, warnId);
+  };
+  if (window.google && google.maps && google.maps.places) {
+    run();
+  } else {
+    _gmapsPending.push(run);
+  }
+}
 </script>
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDxfF8EafFfT2jyoDHQ22c8n_kSnvDTUVk&libraries=places" async defer></script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDxfF8EafFfT2jyoDHQ22c8n_kSnvDTUVk&libraries=places&callback=_onGmapsReady" async defer></script>
 </body>
 </html>
