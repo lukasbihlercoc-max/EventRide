@@ -1870,13 +1870,31 @@ function showToast(msg, ok) {
 function esc(s){if(!s)return"";return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 
 // ---- GOOGLE MAPS READY MECHANISM ----
-// Queue for autocomplete setups that run before Google Maps has loaded
 let _gmapsPending = [];
 function _onGmapsReady() {
   _gmapsPending.forEach(fn => fn());
   _gmapsPending = [];
+  _showMapsStatus('✓ Google Maps geladen', 'green');
 }
-// Call this instead of setTimeout(()=>setupAutocomplete(...))
+function _showMapsStatus(msg, color) {
+  let el = document.getElementById('_maps-status');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = '_maps-status';
+    el.style.cssText = 'position:fixed;bottom:70px;left:50%;transform:translateX(-50%);padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;color:#fff;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,.3)';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.background = color === 'green' ? '#1a7f37' : '#cf222e';
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 5000);
+}
+// Show error if Maps fails to load after 8 seconds
+setTimeout(() => {
+  if (!window.google || !google.maps || !google.maps.places) {
+    _showMapsStatus('✗ Google Maps nicht geladen – Adress-Vorschläge deaktiviert', 'red');
+  }
+}, 8000);
 function setupAutocompleteWhenReady(inputId, dataObj, coordsDisplayId, coordsTextId, warnId) {
   const run = () => {
     const input = document.getElementById(inputId);
