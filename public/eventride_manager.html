@@ -214,7 +214,9 @@ select option{background:var(--surface);color:var(--text)}
 .edit-label{color:var(--text-2);font-size:12px;font-weight:500}
 
 /* ── Modals ── */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;z-index:200}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:200}
+/* pac-container is appended to body by Google Maps — must float above everything */
+.pac-container{z-index:2147483647!important;pointer-events:auto!important}
 .modal{background:var(--surface);border-radius:12px;padding:2rem;width:480px;max-height:92vh;overflow-y:auto;box-shadow:var(--sh3);border:1px solid var(--border)}
 .modal h3{font-size:16px;font-weight:700;margin-bottom:1.25rem;letter-spacing:-.3px}
 .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem}
@@ -1608,7 +1610,7 @@ function openFlyerUpload(index) {
     '<button class="primary" id="btn-upload-submit" onclick="submitFlyerUpload()">↑ In App speichern</button>';
 
   document.getElementById('modal-upload').style.display = 'flex';
-  if (window.google && window.google.maps && window.google.maps.places) initUploadAutocomplete();
+  setTimeout(() => { if (window.google && window.google.maps && window.google.maps.places) initUploadAutocomplete(); }, 100);
 }
 
 function skipFlyerEvent() {
@@ -1700,7 +1702,7 @@ function openUpload(id) {
   document.getElementById('up-eintritt').value = uploadData.eintritt;
   document.getElementById('up-beschreibung').value = uploadData.beschreibung;
   document.getElementById('modal-upload').style.display = 'flex';
-  if (window.google && window.google.maps && window.google.maps.places) initUploadAutocomplete();
+  setTimeout(() => { if (window.google && window.google.maps && window.google.maps.places) initUploadAutocomplete(); }, 100);
 }
 
 function closeUpload() {
