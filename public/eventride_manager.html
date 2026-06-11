@@ -1839,7 +1839,11 @@ function setupAutocomplete(inputId, dataObj, coordsDisplayId, coordsTextId, warn
     timer = setTimeout(() => {
       svc.getPlacePredictions({ input: val, componentRestrictions: { country: 'at' } }, (preds, st) => {
         drop.innerHTML = '';
-        if (st !== google.maps.places.PlacesServiceStatus.OK || !preds) { drop.style.display = 'none'; return; }
+        if (st !== google.maps.places.PlacesServiceStatus.OK || !preds) {
+          drop.innerHTML = `<div style="padding:10px 14px;font-size:12px;color:var(--red)">Fehler: ${st}</div>`;
+          drop.style.display = 'block';
+          return;
+        }
         preds.forEach(p => {
           const item = document.createElement('div');
           item.textContent = p.description;
