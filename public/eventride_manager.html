@@ -1790,28 +1790,73 @@ function handleCoordsInput(val, dataObj, coordsDisplayId, coordsTextId, warnId, 
   }
 }
 
-// Allgemeines Autocomplete-Setup für jedes Adressfeld
+// Allgemeines Autocomplete-Setup — custom dropdown (kein Google PAC, iOS-kompatibel)
 function setupAutocomplete(inputId, dataObj, coordsDisplayId, coordsTextId, warnId) {
   const input = document.getElementById(inputId);
   if (!input || !window.google || !google.maps || !google.maps.places) return;
-  const ac = new google.maps.places.Autocomplete(input, {
-    componentRestrictions: { country: 'at' },
-    fields: ['formatted_address', 'geometry'],
+  // Prevent duplicate setup
+  if (input._acSetup) return;
+  input._acSetup = true;
+
+  const svc = new google.maps.places.AutocompleteService();
+  const detailSvc = new google.maps.places.PlacesService(document.createElement('div'));
+
+  // Build custom dropdown container
+  const wrap = input.parentNode;
+  wrap.style.position = 'relative';
+  const drop = document.createElement('div');
+  drop.style.cssText = [
+    'position:absolute','top:100%','left:0','right:0','z-index:9999',
+    'background:var(--surface)','border:1px solid var(--border)',
+    'border-radius:8px','box-shadow:0 6px 20px rgba(0,0,0,.18)',
+    'max-height:220px','overflow-y:auto','display:none','margin-top:2px'
+  ].join(';');
+  wrap.appendChild(drop);
+
+  function selectPlace(placeId, description) {
+    drop.style.display = 'none';
+    input.value = description;
+    detailSvc.getDetails({ placeId, fields: ['formatted_address','geometry'] }, (place, st) => {
+      if (st !== google.maps.places.PlacesServiceStatus.OK || !place.geometry) return;
+      dataObj.lat = place.geometry.location.lat();
+      dataObj.lng = place.geometry.location.lng();
+      dataObj.adresse = place.formatted_address;
+      input.value = place.formatted_address;
+      const el = document.getElementById(coordsDisplayId);
+      if (el) el.style.display = 'block';
+      const txt = document.getElementById(coordsTextId);
+      if (txt) txt.textContent = `${dataObj.lat.toFixed(5)}, ${dataObj.lng.toFixed(5)}`;
+      const warn = document.getElementById(warnId);
+      if (warn) warn.style.display = 'none';
+    });
+  }
+
+  let timer;
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    const val = input.value.trim();
+    if (val.length < 2) { drop.style.display = 'none'; return; }
+    timer = setTimeout(() => {
+      svc.getPlacePredictions({ input: val, componentRestrictions: { country: 'at' } }, (preds, st) => {
+        drop.innerHTML = '';
+        if (st !== google.maps.places.PlacesServiceStatus.OK || !preds) { drop.style.display = 'none'; return; }
+        preds.forEach(p => {
+          const item = document.createElement('div');
+          item.textContent = p.description;
+          item.style.cssText = 'padding:11px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border-sub);color:var(--text)';
+          item.addEventListener('mouseover', () => item.style.background = 'var(--surface-2)');
+          item.addEventListener('mouseout',  () => item.style.background = '');
+          // pointerdown fires before blur — prevents keyboard dismissal on iOS
+          item.addEventListener('pointerdown', e => { e.preventDefault(); selectPlace(p.place_id, p.description); });
+          drop.appendChild(item);
+        });
+        drop.style.display = 'block';
+      });
+    }, 300);
   });
-  ac.addListener('place_changed', () => {
-    const place = ac.getPlace();
-    if (!place.geometry) return;
-    dataObj.lat = place.geometry.location.lat();
-    dataObj.lng = place.geometry.location.lng();
-    dataObj.adresse = place.formatted_address;
-    input.value = place.formatted_address;
-    const el = document.getElementById(coordsDisplayId);
-    if (el) el.style.display = 'block';
-    const txt = document.getElementById(coordsTextId);
-    if (txt) txt.textContent = `${dataObj.lat.toFixed(5)}, ${dataObj.lng.toFixed(5)}`;
-    const warn = document.getElementById(warnId);
-    if (warn) warn.style.display = 'none';
-  });
+
+  input.addEventListener('blur', () => setTimeout(() => { drop.style.display = 'none'; }, 150));
+  input.addEventListener('focus', () => { if (input.value.trim().length >= 2) input.dispatchEvent(new Event('input')); });
 }
 
 function parseCoordsInput(val) {
