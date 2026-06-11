@@ -1887,7 +1887,6 @@ function _showMapsStatus(msg, color) {
   el.textContent = msg;
   el.style.background = color === 'green' ? '#1a7f37' : '#cf222e';
   el.style.display = 'block';
-  setTimeout(() => { el.style.display = 'none'; }, 5000);
 }
 // Show error if Maps fails to load after 8 seconds
 setTimeout(() => {
