@@ -240,9 +240,12 @@ class _EventsPageState extends State<EventsPage> {
 
       if (!mounted) return;
       Navigator.pop(context);
-    } catch (e) {
+    } on FormatException {
       if (!mounted) return;
       AppSnackbar.show(context, message: "Ungültiges Datumformat");
+    } catch (e) {
+      if (!mounted) return;
+      AppSnackbar.show(context, message: "Fehler beim Speichern: $e");
     }
   }
 

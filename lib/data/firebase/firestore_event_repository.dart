@@ -27,8 +27,9 @@ class FirestoreEventRepository implements IEventRepository {
   @override
   Stream<List<Event>> watch() {
     return _firestore.collection(_collection).snapshots().map((snap) {
-      final events =
-          snap.docs.map((doc) => Event.fromMap(doc.data())).toList();
+      final events = snap.docs
+          .map((doc) => Event.fromMap({...doc.data(), 'id': doc.id}))
+          .toList();
       _cache
         ..clear()
         ..addAll(events);
