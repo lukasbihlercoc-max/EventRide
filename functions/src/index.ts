@@ -336,6 +336,45 @@ export const onEventRequestCreated = onDocumentCreated(
 );
 
 // ──────────────────────────────────────────────────────────────────────────────
+// Trigger 5c: Neue User-Meldung → alle Admins benachrichtigen
+// ──────────────────────────────────────────────────────────────────────────────
+
+export const onUserReportCreated = onDocumentCreated(
+  "user_reports/{docId}",
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+
+    const data = snap.data();
+    const reporterUid = data["reporterUid"] as string | undefined;
+    const reportedUid = data["reportedUid"] as string | undefined;
+    const reason = (data["reason"] as string | undefined) ?? "Unbekannt";
+
+    const [reporterName, reportedName] = await Promise.all([
+      reporterUid ? getUserName(reporterUid, "Ein Nutzer") : Promise.resolve("Ein Nutzer"),
+      reportedUid ? getUserName(reportedUid, "Ein Nutzer") : Promise.resolve("Ein Nutzer"),
+    ]);
+
+    const adminsSnap = await db
+      .collection("users")
+      .where("isAdmin", "==", true)
+      .get();
+
+    await Promise.all(
+      adminsSnap.docs.map(async (adminDoc) => {
+        const tokens = (adminDoc.data()["fcmTokens"] as string[]) ?? [];
+        if (!tokens.length) return;
+        await sendNotification(tokens, adminDoc.id, {
+          title: "Neue Nutzer-Meldung",
+          body: `${reporterName} hat ${reportedName} gemeldet: ${reason}`,
+          data: {type: "user_report", reportedUid: reportedUid ?? ""},
+        });
+      })
+    );
+  }
+);
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Callable 6: Einladung atomar annehmen
 //   – verifiziert Anfrage-Status in einer Transaction
 //   – storniert alle anderen offenen Einladungen des Users für das Event

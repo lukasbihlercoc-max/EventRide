@@ -66,6 +66,15 @@ class BlockService extends ChangeNotifier {
     });
   }
 
+  Future<void> unblockUser({
+    required String currentUid,
+    required String targetUid,
+  }) async {
+    await FirebaseFirestore.instance.collection('users').doc(currentUid).update({
+      'blockedUserIds': FieldValue.arrayRemove([targetUid]),
+    });
+  }
+
   @override
   void dispose() {
     _sub?.cancel();

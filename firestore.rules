@@ -215,6 +215,19 @@ service cloud.firestore {
     }
 
     // ----------------------------------------------------------------
+    // user_reports/{docId}
+    //
+    // Erstellen: Eingeloggt + reporterUid muss eigene UID sein
+    // Lesen/Updaten/Löschen: Nicht erlaubt (Server-SDK)
+    // ----------------------------------------------------------------
+    match /user_reports/{docId} {
+      allow create: if isSignedIn()
+                    && request.resource.data.reporterUid == request.auth.uid;
+      allow read: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // ----------------------------------------------------------------
     // pending_events/{docId}  (Manager-internes Admin-Tool)
     //
     // Lesen/Schreiben: Nur eingeloggte Nutzer (nur über Admin-HTML erreichbar)

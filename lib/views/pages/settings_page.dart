@@ -1,7 +1,9 @@
 // settings_page.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:my_app/data/app_user.dart';
+import 'package:my_app/data/block_service.dart';
 import 'package:my_app/data/event_request.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/data/license_request.dart';
@@ -9,6 +11,7 @@ import 'package:my_app/data/notification_service.dart';
 import 'package:my_app/utils/app_route.dart';
 import 'package:my_app/views/pages/admin_event_requests_page.dart';
 import 'package:my_app/views/pages/admin_license_page.dart';
+import 'package:my_app/views/pages/admin_user_reports_page.dart';
 import 'package:my_app/config/legal_texts.dart';
 import 'package:my_app/views/pages/legal_page.dart';
 import 'package:my_app/views/widgets/app_bottom_sheet.dart';
@@ -200,6 +203,49 @@ class _SettingsPageState extends State<SettingsPage> {
                           );
                         },
                       ),
+                      StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance
+                            .collection('user_reports')
+                            .snapshots(),
+                        builder: (context, snap) {
+                          final count = snap.data?.docs.length ?? 0;
+                          return ListTile(
+                            leading: const Icon(
+                              Icons.flag_outlined,
+                              color: Colors.orangeAccent,
+                            ),
+                            title: const Text(
+                              'Nutzer-Meldungen',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                            trailing: count > 0
+                                ? Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orangeAccent,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      '$count',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  )
+                                : const Icon(Icons.chevron_right_rounded,
+                                    color: Colors.white38),
+                            onTap: () => Navigator.push(
+                              context,
+                              AppRoute(
+                                  builder: (_) =>
+                                      const AdminUserReportsPage()),
+                            ),
+                          );
+                        },
+                      ),
                       const Divider(color: Colors.white30),
                     ],
 
@@ -312,6 +358,53 @@ class _SettingsPageState extends State<SettingsPage> {
                         trailing: const Icon(Icons.chevron_right_rounded,
                             color: Colors.white38),
                         onTap: () => _showChangePasswordSheet(context),
+                      ),
+                      const Divider(color: Colors.white30),
+                    ],
+
+                    // ── Sicherheit ──────────────────────────────────────────
+                    if (user != null) ...[
+                      const Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: Text(
+                          "Sicherheit",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Consumer<BlockService>(
+                        builder: (context, blockService, _) {
+                          final blockedIds = blockService.blockedUserIds;
+                          final count = blockedIds.length;
+                          return ListTile(
+                            leading: const Icon(Icons.block,
+                                color: Colors.redAccent),
+                            title: const Text(
+                              "Blockierte Nutzer",
+                              style: TextStyle(color: Colors.white),
+                            ),
+                            subtitle: count == 0
+                                ? const Text(
+                                    "Keine blockierten Nutzer",
+                                    style: TextStyle(color: Colors.white38),
+                                  )
+                                : Text(
+                                    '$count blockierte Person${count == 1 ? '' : 'en'}',
+                                    style: const TextStyle(
+                                        color: Colors.white54),
+                                  ),
+                            trailing: const Icon(
+                              Icons.chevron_right_rounded,
+                              color: Colors.white38,
+                            ),
+                            onTap: count == 0
+                                ? null
+                                : () => _showBlockedUsersSheet(
+                                    context, blockedIds, user.userId),
+                          );
+                        },
                       ),
                       const Divider(color: Colors.white30),
                     ],
@@ -916,6 +1009,142 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
     );
     passwordController.dispose();
+  }
+
+  void _showBlockedUsersSheet(
+    BuildContext context,
+    List<String> blockedIds,
+    String currentUid,
+  ) {
+    showAppSheet<void>(
+      context,
+      isDismissible: true,
+      (ctx) => AppSheetShell(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const AppSheetHeader(
+              icon: Icons.block,
+              iconColor: Colors.redAccent,
+              title: 'Blockierte Nutzer',
+            ),
+            const SizedBox(height: 8),
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(ctx).size.height * 0.5,
+              ),
+              child: ListView(
+                shrinkWrap: true,
+                children: blockedIds
+                    .map((uid) => _BlockedUserTile(
+                          key: ValueKey(uid),
+                          blockedUid: uid,
+                          currentUid: currentUid,
+                        ))
+                    .toList(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            AppSheetGhostButton(
+              label: 'Schließen',
+              onTap: () => Navigator.pop(ctx),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BlockedUserTile extends StatefulWidget {
+  final String blockedUid;
+  final String currentUid;
+
+  const _BlockedUserTile({super.key, required this.blockedUid, required this.currentUid});
+
+  @override
+  State<_BlockedUserTile> createState() => _BlockedUserTileState();
+}
+
+class _BlockedUserTileState extends State<_BlockedUserTile> {
+  late final Future<({String name, String? photoUrl})> _profileFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _profileFuture = _loadProfile();
+  }
+
+  Future<({String name, String? photoUrl})> _loadProfile() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.blockedUid)
+          .get();
+      final fallbackName = 'Nutzer ${widget.blockedUid.substring(0, 6)}';
+      if (!doc.exists) return (name: fallbackName, photoUrl: null);
+      final d = doc.data()!;
+      final first = (d['firstName'] as String? ?? '').trim();
+      final last = (d['lastName'] as String? ?? '').trim();
+      final fullName = '$first $last'.trim();
+      final photoUrl = d['photoUrl'] as String?;
+      return (
+        name: fullName.isNotEmpty ? fullName : fallbackName,
+        photoUrl: photoUrl,
+      );
+    } catch (_) {
+      return (name: 'Nutzer ${widget.blockedUid.substring(0, 6)}', photoUrl: null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<({String name, String? photoUrl})>(
+      future: _profileFuture,
+      builder: (context, snap) {
+        final name = snap.data?.name ?? '';
+        final photoUrl = snap.data?.photoUrl;
+        final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+        return ListTile(
+          leading: CircleAvatar(
+            backgroundColor: Colors.white12,
+            backgroundImage:
+                photoUrl != null ? NetworkImage(photoUrl) : null,
+            child: photoUrl == null
+                ? Text(initial, style: const TextStyle(color: Colors.white70))
+                : null,
+          ),
+          title: snap.connectionState == ConnectionState.waiting
+              ? const Text('Lädt...',
+                  style: TextStyle(color: Colors.white38, fontSize: 14))
+              : Text(name.isNotEmpty ? name : widget.blockedUid.substring(0, 8),
+                  style: const TextStyle(color: Colors.white)),
+          trailing: TextButton(
+            onPressed: () async {
+              final blockSvc = context.read<BlockService>();
+              try {
+                await blockSvc.unblockUser(
+                  currentUid: widget.currentUid,
+                  targetUid: widget.blockedUid,
+                );
+                if (context.mounted) {
+                  AppSnackbar.show(context, message: 'Blockierung aufgehoben');
+                }
+              } catch (_) {
+                if (context.mounted) {
+                  AppSnackbar.show(context, message: 'Fehler beim Entsperren');
+                }
+              }
+            },
+            child: const Text(
+              'Entsperren',
+              style: TextStyle(color: Colors.redAccent),
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 
