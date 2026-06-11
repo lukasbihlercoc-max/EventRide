@@ -1160,6 +1160,7 @@ function saveAppEdit(id) {
   const uhr = appEditData.uhrzeit || '20:00';
   const datumISO = `${appEditData.datumISO}T${uhr}:00.000Z`;
   db.collection('events').doc(id).update({
+    id: id,
     name: appEditData.name,
     datum: datumISO,
     uhrzeit: uhr,
@@ -1633,13 +1634,14 @@ function submitFlyerUpload() {
   const combinedBeschreibung = eintrittText && beschreibungText
     ? eintrittText + '\n\n' + beschreibungText : eintrittText || beschreibungText;
 
-  db.collection('events').add({
+  const _flyerRef = db.collection('events').doc();
+  _flyerRef.set({
     name: uploadData.name, datum: datumISO, uhrzeit: uhr,
     standort: uploadData.standort, gemeinde: uploadData.standort,
     adresse: uploadData.adresse || uploadData.standort || '', bezirk: uploadData.bezirk || '',
     beschreibung: combinedBeschreibung, eintritt: uploadData.eintritt || '',
     typ: normalizeTyp(uploadData.typ), latitude: uploadData.lat || null, longitude: uploadData.lng || null,
-    id: Date.now().toString(), createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    id: _flyerRef.id, createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   }).then(() => {
     flyerEvents[flyerUploadIndex].status = "hochgeladen";
     updateFlyerList();
@@ -1831,7 +1833,8 @@ function submitUpload() {
     ? eintrittText + '\n\n' + beschreibungText
     : eintrittText || beschreibungText;
 
-  db.collection('events').add({
+  const _uploadRef = db.collection('events').doc();
+  _uploadRef.set({
     name: uploadData.name,
     datum: datumISO,
     uhrzeit: uhr,
@@ -1844,7 +1847,7 @@ function submitUpload() {
     typ: normalizeTyp(uploadData.typ),
     latitude: uploadData.lat || null,
     longitude: uploadData.lng || null,
-    id: Date.now().toString(),
+    id: _uploadRef.id,
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   }).then(() => db.collection('pending_events').doc(uploadPendingId).update({ inApp: true }))
     .then(() => { closeUpload(); showToast('✓ ' + uploadData.name + ' in App gespeichert'); })
