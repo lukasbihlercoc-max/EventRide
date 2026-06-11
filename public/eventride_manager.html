@@ -11,10 +11,10 @@
 <style>
 /* ── Variables ── */
 :root{
-  --bg:#EFEFF0;--surface:#ffffff;--surface-2:#F6F6F8;--surface-3:#EFEFF1;
-  --border:#E2E2E6;--border-sub:#EBEBED;
-  --text:#111118;--text-2:#555560;--text-3:#AAABB8;
-  --accent:#E88C2E;--accent-h:#D07A20;--accent-soft:rgba(232,140,46,.10);
+  --bg:#F8F4EF;--surface:#ffffff;--surface-2:#F3EEE8;--surface-3:#EDE8E0;
+  --border:#E0D8CE;--border-sub:#E8E2D8;
+  --text:#1A1510;--text-2:#5C5047;--text-3:#A89B8A;
+  --accent:#F5A04A;--accent-h:#E08930;--accent-soft:rgba(245,160,74,.10);
   --green:#22A861;--green-bg:rgba(34,168,97,.10);--green-t:#0D6B3A;
   --red:#E5453A;--red-bg:rgba(229,69,58,.09);--red-t:#9B1C1C;
   --blue:#2C87CC;--blue-bg:rgba(44,135,204,.10);--blue-t:#0B4280;
@@ -27,10 +27,10 @@
   color-scheme:light;
 }
 [data-theme=dark]{
-  --bg:#0D1117;--surface:#161C28;--surface-2:#1C2235;--surface-3:#222840;
-  --border:#2A3248;--border-sub:#1E2840;
-  --text:#DDE1EC;--text-2:#8892A8;--text-3:#44506A;
-  --accent:#F0983C;--accent-h:#E08530;--accent-soft:rgba(240,152,60,.13);
+  --bg:#1C1814;--surface:#252018;--surface-2:#2C2820;--surface-3:#342E24;
+  --border:#3A3428;--border-sub:#302A20;
+  --text:#EDE8E0;--text-2:#9A9080;--text-3:#5A524A;
+  --accent:#F5A04A;--accent-h:#E08930;--accent-soft:rgba(245,160,74,.13);
   --green:#3DC47A;--green-bg:rgba(61,196,122,.11);--green-t:#3DC47A;
   --red:#E8564C;--red-bg:rgba(232,86,76,.11);--red-t:#E8564C;
   --blue:#4DA4E0;--blue-bg:rgba(77,164,224,.11);--blue-t:#4DA4E0;
@@ -55,9 +55,9 @@ a{color:var(--accent);text-decoration:none}
 /* ── Buttons ── */
 button{font-family:inherit;font-size:13px;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--rs);padding:6px 13px;transition:all .15s ease;box-shadow:var(--sh0);white-space:nowrap}
 button:hover{background:var(--surface-2);border-color:var(--text-3)}
-button.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600;box-shadow:0 2px 8px rgba(232,140,46,.28)}
-button.primary:hover{background:var(--accent-h);border-color:var(--accent-h);box-shadow:0 4px 14px rgba(232,140,46,.38);transform:translateY(-1px)}
-button.primary:active{transform:none;box-shadow:0 1px 4px rgba(232,140,46,.2)}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600;box-shadow:0 2px 8px rgba(245,160,74,.28)}
+button.primary:hover{background:var(--accent-h);border-color:var(--accent-h);box-shadow:0 4px 14px rgba(245,160,74,.38);transform:translateY(-1px)}
+button.primary:active{transform:none;box-shadow:0 1px 4px rgba(245,160,74,.2)}
 button.danger{color:var(--red-t);border-color:var(--red-bg);background:var(--surface)}
 button.danger:hover{background:var(--red-bg)}
 button.small{padding:4px 10px;font-size:12px}
