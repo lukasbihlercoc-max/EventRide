@@ -7,6 +7,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:my_app/data/block_service.dart';
 import 'package:my_app/data/chat_service.dart';
 import 'package:my_app/data/notification_service.dart';
 import 'package:my_app/data/seen_anfragen_service.dart';
@@ -110,6 +111,7 @@ void main() async {
   // ----------------------------
 
   final authRepository = FirebaseAuthRepository();
+  final blockService = BlockService();
 
   final anfrageRepository = FirestoreAnfrageRepository.create();
   final anfrageService = AnfrageService();
@@ -206,6 +208,7 @@ void main() async {
     seenAnfragenService: seenAnfragenService,
     interessentenService: interessentenService,
     notificationService: notificationService,
+    blockService: blockService,
   ));
 }
 
@@ -220,6 +223,7 @@ class MyApp extends StatefulWidget {
   final SeenAnfragenService seenAnfragenService;
   final InteressentenService interessentenService;
   final NotificationService notificationService;
+  final BlockService blockService;
 
   const MyApp({
     super.key,
@@ -233,6 +237,7 @@ class MyApp extends StatefulWidget {
     required this.seenAnfragenService,
     required this.interessentenService,
     required this.notificationService,
+    required this.blockService,
   });
 
   @override
@@ -255,6 +260,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           // Login: Heartbeat + Notifications starten, Streams neu laden.
           _currentUserId = newUserId;
           _startHeartbeat();
+          widget.blockService.init(newUserId);
           widget.fahrtService.load();
           // userId als lokale Variable sichern – _currentUserId könnte sich
           // durch einen Logout-Event ändern bevor then() ausgeführt wird.
@@ -271,6 +277,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           final uid = _currentUserId;
           _currentUserId = '';
           _stopHeartbeat();
+          widget.blockService.reset();
           widget.notificationService.stopChatMonitoring();
           await widget.notificationService.removeToken(uid);
         } else {
@@ -365,6 +372,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         Provider<IFahrtRepository>.value(value: widget.fahrtRepository),
         Provider<IUserRepository>.value(value: widget.userRepository),
         Provider<NotificationService>.value(value: widget.notificationService),
+        ChangeNotifierProvider<BlockService>.value(value: widget.blockService),
       ],
 
       

@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:my_app/data/event_daten.dart';
 import 'package:my_app/data/fahrt_daten.dart';
+import 'package:my_app/data/block_service.dart';
 import 'package:my_app/data/fahrt_service.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/utils/geo_utils.dart';
@@ -43,12 +44,13 @@ class FahrtFindenPage extends StatelessWidget {
             title: const Text('Fahrten finden'),
             leading: BackButton(onPressed: () => Navigator.pop(context)),
           ),
-          body: Consumer<FahrtService>(
-            builder: (context, fahrtService, child) {
+          body: Consumer2<FahrtService, BlockService>(
+            builder: (context, fahrtService, blockService, child) {
               final fahrtenFuerEvent = fahrtService.alleFahrten
                   .where((fahrt) =>
                       fahrt.eventId == event.stabileId &&
-                      fahrt.freiePlaetze > 0)
+                      fahrt.freiePlaetze > 0 &&
+                      !blockService.blockedUserIds.contains(fahrt.ownerId))
                   .toList();
 
               final user = context.watch<IAuthRepository>().currentUser;

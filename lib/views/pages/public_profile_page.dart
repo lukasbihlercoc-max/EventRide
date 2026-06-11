@@ -6,6 +6,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:my_app/data/app_user.dart';
+import 'package:my_app/data/block_service.dart';
 import 'package:my_app/data/review.dart';
 import 'package:my_app/views/widgets/app_card.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
@@ -14,6 +15,7 @@ import 'package:my_app/views/widgets/trust_shields_widget.dart';
 import 'package:my_app/views/widgets/app_bottom_sheet.dart';
 import 'package:my_app/views/widgets/review_card_widget.dart';
 import 'package:my_app/views/widgets/user_avatar_widget.dart';
+import 'package:provider/provider.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
@@ -94,6 +96,7 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
   bool _canReview = false;
   bool _hasReviewed = false;
   String? _sharedFahrtId;
+  bool _isBlockedByThem = false;
 
   CarInfo? _car;
 
@@ -188,11 +191,19 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
         final last = d['lastName'] as String? ?? '';
         final fullName = '$first $last'.trim();
 
+        final theirBlockedIds = (d['blockedUserIds'] as List<dynamic>?)
+                ?.whereType<String>()
+                .toList() ??
+            const [];
+        final blockedByThem =
+            currentUid != null && theirBlockedIds.contains(currentUid);
+
         DateTime? memberSince;
         final ts = d['createdAt'];
         if (ts is Timestamp) memberSince = ts.toDate();
 
         setState(() {
+          _isBlockedByThem = blockedByThem;
           _name = fullName.isNotEmpty ? fullName : widget.name;
           _photoUrl = (d['photoUrl'] as String?)?.isNotEmpty == true
               ? d['photoUrl'] as String
@@ -261,20 +272,217 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
     _load();
   }
 
+  void _showReportSheet(BuildContext context) {
+    String? selectedReason;
+    showAppSheet(context, (ctx) {
+      return StatefulBuilder(builder: (_, setSheetState) {
+        return AppSheetShell(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const AppSheetHeader(
+                icon: Icons.flag_outlined,
+                iconColor: Colors.orangeAccent,
+                title: 'Nutzer melden',
+              ),
+              const SizedBox(height: 16),
+              for (final reason in ['Spam', 'Belästigung', 'Fake-Profil', 'Sonstiges'])
+                InkWell(
+                  onTap: () => setSheetState(() => selectedReason = reason),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                    child: Row(
+                      children: [
+                        Icon(
+                          selectedReason == reason
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_unchecked,
+                          color: selectedReason == reason
+                              ? const Color(0xFFF5A04A)
+                              : Colors.white38,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          reason,
+                          style: const TextStyle(color: Colors.white, fontSize: 15),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 20),
+              AppSheetPrimaryButton(
+                label: 'Melden',
+                onTap: selectedReason == null
+                    ? () {}
+                    : () async {
+                        Navigator.pop(ctx);
+                        final currentUid =
+                            FirebaseAuth.instance.currentUser?.uid;
+                        if (currentUid == null) return;
+                        final blockSvc = context.read<BlockService>();
+                        try {
+                          await blockSvc.reportUser(
+                            currentUid: currentUid,
+                            targetUid: widget.userId,
+                            reason: selectedReason!,
+                          );
+                          if (mounted) {
+                            AppSnackbar.show(this.context,
+                                message: 'Nutzer wurde gemeldet');
+                          }
+                        } catch (_) {
+                          if (mounted) {
+                            AppSnackbar.show(this.context,
+                                message: 'Fehler beim Melden');
+                          }
+                        }
+                      },
+              ),
+              const SizedBox(height: 10),
+              AppSheetGhostButton(
+                label: 'Abbrechen',
+                onTap: () => Navigator.pop(ctx),
+              ),
+            ],
+          ),
+        );
+      });
+    });
+  }
+
+  void _showBlockDialog(BuildContext context) {
+    showAppSheet(context, (ctx) {
+      return AppBottomSheet(
+        icon: Icons.block,
+        iconColor: Colors.redAccent,
+        title: 'Nutzer blockieren?',
+        body:
+            '$_name wird aus deinem Feed entfernt. Du kannst ihn/sie jederzeit über das Profil entsperren.',
+        primaryLabel: 'Blockieren',
+        secondaryLabel: 'Abbrechen',
+        danger: true,
+        onSecondary: () => Navigator.pop(ctx),
+        onPrimary: () async {
+          Navigator.pop(ctx);
+          final currentUid = FirebaseAuth.instance.currentUser?.uid;
+          if (currentUid == null) return;
+          final blockSvc = context.read<BlockService>();
+          try {
+            await blockSvc.blockUser(
+              currentUid: currentUid,
+              targetUid: widget.userId,
+            );
+            if (mounted) {
+              AppSnackbar.show(this.context,
+                  message: '$_name blockiert');
+            }
+          } catch (_) {
+            if (mounted) {
+              AppSnackbar.show(this.context,
+                  message: 'Fehler beim Blockieren');
+            }
+          }
+        },
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final blockService = context.watch<BlockService>();
+    final isBlocked = blockService.isBlocked(widget.userId) || _isBlockedByThem;
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    final isOwnProfile = currentUid == widget.userId;
+
+    final appBar = AppBar(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      surfaceTintColor: Colors.transparent,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+        onPressed: () => Navigator.of(context).pop(),
+      ),
+      actions: isOwnProfile
+          ? null
+          : [
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert, color: Colors.white),
+                color: const Color(0xFF1E2C47),
+                onSelected: (value) {
+                  if (value == 'report') _showReportSheet(context);
+                  if (value == 'block') _showBlockDialog(context);
+                },
+                itemBuilder: (_) => [
+                  const PopupMenuItem(
+                    value: 'report',
+                    child: Row(children: [
+                      Icon(Icons.flag_outlined, size: 18, color: Colors.white70),
+                      SizedBox(width: 10),
+                      Text('Nutzer melden',
+                          style: TextStyle(color: Colors.white)),
+                    ]),
+                  ),
+                  const PopupMenuItem(
+                    value: 'block',
+                    child: Row(children: [
+                      Icon(Icons.block, size: 18, color: Colors.redAccent),
+                      SizedBox(width: 10),
+                      Text('Nutzer blockieren',
+                          style: TextStyle(color: Colors.redAccent)),
+                    ]),
+                  ),
+                ],
+              ),
+            ],
+    );
+
+    if (isBlocked) {
+      return AppBackground(
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          appBar: appBar,
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.block,
+                      size: 52, color: Colors.white.withValues(alpha: 0.35)),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Profil nicht verfügbar',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.80),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Du hast diesen Nutzer blockiert.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.45),
+                      fontSize: 13.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return AppBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          surfaceTintColor: Colors.transparent,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-        ),
+        appBar: appBar,
         body: _loading
             ? const Center(child: CircularProgressIndicator(color: Colors.white))
             : SafeArea(

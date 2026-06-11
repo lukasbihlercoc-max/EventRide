@@ -10,6 +10,7 @@ import 'package:my_app/views/widgets/app_card.dart';
 import 'package:my_app/views/widgets/trust_shields_widget.dart';
 
 import 'package:my_app/data/app_user.dart';
+import 'package:my_app/data/block_service.dart';
 import 'package:my_app/data/fahrt_service.dart';
 import 'package:my_app/data/anfrage_service.dart';
 import 'package:my_app/data/anfrage_daten.dart';
@@ -454,8 +455,14 @@ class _FahrtenTabBarState extends State<_FahrtenTabBar> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer2<AnfrageService, SeenAnfragenService>(
-      builder: (context, anfrageService, seenService, _) {
+    return Consumer3<AnfrageService, SeenAnfragenService, BlockService>(
+      builder: (context, anfrageService, seenService, blockService, _) {
+        final blockedIds = blockService.blockedUserIds;
+        final visibleConvos = _conversations.where((c) {
+          final other = c.ownerId == widget.userId ? c.requesterId : c.ownerId;
+          return !blockedIds.contains(other);
+        }).toList();
+
         final requesterIds = anfrageService
             .getAnfragenByRequester(widget.userId)
             .where((a) =>
@@ -475,12 +482,12 @@ class _FahrtenTabBarState extends State<_FahrtenTabBar> {
             .map((a) => a.fahrtId)
             .toSet();
 
-        final hasPassengerChatUnread = _conversations.any((c) =>
+        final hasPassengerChatUnread = visibleConvos.any((c) =>
             c.requesterId == widget.userId &&
             activeAnfragenIds.contains(c.fahrtId) &&
             c.isUnreadFor(widget.userId));
 
-        final hasDriverChatUnread = _conversations.any((c) =>
+        final hasDriverChatUnread = visibleConvos.any((c) =>
             c.ownerId == widget.userId && c.isUnreadFor(widget.userId));
 
         final showMitfahrtenDot = seenService.hasUnseenRequester(widget.userId, requesterIds)
@@ -524,7 +531,7 @@ class _AngeboteneFahrtenTabState extends State<_AngeboteneFahrtenTab>
   @override
   bool get wantKeepAlive => true;
 
-  Map<String, int> _unreadByFahrtId = {};
+  List<ChatConversation> _rawConversations = [];
   StreamSubscription<List<ChatConversation>>? _convoSub;
 
   @override
@@ -537,13 +544,7 @@ class _AngeboteneFahrtenTabState extends State<_AngeboteneFahrtenTab>
           .conversationsStream(widget.userId)
           .listen((convos) {
         if (!mounted) return;
-        final map = <String, int>{};
-        for (final c in convos) {
-          if (c.isUnreadFor(widget.userId)) {
-            map[c.fahrtId] = (map[c.fahrtId] ?? 0) + 1;
-          }
-        }
-        setState(() => _unreadByFahrtId = map);
+        setState(() => _rawConversations = convos);
       });
     });
   }
@@ -607,8 +608,18 @@ class _AngeboteneFahrtenTabState extends State<_AngeboteneFahrtenTab>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return Consumer<FahrtService>(
-      builder: (context, fahrtService, _) {
+    return Consumer2<FahrtService, BlockService>(
+      builder: (context, fahrtService, blockService, _) {
+        final blockedIds = blockService.blockedUserIds;
+        final unreadByFahrtId = <String, int>{};
+        for (final c in _rawConversations) {
+          final other = c.ownerId == widget.userId ? c.requesterId : c.ownerId;
+          if (blockedIds.contains(other)) continue;
+          if (c.isUnreadFor(widget.userId)) {
+            unreadByFahrtId[c.fahrtId] = (unreadByFahrtId[c.fahrtId] ?? 0) + 1;
+          }
+        }
+
         final es = context.read<EventService>();
         final datumCache = {for (final e in es.events) e.id: e.datum};
         final meineFahrten = List<FahrtDaten>.from(
@@ -663,7 +674,7 @@ class _AngeboteneFahrtenTabState extends State<_AngeboteneFahrtenTab>
                             secondaryBackground: const _SwipeDeleteBackground(),
                             child: _FahrerGlassCard(
                               fahrt: fahrt,
-                              unreadChatCount: _unreadByFahrtId[fahrt.id] ?? 0,
+                              unreadChatCount: unreadByFahrtId[fahrt.id] ?? 0,
                             ),
                           ),
                         );

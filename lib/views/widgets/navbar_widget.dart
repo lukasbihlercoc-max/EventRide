@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:my_app/data/app_user.dart';
+import 'package:my_app/data/block_service.dart';
 import 'package:my_app/data/chat_conversation.dart';
 import 'package:my_app/data/chat_service.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
@@ -242,12 +243,18 @@ class _NavItemFahrtenState extends State<_NavItemFahrten> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Consumer2<AnfrageService, SeenAnfragenService>(
-              builder: (context, anfrageService, seenService, _) {
+            Consumer3<AnfrageService, SeenAnfragenService, BlockService>(
+              builder: (context, anfrageService, seenService, blockService, _) {
                 final uid = context.read<IAuthRepository>().currentUser?.userId;
                 bool hasAnfrageUnseen = false;
                 bool hasChatUnread = false;
                 if (uid != null) {
+                  final blockedIds = blockService.blockedUserIds;
+                  final visibleConvos = _conversations.where((c) {
+                    final other = c.ownerId == uid ? c.requesterId : c.ownerId;
+                    return !blockedIds.contains(other);
+                  }).toList();
+
                   final requesterIds = anfrageService
                       .getAnfragenByRequester(uid)
                       .where((a) =>
@@ -268,7 +275,7 @@ class _NavItemFahrtenState extends State<_NavItemFahrten> {
                       .map((a) => a.fahrtId)
                       .toSet();
 
-                  hasChatUnread = _conversations.any((c) {
+                  hasChatUnread = visibleConvos.any((c) {
                     if (!c.isUnreadFor(uid)) return false;
                     if (c.requesterId == uid) {
                       return activePassengerFahrtIds.contains(c.fahrtId);

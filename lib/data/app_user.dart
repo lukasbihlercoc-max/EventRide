@@ -44,6 +44,7 @@ class AppUser {
 
   final double? ratingAvg;
   final int ratingCount;
+  final List<String> blockedUserIds;
 
   const AppUser({
     required this.userId,
@@ -61,6 +62,7 @@ class AppUser {
     this.licenseRejectReason,
     this.ratingAvg,
     this.ratingCount = 0,
+    this.blockedUserIds = const [],
   });
 
   int get trustLevel {
