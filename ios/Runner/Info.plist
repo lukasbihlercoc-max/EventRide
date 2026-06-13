@@ -49,13 +49,13 @@
 		<string>remote-notification</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>EventRide benötigt Kamerazugriff für dein Profilbild.</string>
+	<string>EventRide uses the camera to take a profile photo so other users can identify you as a driver or passenger.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>EventRide benötigt Zugriff auf deine Fotos für dein Profilbild.</string>
+	<string>EventRide accesses your photo library so you can choose an existing photo as your profile picture, helping other users recognize you.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>EventRide möchte das Profilbild in deiner Fotobibliothek speichern.</string>
+	<string>EventRide saves your profile photo to your photo library so you can access it outside the app.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>EventRide nutzt deinen Standort um ihn auf der Karte anzuzeigen.</string>
+	<string>EventRide uses your location to show your position on the map when selecting a pickup or drop-off point for a ride.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
