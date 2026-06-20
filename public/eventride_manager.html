@@ -1145,9 +1145,12 @@ function removeQuelle(id, index) {
 }
 
 function extractInstagramUsername(url) {
-  // instagram.com/username or instagram.com/@username
+  // instagram.com/stories/username/... → extract username from stories
+  const storiesM = url.match(/instagram\.com\/stories\/@?([\w.]+)/i);
+  if (storiesM && storiesM[1]) return storiesM[1];
+  // instagram.com/username or instagram.com/@username (profile URLs)
   const m = url.match(/instagram\.com\/@?([\w.]+)/i);
-  if (m && m[1] && !['p','reel','stories','explore','tv','accounts','about'].includes(m[1].toLowerCase())) return m[1];
+  if (m && m[1] && !['p','reel','stories','explore','tv','accounts','about','direct','ar'].includes(m[1].toLowerCase())) return m[1];
   // bare @username
   if (/^@[\w.]+$/.test(url.trim())) return url.trim().slice(1);
   return null;
