@@ -276,6 +276,45 @@ select option{background:var(--surface);color:var(--text)}
   .detail-panel{position:static;max-height:none}
   .app-wrap{padding:0 1rem 3rem}
 }
+
+/* ── IG Accounts Tab ── */
+.ig-table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;overflow-x:auto}
+.ig-table{width:100%;border-collapse:collapse;font-size:13px;min-width:700px}
+.ig-table th{padding:10px 14px;text-align:left;font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--text-3);border-bottom:1px solid var(--border);background:var(--surface-2);white-space:nowrap;cursor:pointer;user-select:none}
+.ig-table th:hover{color:var(--text)}
+.ig-table td{padding:10px 14px;border-bottom:1px solid var(--border-sub);vertical-align:middle;color:var(--text)}
+.ig-table tbody tr:last-child td{border-bottom:none}
+.ig-table tbody tr:hover td{background:var(--surface-2)}
+.ig-username{font-family:'SFMono-Regular',Consolas,monospace;font-size:12px;color:var(--accent)}
+.badge-ig-offen{background:rgba(245,160,74,.12);color:#7A4A00;border-color:rgba(245,160,74,.25)}
+.badge-ig-geprueft{background:var(--surface-2);color:var(--text-2);border-color:var(--border)}
+.badge-ig-termin{background:rgba(26,127,55,.10);color:var(--green-t);border-color:rgba(26,127,55,.20)}
+.badge-ig-irrelevant{background:rgba(207,34,46,.06);color:var(--red-t);border-color:rgba(207,34,46,.12)}
+[data-theme=dark] .badge-ig-offen{color:#FAC775;border-color:rgba(245,160,74,.28)}
+[data-theme=dark] .badge-ig-termin{color:#3FB950;border-color:rgba(63,185,80,.24)}
+[data-theme=dark] .badge-ig-irrelevant{color:#F85149;border-color:rgba(248,81,73,.20)}
+.ig-stat-chip{background:var(--surface);border:1px solid var(--border);border-radius:var(--rs);padding:14px 18px;flex:1;min-width:100px;text-align:center}
+.ig-stat-num{font-size:26px;font-weight:700;line-height:1;letter-spacing:-1px;font-variant-numeric:tabular-nums}
+.ig-stat-lbl{font-size:11px;color:var(--text-3);margin-top:4px}
+.ig-status-select{font-size:12px;padding:4px 8px;width:auto;border-radius:var(--rx);border:1px solid var(--border);background:var(--surface);color:var(--text)}
+/* Ampel dots */
+.ampel-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;display:inline-block}
+/* KI badge */
+.ki-badge{display:inline-flex;align-items:center;gap:3px;font-size:10px;padding:1px 5px;border-radius:100px;background:rgba(9,105,218,.08);color:#0969DA;border:1px solid rgba(9,105,218,.12);font-weight:500;line-height:1.4}
+.ki-badge.done{background:var(--surface-2);color:var(--text-3);border-color:var(--border);text-decoration:line-through}
+[data-theme=dark] .ki-badge{background:rgba(88,166,255,.08);color:#58A6FF;border-color:rgba(88,166,255,.12)}
+[data-theme=dark] .ki-badge.done{background:var(--surface-3);color:var(--text-3)}
+/* Bezirke tab – sections within gemeinde */
+.gem-section{padding:10px 18px 10px 34px}
+.gem-section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.gem-section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-3)}
+.gem-sub-row{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border-sub)}
+.gem-sub-row:last-of-type{border-bottom:none}
+/* Inline add form */
+.bez-inline-add{background:var(--accent-soft);border:1px solid rgba(245,160,74,.25);border-radius:var(--rs);padding:12px;margin-top:8px}
+/* Accounts tab – bezirk group headers in table */
+.ig-bez-hdr{background:var(--surface-2);padding:8px 14px;font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--text-2);text-transform:uppercase;border-bottom:1px solid var(--border);cursor:pointer;user-select:none}
+.ig-bez-hdr:hover{background:var(--surface-3)}
 </style>
 </head>
 <body>
@@ -311,6 +350,7 @@ select option{background:var(--surface);color:var(--text)}
       <button class="tab-btn" onclick="switchTab('bezirke')" id="tab-bezirke">Bezirke</button>
       <button class="tab-btn" onclick="switchTab('csv')" id="tab-csv">CSV Import</button>
       <button class="tab-btn" onclick="switchTab('flyer')" id="tab-flyer">Flyer</button>
+      <button class="tab-btn" onclick="switchTab('accounts')" id="tab-accounts">📱 Accounts</button>
     </div>
 
     <div id="content"></div>
@@ -341,6 +381,20 @@ select option{background:var(--surface);color:var(--text)}
     <div class="btn-row" id="upload-btn-row" style="margin-top:1rem">
       <button onclick="closeUpload()">Abbrechen</button>
       <button class="primary" id="btn-upload-submit" onclick="submitUpload()">↑ In App speichern</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-ig-account" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeIgModal()">
+  <div class="modal" style="width:560px;max-width:97vw">
+    <div class="modal-header">
+      <h3 id="ig-modal-title" style="margin:0">Account hinzufügen</h3>
+      <button class="icon-btn" onclick="closeIgModal()">×</button>
+    </div>
+    <div id="ig-modal-body"></div>
+    <div class="btn-row" style="margin-top:1.25rem">
+      <button onclick="closeIgModal()">Abbrechen</button>
+      <button class="primary" onclick="saveIgAccount()">Speichern</button>
     </div>
   </div>
 </div>
@@ -412,6 +466,24 @@ let isFlyerMode = false;
 let appEditMode = false;
 let appEditData = {};
 
+// ---- IG ACCOUNTS STATE ----
+let igAccounts = [];
+let igFilterStatus = "Alle";
+let igFilterTyp = "Alle";
+let igFilterBezirk = "Alle";
+let igSearch = "";
+let igSortField = "status";
+let igSortDir = "asc";
+let igEditData = {};
+let igEditId = null;
+let igShowImport = false;
+let igFilterKI = false;
+let igBezOpen = {};
+let bezInlineAddGem = null;
+let bezInlineAddData = {};
+let multiConfirmedIds = new Set();
+let gemeindeMeta = {};
+
 // ---- AUTH ----
 const ALLOWED_EMAILS = ['lukas.bihler.coc@gmail.com', 'matzematze666@gmail.com', 'chiara.bihler.cb@gmail.com'];
 
@@ -480,11 +552,24 @@ function initFS() {
 
   db.collection("pending_events").orderBy("createdAt","desc").onSnapshot(snap => {
     pending = snap.docs.map(d => ({_id: d.id, _src: "pending", ...d.data()}));
+    computeMultiConfirmed();
     render();
   }, e => {
     pending = [];
     render();
   });
+
+  db.collection("ig_accounts").onSnapshot(snap => {
+    igAccounts = snap.docs.map(d => ({_id: d.id, ...d.data()}));
+    if(curTab === "accounts") renderAccounts();
+    else if(curTab === "bezirke") renderBezirke();
+  }, e => { console.warn("ig_accounts read error", e); });
+
+  db.collection("gemeinde_meta").onSnapshot(snap => {
+    gemeindeMeta = {};
+    snap.docs.forEach(d => { gemeindeMeta[d.id] = d.data(); });
+    if(curTab === "bezirke") renderBezirke();
+  }, e => { console.warn("gemeinde_meta read error", e); });
 }
 
 // ---- DATE UTILS ----
@@ -651,6 +736,7 @@ function render() {
   else if(curTab==="bezirke") renderBezirke();
   else if(curTab==="csv") renderCSV();
   else if(curTab==="flyer") renderFlyer();
+  else if(curTab==="accounts") renderAccounts();
 }
 
 function switchTab(t) {
@@ -747,6 +833,10 @@ function eventRow(ev, hasDupes=false) {
   if(inApp) icons.push(`<span class="icon-upload" title="In App">↑</span>`);
   if(similarApp) icons.push(`<span style="font-size:10px;background:#E6F1FB;color:#0C447C;padding:1px 6px;border-radius:8px;font-weight:600" title="Ähnliches Event möglicherweise bereits in App">~App</span>`);
   if(hasDupes) icons.push(`<span style="font-size:10px;background:#FFF3D6;color:#7A4A00;padding:1px 6px;border-radius:8px;font-weight:600">ähnlich</span>`);
+  if(multiConfirmedIds.has(ev._id)) icons.push(`<span style="font-size:10px;background:#D1FAE5;color:#065F46;padding:1px 6px;border-radius:8px;font-weight:600">✓✓ Mehrfach</span>`);
+  const qtypStyle = {web:'background:#E6F1FB;color:#0C447C',flyer:'background:#FFF3D6;color:#7A4A00',instagram:'background:#FCE7F3;color:#9D174D'};
+  const qtypLabel = {web:'🌐 Web',flyer:'📄 Flyer',instagram:'📱 IG'};
+  if(ev.quelleTyp && qtypLabel[ev.quelleTyp]) icons.push(`<span style="font-size:10px;${qtypStyle[ev.quelleTyp]};padding:1px 6px;border-radius:8px;font-weight:600">${qtypLabel[ev.quelleTyp]}</span>`);
 
   return `<div class="event-row ${statusClass} ${isSel?"selected":""} ${past&&!inApp?"past":""} ${hasDupes?"has-dupes":""}" onclick="selectEv('${ev._id}')">
     ${typBadge(ev.typ)}
@@ -864,14 +954,17 @@ function detailPanel(ev) {
         </div>
       </div>
 
-      ${ev.quelle?`<div class="detail-section">
-        <div class="detail-section-title">Quellen</div>
-        <a href="${ev.quelle.startsWith("http")?ev.quelle:"https://"+ev.quelle}" target="_blank" style="font-size:12px;display:block;margin-bottom:6px;word-break:break-all">${esc(ev.quelle)}</a>
-      </div>`:""}
-
       <div class="detail-section">
-        <div class="detail-section-title">Weitere Quelle (Instagram, Facebook …)</div>
-        <input value="${esc(ev.quelle2||"")}" placeholder="URL einfügen…" onchange="updPending('${ev._id}',{quelle2:this.value})" style="font-size:12px">
+        <div class="detail-section-title">Quellen & Sicherheit</div>
+        ${ev.quelleTyp||ev.sicherheit?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+          ${ev.quelleTyp?`<span style="font-size:11px;padding:2px 8px;border-radius:8px;font-weight:600;${{'web':'background:#E6F1FB;color:#0C447C','flyer':'background:#FFF3D6;color:#7A4A00','instagram':'background:#FCE7F3;color:#9D174D'}[ev.quelleTyp]||'background:var(--surface-2);color:var(--text-2)'}">${{'web':'🌐 Web','flyer':'📄 Flyer','instagram':'📱 Instagram'}[ev.quelleTyp]||ev.quelleTyp}</span>`:""}
+          ${ev.sicherheit==="sicher"?`<span style="font-size:11px;padding:2px 8px;border-radius:8px;font-weight:600;background:#D1FAE5;color:#065F46">🟢 Sicher</span>`:ev.sicherheit==="mittel"?`<span style="font-size:11px;padding:2px 8px;border-radius:8px;background:#FEF3C7;color:#92400E">🟡 Mittel</span>`:""}
+          ${multiConfirmedIds.has(ev._id)?`<span style="font-size:11px;padding:2px 8px;border-radius:8px;font-weight:600;background:#D1FAE5;color:#065F46">✓✓ Mehrfach bestätigt</span>`:""}
+        </div>`:""}
+        ${ev.quelleLink?`<div style="margin-bottom:6px"><a href="${esc(ev.quelleLink)}" target="_blank" rel="noopener" style="font-size:12px;word-break:break-all;color:var(--accent)">${esc(ev.quelleLink)}</a></div>`:""}
+        ${ev.srcZitat?`<div style="font-size:12px;color:var(--text-2);background:var(--surface-2);border-left:3px solid var(--border);padding:8px 12px;border-radius:0 var(--rx) var(--rx) 0;margin-bottom:6px;font-style:italic">"${esc(ev.srcZitat)}"</div>`:""}
+        ${ev.quelle?`<a href="${ev.quelle.startsWith("http")?ev.quelle:"https://"+ev.quelle}" target="_blank" style="font-size:11px;color:var(--text-3);display:block;word-break:break-all">${esc(ev.quelle)}</a>`:""}
+        ${quellenHtml(ev)}
       </div>
 
       <div class="section-div"></div>
@@ -881,6 +974,10 @@ function detailPanel(ev) {
         <label class="check-label">
           <input type="checkbox" ${ev.geprueft?"checked":""} onchange="updPending('${ev._id}',{geprueft:this.checked})">
           Manuell überprüft (Instagram / Internet)
+        </label>
+        <label class="check-label">
+          <input type="checkbox" ${ev.kiRechercheNichtGefunden?"checked":""} onchange="updPending('${ev._id}',{kiRechercheNichtGefunden:this.checked})">
+          🤖 KI-Recherche – nichts gefunden
         </label>
         <label class="check-label">
           <input type="checkbox" ${ev.inApp?"checked":""} onchange="updPending('${ev._id}',{inApp:this.checked})">
@@ -913,7 +1010,21 @@ function editFormHTML(d) {
     <span class="edit-label">Veranstalter</span><input value="${esc(d.veranstalter||"")}" onchange="editData.veranstalter=this.value">
     <span class="edit-label">Eintritt</span><input value="${esc(d.eintritt||"")}" onchange="editData.eintritt=this.value">
     <span class="edit-label">Beschreibung</span><textarea onchange="editData.beschreibung=this.value" style="font-size:12px;padding:7px 10px;resize:vertical" rows="2">${esc(d.beschreibung||"")}</textarea>
-    <span class="edit-label">Quelle</span><input value="${esc(d.quelle||"")}" onchange="editData.quelle=this.value">
+    <span class="edit-label">Quelle (alt)</span><input value="${esc(d.quelle||"")}" onchange="editData.quelle=this.value">
+    <span class="edit-label">Quell-Typ</span>
+    <select onchange="editData.quelleTyp=this.value">
+      <option value="" ${!d.quelleTyp?"selected":""}>–</option>
+      <option value="web" ${d.quelleTyp==="web"?"selected":""}>🌐 Web</option>
+      <option value="flyer" ${d.quelleTyp==="flyer"?"selected":""}>📄 Flyer</option>
+      <option value="instagram" ${d.quelleTyp==="instagram"?"selected":""}>📱 Instagram</option>
+    </select>
+    <span class="edit-label">Quell-Link</span><input value="${esc(d.quelleLink||"")}" placeholder="https://…" onchange="editData.quelleLink=this.value">
+    <span class="edit-label">Quell-Zitat</span><textarea rows="2" oninput="editData.srcZitat=this.value" style="font-size:12px;padding:7px 10px">${esc(d.srcZitat||"")}</textarea>
+    <span class="edit-label">Sicherheit</span>
+    <select onchange="editData.sicherheit=this.value">
+      <option value="mittel" ${(!d.sicherheit||d.sicherheit==="mittel")?"selected":""}>🟡 Mittel</option>
+      <option value="sicher" ${d.sicherheit==="sicher"?"selected":""}>🟢 Sicher</option>
+    </select>
     <span class="edit-label">Adresse</span><input id="ed-adresse" value="${esc(d.adresse||"")}" placeholder="Adresse suchen…" oninput="editData.adresse=this.value">
     <span class="edit-label">Koordinaten</span>
     <div>
@@ -929,8 +1040,8 @@ function startEdit(id) {
   if(!ev) return;
   editData = {...ev,
     typ: normalizeTyp(ev.typ),
-    lat: ev.latitude ?? ev.lat ?? null,
-    lng: ev.longitude ?? ev.lng ?? null,
+    latitude: ev.latitude ?? ev.lat ?? null,
+    longitude: ev.longitude ?? ev.lng ?? null,
   };
   editMode = true;
   render();
@@ -944,8 +1055,8 @@ function saveEdit(id) {
   const yr = getYear(editData.datum);
   const patch = {...editData,
     adresse: editData.adresse || editData.gemeinde || '',
-    latitude: editData.lat || null,
-    longitude: editData.lng || null,
+    latitude: editData.latitude || null,
+    longitude: editData.longitude || null,
     typ: normalizeTyp(editData.typ),
   };
   if(yr>=2026) patch.status="confirmed";
@@ -970,17 +1081,115 @@ function confirm2026(id) {
   updPending(id,{datum:d.value,status:"confirmed"});
 }
 
+// ---- QUELLEN (MULTI-SOURCE) ----
+function quellenHtml(ev) {
+  const quellen = ev.quellen || [];
+  const id = ev._id;
+  let html = '';
+  // Legacy quelle2 – show read-only if not already in quellen array
+  if (ev.quelle2 && !quellen.includes(ev.quelle2)) {
+    const href = ev.quelle2.startsWith("http") ? ev.quelle2 : "https://" + ev.quelle2;
+    const isIg = /instagram\.com/i.test(ev.quelle2) || /^@/.test(ev.quelle2);
+    html += `<div style="display:flex;align-items:center;gap:6px;margin-top:6px;padding:5px 8px;background:var(--surface-2);border-radius:var(--rx)">
+      <span style="font-size:13px;flex-shrink:0">${isIg ? '📱' : '🔗'}</span>
+      <a href="${href}" target="_blank" rel="noopener" style="font-size:12px;color:var(--accent);flex:1;word-break:break-all;min-width:0">${esc(ev.quelle2)}</a>
+    </div>`;
+  }
+  // quellen array items
+  quellen.forEach((q, i) => {
+    const href = q.startsWith("http") ? q : "https://" + q;
+    const isIg = /instagram\.com/i.test(q) || /^@/.test(q);
+    html += `<div style="display:flex;align-items:center;gap:6px;margin-top:6px;padding:5px 8px;background:var(--surface-2);border-radius:var(--rx)">
+      <span style="font-size:13px;flex-shrink:0">${isIg ? '📱' : '🔗'}</span>
+      <a href="${href}" target="_blank" rel="noopener" style="font-size:12px;color:var(--accent);flex:1;word-break:break-all;min-width:0">${esc(q)}</a>
+      <button class="icon-btn" style="padding:2px 6px;font-size:11px;color:var(--red-t);flex-shrink:0" onclick="removeQuelle('${id}',${i})">✕</button>
+    </div>`;
+  });
+  // Input to add new source
+  html += `<div style="display:flex;gap:6px;margin-top:8px">
+    <input id="quelle-inp-${id}" placeholder="Instagram, Website, Facebook …" style="font-size:12px;flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();addQuelle('${id}')}">
+    <button class="small primary" style="white-space:nowrap;flex-shrink:0;padding:5px 12px" onclick="addQuelle('${id}')">＋ Quelle</button>
+  </div>`;
+  return html;
+}
+
+function addQuelle(id) {
+  const inp = document.getElementById("quelle-inp-" + id);
+  if (!inp || !inp.value.trim()) return;
+  const val = inp.value.trim();
+  const ev = pending.find(e => e._id === id);
+  if (!ev) return;
+  const quellen = [...(ev.quellen || [])];
+  if (quellen.includes(val)) { showToast("Bereits vorhanden", false); return; }
+  quellen.push(val);
+  updPending(id, {quellen});
+  inp.value = "";
+  // Instagram auto-add
+  const igUser = extractInstagramUsername(val);
+  if (igUser) {
+    const exists = igAccounts.some(a => a.username === igUser);
+    if (!exists) {
+      autoAddIgAccount(igUser, ev.gemeinde, ev.bezirk);
+    } else {
+      showToast(`📱 @${igUser} ist bereits in Accounts`);
+    }
+  }
+}
+
+function removeQuelle(id, index) {
+  const ev = pending.find(e => e._id === id);
+  if (!ev) return;
+  const quellen = [...(ev.quellen || [])];
+  quellen.splice(index, 1);
+  updPending(id, {quellen});
+}
+
+function extractInstagramUsername(url) {
+  // instagram.com/username or instagram.com/@username
+  const m = url.match(/instagram\.com\/@?([\w.]+)/i);
+  if (m && m[1] && !['p','reel','stories','explore','tv','accounts','about'].includes(m[1].toLowerCase())) return m[1];
+  // bare @username
+  if (/^@[\w.]+$/.test(url.trim())) return url.trim().slice(1);
+  return null;
+}
+
+async function autoAddIgAccount(username, gemeinde, bezirk) {
+  const derivedBezirk = bezirk || deriveBezirkFromGemeinde(gemeinde) || "";
+  try {
+    await db.collection("ig_accounts").add({
+      username,
+      displayName: "",
+      vereinsTyp: "Sonstige",
+      gemeinde: gemeinde || "",
+      bezirk: derivedBezirk,
+      status: "offen",
+      letzterTermin: "",
+      letzteEventNamen: "",
+      quelle: "",
+      zuletztGeprueftAm: "",
+      notizen: "",
+      kiRecherche: false,
+      manuellKontrolliert: false,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    showToast(`📱 @${username} zu Accounts hinzugefügt${gemeinde ? " (" + gemeinde + ")" : ""}`);
+  } catch(e) {
+    console.error("IG auto-add error", e);
+    showToast("Fehler beim Hinzufügen des IG-Accounts", false);
+  }
+}
+
 // ---- ADD MODAL ----
-function openAdd() {
-  addFormData = {name:"",datum:"",uhrzeit:"20:00",gemeinde:"",bezirk:"Spittal",veranstalter:"örtlich",eintritt:"",beschreibung:"",typ:"e1",quelle:"",adresse:"",lat:null,lng:null};
-  const bezSelect = BEZIRKE.map(b=>`<option ${b==="Spittal"?"selected":""}>${b}</option>`).join("");
+function openAdd(prefill) {
+  addFormData = Object.assign({name:"",datum:"",uhrzeit:"20:00",gemeinde:"",bezirk:"Spittal",veranstalter:"örtlich",eintritt:"",beschreibung:"",typ:"e1",quelle:"",quelleTyp:"",quelleLink:"",srcZitat:"",sicherheit:"mittel",adresse:"",latitude:null,longitude:null}, prefill||{});
+  const bezSelect = BEZIRKE.map(b=>`<option value="${b}" ${b===addFormData.bezirk?"selected":""}>${b}</option>`).join("");
   const typSelect = [['e1','Kirchtage/Feste'],['e2','Feuerwehr'],['e3','Disco/Party'],['e4','Ball'],['e5','Krampus'],['e6','Festival/Open-Air']]
     .map(([v,l])=>`<option value="${v}" ${v==="e1"?"selected":""}>${l}</option>`).join("");
   document.getElementById("add-form").innerHTML = `<div class="edit-grid">
     <span class="edit-label">Name *</span><input placeholder="Eventname" oninput="addFormData.name=this.value">
     <span class="edit-label">Datum *</span><input placeholder="TT.MM.JJJJ" oninput="addFormData.datum=this.value">
     <span class="edit-label">Uhrzeit</span><input value="20:00" oninput="addFormData.uhrzeit=this.value">
-    <span class="edit-label">Gemeinde *</span><input placeholder="z.B. Seeboden" oninput="addFormData.gemeinde=this.value">
+    <span class="edit-label">Gemeinde *</span><input placeholder="z.B. Seeboden" value="${esc(addFormData.gemeinde||"")}" oninput="addFormData.gemeinde=this.value">
     <span class="edit-label">Bezirk</span><select onchange="addFormData.bezirk=this.value">${bezSelect}</select>
     <span class="edit-label">Typ</span><select onchange="addFormData.typ=this.value">${typSelect}</select>
     <span class="edit-label">Veranstalter</span><input value="örtlich" oninput="addFormData.veranstalter=this.value">
@@ -1020,9 +1229,13 @@ function submitAdd() {
     beschreibung: addFormData.beschreibung || '',
     quelle: addFormData.quelle || '',
     quelle2: '',
+    quelleTyp: addFormData.quelleTyp || '',
+    quelleLink: addFormData.quelleLink || '',
+    srcZitat: addFormData.srcZitat || '',
+    sicherheit: addFormData.sicherheit || 'mittel',
     adresse: addFormData.adresse || addFormData.gemeinde,
-    latitude: addFormData.lat || null,
-    longitude: addFormData.lng || null,
+    latitude: addFormData.latitude || null,
+    longitude: addFormData.longitude || null,
     status: yr>=2026?"confirmed":"check",
     geprueft: false, inApp: false,
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -1196,25 +1409,55 @@ function goToRecherche(bez, gem) {
   switchTab('recherche');
 }
 
+function getGemEvents(gem, bez) {
+  const first = gem.split(" ")[0];
+  const match = e => (e.gemeinde===gem||e.gemeinde.startsWith(first)) && e.bezirk===bez;
+  return [...pending.filter(match), ...appEvents.filter(match)]
+    .sort((a,b)=>monthDay(a.datum)-monthDay(b.datum));
+}
+
+function getGemAccs(gem, bez) {
+  const first = gem.split(" ")[0];
+  return igAccounts.filter(a=>(a.gemeinde===gem||((a.gemeinde||"").startsWith(first)))&&a.bezirk===bez);
+}
+
+function gemAmpelClass(gem, bez) {
+  const evs = getGemEvents(gem, bez);
+  const accs = getGemAccs(gem, bez);
+  const meta = gemeindeMeta[gem];
+  if (!evs.length && !accs.length) {
+    return meta?.rechercheStatus === "nichts_gefunden" ? "grau" : "rot";
+  }
+  if (accs.length && accs.every(a=>a.status==="nicht_relevant") && !evs.length) return "grau";
+  if (accs.some(a=>a.status==="offen")) return "orange";
+  if (evs.length) return "gruen";
+  return "orange";
+}
+
 function renderBezirke() {
+  const ampelCol = {rot:"#CF222E",orange:"#D98D00",gruen:"#1A7F37",grau:"#8C959F"};
+  const ampelTip = {rot:"Keine Events, keine Accounts",orange:"Offene Accounts",gruen:"Events bestätigt",grau:"Nicht relevant"};
   let html = "";
-  for(const bez of BEZIRKE) {
+
+  for (const bez of BEZIRKE) {
     const bezEvs = pending.filter(e=>e.bezirk===bez);
     const appBezEvs = appEvents.filter(e=>e.bezirk===bez);
+    const bezAccs = igAccounts.filter(a=>a.bezirk===bez);
     const conf = bezEvs.filter(e=>!isCheck(e)).length;
     const chk = bezEvs.filter(e=>isCheck(e)).length;
     const isOpen = expandBez[bez];
     const gems = GEMEINDEN[bez]||[];
-    const total = bezEvs.length + appBezEvs.length;
+    const offeneAccs = bezAccs.filter(a=>a.status==="offen").length;
 
     html += `<div class="bez-card">
-      <div class="bez-header" onclick="expandBez['${bez}']=!expandBez['${bez}'];render()">
-        <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
+      <div class="bez-header" onclick="expandBez['${bez}']=!expandBez['${bez}'];renderBezirke()">
+        <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;flex-wrap:wrap">
           <span style="font-weight:600;font-size:14px">${bez}</span>
-          ${appBezEvs.length?`<span class="badge badge-inapp">${appBezEvs.length} in App</span>`:""}
+          ${appBezEvs.length?`<span class="badge badge-inapp">${appBezEvs.length} App</span>`:""}
           ${conf?`<span class="badge badge-confirmed">${conf} bestätigt</span>`:""}
           ${chk?`<span class="badge badge-check">${chk} prüfen</span>`:""}
-          ${total===0?`<span style="font-size:11px;color:var(--text-3)">keine Events</span>`:""}
+          ${bezAccs.length?`<span class="badge" style="background:rgba(9,105,218,.08);color:var(--blue-t);border-color:rgba(9,105,218,.14)">${bezAccs.length} 📱${offeneAccs?" · "+offeneAccs+" offen":""}</span>`:""}
+          ${!bezEvs.length&&!appBezEvs.length&&!bezAccs.length?`<span style="font-size:11px;color:var(--text-3)">keine Daten</span>`:""}
         </div>
         <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
           <button class="small" style="font-size:11px;padding:3px 9px;color:var(--accent);border-color:var(--accent-soft);background:var(--accent-soft)" onclick="event.stopPropagation();goToRecherche('${bez}','')">Recherche →</button>
@@ -1222,46 +1465,124 @@ function renderBezirke() {
         </div>
       </div>`;
 
-    if(isOpen) {
+    if (isOpen) {
       html += `<div class="bez-body">`;
-      for(const gem of gems) {
-        const gEvs = bezEvs.filter(e=>e.gemeinde===gem||e.gemeinde.startsWith(gem.split(" ")[0]));
-        const gAppEvs = appEvents.filter(e=>e.gemeinde===gem||e.gemeinde.startsWith(gem.split(" ")[0]));
+      for (const gem of gems) {
         const gKey = bez+"_"+gem;
         const gOpen = expandGem[gKey];
-        const gTotal = gEvs.length + gAppEvs.length;
+        const gEvs = getGemEvents(gem, bez);
+        const gAccs = getGemAccs(gem, bez);
+        const ampel = gemAmpelClass(gem, bez);
+        const isAddingAcc = bezInlineAddGem === gKey;
+        const gemQ = gem.replace(/'/g,"\\'");
+        const parts = [];
+        if (gEvs.length) parts.push(`${gEvs.length} 🎉`);
+        if (gAccs.length) parts.push(`${gAccs.length} 📱`);
 
-        // Count display: App = normal, Recherche = blasser
-        const countParts = [];
-        if(gAppEvs.length) countParts.push(`<span style="font-weight:600;color:var(--text)">${gAppEvs.length} App</span>`);
-        if(gEvs.length) countParts.push(`<span style="color:var(--text-3)">${gEvs.length} Recherche</span>`);
-        const countHtml = gTotal===0 ? `<span style="color:var(--border)">—</span>` : countParts.join(`<span style="color:var(--border);margin:0 2px">·</span>`);
-
-        html += `<div class="gem-row ${gTotal===0?"no-events":""}" onclick="${gTotal?`expandGem['${gKey}']=!expandGem['${gKey}'];render()`:""}" style="cursor:${gTotal?"pointer":"default"}">
-          <span style="font-size:12px;flex:1">${gem}</span>
+        const metaGem = gemeindeMeta[gem];
+        const metaSet = metaGem?.rechercheStatus === "nichts_gefunden";
+        const metaBtn = `<button class="small" title="${metaSet?("Suche: "+metaGem.rechercheDatum+" – Klicken zum Zurücksetzen"):"Als 'nichts gefunden' markieren"}" onclick="event.stopPropagation();toggleGemeindeMeta('${gemQ}','${bez}')" style="font-size:10px;padding:2px 6px;${metaSet?"color:var(--text-2);border-color:var(--border)":"color:var(--border)"}">🔍${metaSet?" "+metaGem.rechercheDatum:""}</button>`;
+        html += `<div class="gem-row" style="padding:9px 18px 9px 24px;cursor:pointer;align-items:center" onclick="expandGem['${gKey}']=!expandGem['${gKey}'];renderBezirke()">
+          <div class="ampel-dot" style="background:${ampelCol[ampel]};margin-right:10px" title="${ampelTip[ampel]}"></div>
+          <span style="font-size:13px;font-weight:500;flex:1">${gem}</span>
           <div style="display:flex;align-items:center;gap:6px">
-            <span class="gem-count" style="display:flex;align-items:center;gap:3px">${countHtml}</span>
-            ${gTotal>0?`<button class="small" style="font-size:10px;padding:2px 8px;color:var(--accent);border-color:var(--accent-soft);background:var(--accent-soft);flex-shrink:0" onclick="event.stopPropagation();goToRecherche('${bez}','${gem.replace(/'/g,"\\'")}')">↗</button>`:""}
+            ${parts.length?`<span style="font-size:11px;color:var(--text-3)">${parts.join(" · ")}</span>`:`<span style="font-size:11px;color:var(--border)">—</span>`}
+            ${metaBtn}
+            <button class="small" style="font-size:10px;padding:2px 8px;color:var(--accent);border-color:var(--accent-soft);background:var(--accent-soft)" onclick="event.stopPropagation();goToRecherche('${bez}','${gemQ}')">↗</button>
+            <span style="color:var(--text-3);font-size:10px;width:10px">${gOpen?"▲":"▼"}</span>
           </div>
         </div>`;
 
-        if(gOpen&&gTotal>0) {
-          // App-Events zuerst (vollständig), dann Recherche-Events (blasser) — sortiert nach Datum
-          const allEvs = gEvs.concat(gAppEvs).sort((a,b)=>monthDay(a.datum)-monthDay(b.datum));
-          allEvs.forEach(ev=>{
-            const isAppEv = ev._src==="app";
-            html += `<div class="gem-event" style="${isAppEv?'':'opacity:.55'}" onclick="${isAppEv?`selId='${ev._id}';switchTab('inapp')`:`selId='${ev._id}';switchTab('recherche')`}">
-              ${typBadge(ev.typ)}
-              <span style="flex:1;font-size:12px;font-weight:${isAppEv?'500':'400'};color:${isAppEv?'var(--text)':'var(--text-2)'}">${esc(ev.name)}</span>
-              <span style="font-size:11px;color:var(--text-3)">${fmt(ev.datum)}</span>
-              ${isAppEv?`<span class="badge badge-inapp" style="font-size:10px">App</span>`:`<span style="font-size:10px;color:var(--text-3)">Recherche</span>`}
+        if (gOpen) {
+          html += `<div style="border-top:1px solid var(--border-sub)">`;
+
+          // ── Events ──────────────────────────────────────────
+          html += `<div class="gem-section" style="border-bottom:1px solid var(--border-sub)">
+            <div class="gem-section-hdr">
+              <span class="gem-section-title">🎉 Events (${gEvs.length})</span>
+              <button class="small primary" style="font-size:10px;padding:2px 9px" onclick="event.stopPropagation();openAdd({gemeinde:'${gemQ}',bezirk:'${bez}'})">＋ Event</button>
             </div>`;
-          });
+          if (gEvs.length) {
+            gEvs.forEach(ev=>{
+              const isApp = ev._src==="app";
+              html += `<div class="gem-sub-row" style="cursor:pointer" onclick="event.stopPropagation();selId='${ev._id}';${isApp?"switchTab('inapp')":"switchTab('recherche')"}">
+                ${typBadge(ev.typ)}
+                <span style="flex:1;font-size:12px;font-weight:${isApp?"500":"400"};color:${isApp?"var(--text)":"var(--text-2)"};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(ev.name)}</span>
+                <span style="font-size:11px;color:${isPast(ev.datum)?"#e74c3c":"var(--text-3)"};flex-shrink:0">${fmt(ev.datum)}</span>
+                ${isApp?`<span class="badge badge-inapp" style="font-size:10px">App</span>`:`<span style="font-size:10px;color:var(--text-3)">Rec.</span>`}
+              </div>`;
+            });
+          } else {
+            html += `<div style="font-size:12px;color:var(--text-3);padding:3px 0">Noch keine Events.</div>`;
+          }
+          html += `</div>`;
+
+          // ── Accounts ─────────────────────────────────────────
+          html += `<div class="gem-section">
+            <div class="gem-section-hdr">
+              <span class="gem-section-title">📱 Accounts (${gAccs.length})</span>
+              <button class="small" style="font-size:10px;padding:2px 9px" onclick="event.stopPropagation();openBezInlineAdd('${gemQ}','${bez}','${gKey}')">＋ Account</button>
+            </div>`;
+          if (gAccs.length) {
+            const sColor={"offen":"#D98D00","geprueft_kein_termin":"var(--text-3)","termin_gefunden":"var(--green)","nicht_relevant":"var(--text-3)"};
+            const sLabel={"offen":"offen","geprueft_kein_termin":"kein Termin","termin_gefunden":"✅ Termin","nicht_relevant":"–"};
+            gAccs.forEach(acc=>{
+              const kiDone=acc.kiRecherche&&acc.manuellKontrolliert;
+              html += `<div class="gem-sub-row">
+                <span style="font-family:monospace;color:var(--accent);font-size:11px;flex-shrink:0">@${esc(acc.username||"")}</span>
+                <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-2);font-size:12px">${esc(acc.displayName||"")} <span style="color:var(--text-3)">${esc(acc.vereinsTyp||"")}</span></span>
+                ${acc.kiRecherche?`<span class="ki-badge ${kiDone?"done":""}">🤖${acc.manuellKontrolliert?" ✓":""}</span>`:""}
+                <span style="font-size:11px;font-weight:500;color:${sColor[acc.status]||"var(--text-3)"};flex-shrink:0;min-width:64px;text-align:right">${sLabel[acc.status]||acc.status}</span>
+                ${acc.status==="termin_gefunden"?`<button class="small primary" style="font-size:10px;padding:2px 7px;flex-shrink:0" onclick="event.stopPropagation();igEventUebernehmen('${acc._id}')">→ Event</button>`:""}
+                <button class="small" style="font-size:10px;padding:2px 7px;flex-shrink:0" onclick="event.stopPropagation();openIgEdit('${acc._id}')">✏</button>
+              </div>`;
+            });
+          } else {
+            html += `<div style="font-size:12px;color:var(--text-3);padding:3px 0">Noch keine Accounts.</div>`;
+          }
+
+          // ── Inline Add Form ───────────────────────────────────
+          if (isAddingAcc) {
+            const tOpts=IG_TYPEN.map(t=>`<option value="${t}" ${bezInlineAddData.vereinsTyp===t?"selected":""}>${t}</option>`).join("");
+            const sOpts=IG_STATUS_LIST.map(([v,l])=>`<option value="${v}" ${bezInlineAddData.status===v?"selected":""}>${l}</option>`).join("");
+            html += `<div class="bez-inline-add">
+              <div style="font-size:11px;font-weight:600;color:var(--text-2);margin-bottom:8px">Neuer Account für <strong>${esc(gem)}</strong></div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+                <div>
+                  <div style="font-size:11px;color:var(--text-3);margin-bottom:3px">Username *</div>
+                  <input placeholder="ohne @" value="${esc(bezInlineAddData.username||"")}" oninput="bezInlineAddData.username=this.value.replace(/^@/,'').trim()" style="font-size:12px;padding:5px 9px">
+                </div>
+                <div>
+                  <div style="font-size:11px;color:var(--text-3);margin-bottom:3px">Anzeigename</div>
+                  <input placeholder="z.B. Zechburschen XY" value="${esc(bezInlineAddData.displayName||"")}" oninput="bezInlineAddData.displayName=this.value" style="font-size:12px;padding:5px 9px">
+                </div>
+                <div>
+                  <div style="font-size:11px;color:var(--text-3);margin-bottom:3px">Typ</div>
+                  <select onchange="bezInlineAddData.vereinsTyp=this.value" style="font-size:12px;padding:5px 9px">${tOpts}</select>
+                </div>
+                <div>
+                  <div style="font-size:11px;color:var(--text-3);margin-bottom:3px">Status</div>
+                  <select onchange="bezInlineAddData.status=this.value" style="font-size:12px;padding:5px 9px">${sOpts}</select>
+                </div>
+              </div>
+              <label style="font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:10px">
+                <input type="checkbox" ${bezInlineAddData.kiRecherche?"checked":""} onchange="bezInlineAddData.kiRecherche=this.checked" style="width:14px;height:14px;accent-color:var(--accent)">
+                🤖 KI/Browser-recherchiert
+              </label>
+              <div style="display:flex;gap:8px">
+                <button class="small primary" style="font-size:12px" onclick="event.stopPropagation();saveBezInlineAdd('${gKey}')">Hinzufügen</button>
+                <button class="small" style="font-size:12px" onclick="event.stopPropagation();closeBezInlineAdd()">Abbrechen</button>
+              </div>
+            </div>`;
+          }
+
+          html += `</div>`; // accounts section
+          html += `</div>`; // gOpen
         }
       }
-      html += `</div>`;
+      html += `</div>`; // bez-body
     }
-    html += `</div>`;
+    html += `</div>`; // bez-card
   }
   document.getElementById("content").innerHTML = html;
 }
@@ -1271,9 +1592,9 @@ function renderCSV() {
   document.getElementById("content").innerHTML = `
   <div class="card" style="padding:1.5rem;max-width:700px">
     <h3 style="font-size:15px;font-weight:700;margin-bottom:.5rem">CSV Import (Copilot-Recherche)</h3>
-    <p style="font-size:13px;color:#888;margin-bottom:1rem;line-height:1.6">Copilot-Tabelle hier einfügen. Pflicht: <code>Eventname</code>, <code>Datum</code>. Optional: Uhrzeit, Gemeinde, Bezirk, Adresse, Veranstalter, Eintritt, Typ, Quelle. Duplikate werden automatisch erkannt und übersprungen. Events landen in der Recherche-Liste zur manuellen Prüfung.</p>
+    <p style="font-size:13px;color:#888;margin-bottom:1rem;line-height:1.6">Pflicht: <code>name</code>, <code>datum</code>. Spaltennamen müssen exakt wie im Template stehen (Groß-/Kleinschreibung egal). Trennzeichen: Komma oder Semikolon. Duplikate werden übersprungen.</p>
     <div style="background:#f7f7f5;border-radius:8px;padding:8px 12px;font-family:monospace;font-size:11px;color:#888;margin-bottom:1rem">
-      Eventname,Datum,Uhrzeit,Gemeinde,Bezirk,Adresse,Veranstalter,Eintritt,Beschreibung,Typ,Quelle
+      name;datum;uhrzeit;gemeinde;bezirk;typ;veranstalter;eintritt;beschreibung;quelle;quelleTyp;quelleLink;srcZitat;sicherheit
     </div>
     <textarea id="csv-input" rows="12" placeholder="CSV hier einfügen…" style="font-family:monospace;font-size:12px;margin-bottom:1rem"></textarea>
     <div style="display:flex;align-items:center;gap:12px">
@@ -1290,9 +1611,9 @@ function renderFlyer() {
   <div style="max-width:700px;display:flex;flex-direction:column;gap:1rem">
     <div class="card" style="padding:1.5rem">
       <h3 style="font-size:15px;font-weight:700;margin-bottom:.5rem">Flyer-Import</h3>
-      <p style="font-size:13px;color:#888;margin-bottom:1rem;line-height:1.6">Copilot-Ausgabe aus Flyer-Screenshots einfügen. Pflicht: <code>Eventname</code>, <code>Datum</code>. Optionale Spalte <code>Adresse</code> für die genaue Venue-Adresse (z.B. "Feuerwehrhaus Seeboden, Hauptstraße 1"). Events landen direkt im Upload-Flow.</p>
+      <p style="font-size:13px;color:#888;margin-bottom:1rem;line-height:1.6">Pflicht: <code>name</code>, <code>datum</code>. Gleiche Spaltenstruktur wie Recherche-Import. Flyer-Events erhalten automatisch <code>quelleTyp=flyer</code>. Events landen direkt im Upload-Flow.</p>
       <div style="background:#f7f7f5;border-radius:8px;padding:8px 12px;font-family:monospace;font-size:11px;color:#888;margin-bottom:1rem">
-        Eventname,Datum,Uhrzeit,Gemeinde,Bezirk,Adresse,Veranstalter,Eintritt,Beschreibung,Typ,Quelle
+        name;datum;uhrzeit;gemeinde;bezirk;typ;veranstalter;eintritt;beschreibung;quelle;quelleTyp;quelleLink;srcZitat;sicherheit
       </div>
       <textarea id="flyer-csv-input" rows="7" placeholder="CSV hier einfügen…" style="font-family:monospace;font-size:12px;margin-bottom:1rem"></textarea>
       <button class="primary" onclick="importFlyerCSV()">↑ Flyer importieren</button>
@@ -1326,10 +1647,11 @@ function importCSV() {
   if(lines.length<2){setCsvMsg("Mind. Header + 1 Zeile nötig.","red");return;}
 
   const sep = lines[0].includes(";") ? ";" : ",";
-  const hdrs = splitCSVLine(lines[0], sep).map(h=>h.toLowerCase());
-  const idx = k => hdrs.findIndex(h=>h.includes(k));
-  const iN=idx("name"),iD=idx("datum"),iU=idx("uhrzeit"),iG=idx("gemeinde"),iB=idx("bezirk"),iA=idx("adresse"),iV=idx("veranstalter"),iE=idx("eintritt"),iT=idx("typ"),iQ=idx("quelle"),iDesc=idx("beschreibung");
-  if(iN<0||iD<0){setCsvMsg("Spalten 'Eventname' und 'Datum' fehlen.","red");return;}
+  const hdrs = splitCSVLine(lines[0], sep).map(h=>h.toLowerCase().trim());
+  const exactIdx = k => hdrs.findIndex(h=>h===k.toLowerCase());
+  const iN=exactIdx("name"),iD=exactIdx("datum"),iU=exactIdx("uhrzeit"),iG=exactIdx("gemeinde"),iB=exactIdx("bezirk"),iA=exactIdx("adresse"),iV=exactIdx("veranstalter"),iE=exactIdx("eintritt"),iT=exactIdx("typ"),iQ=exactIdx("quelle"),iDesc=exactIdx("beschreibung");
+  const iQT=exactIdx("quelletyp"),iQL=exactIdx("quellelink"),iSZ=exactIdx("srczitat"),iSich=exactIdx("sicherheit");
+  if(iN<0||iD<0){setCsvMsg("Spalten 'name' und 'datum' fehlen.","red");return;}
 
   const total = lines.length - 1;
   const btn = document.getElementById("csv-import-btn");
@@ -1361,13 +1683,20 @@ function importCSV() {
       const typRaw = (iT>=0?c[iT]||"":"").trim().split(" ")[0]||"Kirchtage/Feste";
       const yr = getYear(datRaw);
       const ref = db.collection("pending_events").doc();
+      const quelleTypVal = iQT>=0?(c[iQT]||"").trim().toLowerCase():"";
+      const VALID_QTYP = new Set(["web","flyer","instagram"]);
+      const quelleTyp = VALID_QTYP.has(quelleTypVal)?quelleTypVal:"";
       batch.set(ref, {
-        name, datum:datRaw, uhrzeit:iU>=0?c[iU]:"20:00",
-        gemeinde:iG>=0?c[iG]:"", bezirk:bezRaw,
-        adresse:iA>=0?(c[iA]||""):"",
-        veranstalter:iV>=0?c[iV]:"örtlich", eintritt:iE>=0?c[iE]:"k.A.",
-        beschreibung:iDesc>=0?(c[iDesc]||""):"",
-        typ:normalizeTyp(typRaw), quelle:iQ>=0?c[iQ]:"", quelle2:"",
+        name, datum:datRaw, uhrzeit:iU>=0?(c[iU]||"").trim()||"20:00":"20:00",
+        gemeinde:iG>=0?(c[iG]||"").trim():"", bezirk:bezRaw,
+        adresse:iA>=0?(c[iA]||"").trim():"",
+        veranstalter:iV>=0?(c[iV]||"").trim()||"örtlich":"örtlich",
+        eintritt:iE>=0?(c[iE]||"").trim()||"k.A.":"k.A.",
+        beschreibung:iDesc>=0?(c[iDesc]||"").trim():"",
+        typ:normalizeTyp(typRaw), quelle:iQ>=0?(c[iQ]||"").trim():"", quelle2:"",
+        quelleTyp, quelleLink:iQL>=0?(c[iQL]||"").trim():"",
+        srcZitat:iSZ>=0?(c[iSZ]||"").trim():"",
+        sicherheit:iSich>=0&&(c[iSich]||"").trim()==="sicher"?"sicher":"mittel",
         status:yr>=2026?"confirmed":"check", geprueft:false, inApp:false,
         createdAt:firebase.firestore.FieldValue.serverTimestamp()
       });
@@ -1455,11 +1784,12 @@ function importFlyerCSV() {
   if (lines.length < 2) { showToast("Mind. Header + 1 Zeile nötig.", false); return; }
 
   const sep = lines[0].includes(";") ? ";" : ",";
-  const hdrs = splitCSVLine(lines[0], sep).map(h => h.toLowerCase());
-  const idx = k => hdrs.findIndex(h => h.includes(k));
-  const iN=idx("name"),iD=idx("datum"),iU=idx("uhrzeit"),iG=idx("gemeinde"),
-        iB=idx("bezirk"),iA=idx("adresse"),iV=idx("veranstalter"),iE=idx("eintritt"),iT=idx("typ"),iQ=idx("quelle"),iDesc=idx("beschreibung");
-  if (iN < 0 || iD < 0) { showToast("Spalten 'Eventname' und 'Datum' fehlen.", false); return; }
+  const hdrs = splitCSVLine(lines[0], sep).map(h => h.toLowerCase().trim());
+  const exactIdx = k => hdrs.findIndex(h => h === k.toLowerCase());
+  const iN=exactIdx("name"),iD=exactIdx("datum"),iU=exactIdx("uhrzeit"),iG=exactIdx("gemeinde"),
+        iB=exactIdx("bezirk"),iA=exactIdx("adresse"),iV=exactIdx("veranstalter"),iE=exactIdx("eintritt"),iT=exactIdx("typ"),iQ=exactIdx("quelle"),iDesc=exactIdx("beschreibung");
+  const iQT=exactIdx("quelletyp"),iQL=exactIdx("quellelink"),iSZ=exactIdx("srczitat"),iSich=exactIdx("sicherheit");
+  if (iN < 0 || iD < 0) { showToast("Spalten 'name' und 'datum' fehlen.", false); return; }
 
   let imported = 0, dupes = 0;
   const addedKeys = new Set();
@@ -1497,6 +1827,10 @@ function importFlyerCSV() {
       beschreibung: iDesc >= 0 ? (c[iDesc] || "").trim() : "",
       typ: typRaw,
       quelle: iQ >= 0 ? (c[iQ] || "").trim() : "",
+      quelleTyp: iQT>=0?(["web","flyer","instagram"].includes((c[iQT]||"").trim().toLowerCase())?(c[iQT]||"").trim().toLowerCase():""):"flyer",
+      quelleLink: iQL>=0?(c[iQL]||"").trim():"",
+      srcZitat: iSZ>=0?(c[iSZ]||"").trim():"",
+      sicherheit: iSich>=0&&(c[iSich]||"").trim()==="sicher"?"sicher":"mittel",
       status: "offen"
     });
     imported++;
@@ -1695,8 +2029,8 @@ function openUpload(id) {
     typ: normalizeTyp(ev.typ),
     eintritt: (ev.eintritt === 'k.A.' ? '' : ev.eintritt) || '',
     beschreibung: ev.beschreibung || '',
-    lat: ev.latitude ?? ev.lat ?? null,
-    lng: ev.longitude ?? ev.lng ?? null,
+    latitude: ev.latitude ?? ev.lat ?? null,
+    longitude: ev.longitude ?? ev.lng ?? null,
   };
   document.getElementById('upload-form-content').innerHTML = uploadFormHTML();
   document.getElementById('up-eintritt').value = uploadData.eintritt;
@@ -1742,7 +2076,7 @@ function uploadFormHTML() {
     <span class="edit-label">Adresse</span>
     <div>
       <input id="up-adresse" value="${esc(uploadData.adresse)}" placeholder="Adresse eingeben (Maps-Vorschläge)" oninput="uploadData.adresse=this.value;document.getElementById('up-no-coords-warn').style.display=this.value?'block':'none'">
-      <div id="up-coords" style="font-size:11px;color:#27AE60;margin-top:3px;display:${uploadData.lat?'block':'none'}">📍 <span id="up-coords-text">${uploadData.lat?uploadData.lat.toFixed(5)+', '+uploadData.lng.toFixed(5):''}</span></div>
+      <div id="up-coords" style="font-size:11px;color:#27AE60;margin-top:3px;display:${uploadData.latitude?'block':'none'}">📍 <span id="up-coords-text">${uploadData.latitude?uploadData.latitude.toFixed(5)+', '+uploadData.longitude.toFixed(5):''}</span></div>
       <div id="up-no-coords-warn" style="font-size:11px;color:#7A4A00;background:#FFFBF0;border:1px solid #FAC775;border-radius:6px;padding:5px 8px;margin-top:4px;display:${uploadData.adresse&&!uploadData.lat?'block':'none'}">⚠ Einen Vorschlag aus der Liste auswählen – erst dann werden Koordinaten gesetzt</div>
     </div>
     <span class="edit-label" style="color:#bbb;font-size:11px">oder Koord.</span>
@@ -1770,17 +2104,17 @@ function initUploadAutocomplete() {
 function handleCoordsInput(val, dataObj, coordsDisplayId, coordsTextId, warnId, adresseInputId) {
   const m = val.trim().match(/^(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)$/);
   if (!m) return;
-  dataObj.lat = parseFloat(m[1]);
-  dataObj.lng = parseFloat(m[2]);
+  dataObj.latitude = parseFloat(m[1]);
+  dataObj.longitude = parseFloat(m[2]);
   const el = document.getElementById(coordsDisplayId);
   if (el) el.style.display = 'block';
   const txt = document.getElementById(coordsTextId);
-  if (txt) txt.textContent = `${dataObj.lat.toFixed(5)}, ${dataObj.lng.toFixed(5)}`;
+  if (txt) txt.textContent = `${dataObj.latitude.toFixed(5)}, ${dataObj.longitude.toFixed(5)}`;
   const warn = document.getElementById(warnId);
   if (warn) warn.style.display = 'none';
   if (adresseInputId && window.google && google.maps) {
     const geocoder = new google.maps.Geocoder();
-    geocoder.geocode({ location: { lat: dataObj.lat, lng: dataObj.lng } }, (results, status) => {
+    geocoder.geocode({ location: { lat: dataObj.latitude, lng: dataObj.longitude } }, (results, status) => {
       if (status === 'OK' && results[0]) {
         dataObj.adresse = results[0].formatted_address;
         const inp = document.getElementById(adresseInputId);
@@ -1822,14 +2156,14 @@ async function setupAutocomplete(inputId, dataObj, coordsDisplayId, coordsTextId
     try {
       const place = suggestion.placePrediction.toPlace();
       await place.fetchFields({ fields: ['formattedAddress', 'location'] });
-      dataObj.lat = place.location.lat();
-      dataObj.lng = place.location.lng();
+      dataObj.latitude = place.location.lat();
+      dataObj.longitude = place.location.lng();
       dataObj.adresse = place.formattedAddress;
       input.value = place.formattedAddress;
       const el = document.getElementById(coordsDisplayId);
       if (el) el.style.display = 'block';
       const txt = document.getElementById(coordsTextId);
-      if (txt) txt.textContent = `${dataObj.lat.toFixed(5)}, ${dataObj.lng.toFixed(5)}`;
+      if (txt) txt.textContent = `${dataObj.latitude.toFixed(5)}, ${dataObj.longitude.toFixed(5)}`;
       const warn = document.getElementById(warnId);
       if (warn) warn.style.display = 'none';
     } catch(e) { console.error('place details error', e); }
@@ -1904,8 +2238,8 @@ function submitUpload() {
     beschreibung: combinedBeschreibung,
     eintritt: uploadData.eintritt || '',
     typ: normalizeTyp(uploadData.typ),
-    latitude: uploadData.lat || null,
-    longitude: uploadData.lng || null,
+    latitude: uploadData.latitude || null,
+    longitude: uploadData.longitude || null,
     id: _uploadRef.id,
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   }).then(() => db.collection('pending_events').doc(uploadPendingId).update({ inApp: true }))
@@ -1927,6 +2261,578 @@ function showToast(msg, ok) {
 
 // ---- UTILS ----
 function esc(s){if(!s)return"";return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+
+// ---- MULTI-CONFIRM + GEMEINDE HELPERS ----
+function computeMultiConfirmed() {
+  multiConfirmedIds = new Set();
+  const groups = {};
+  for (const ev of pending) {
+    if (!ev.quelleTyp) continue;
+    const key = normalizeName(ev.name) + '|' + getYear(ev.datum);
+    if (!groups[key]) groups[key] = {};
+    if (!groups[key][ev.quelleTyp]) groups[key][ev.quelleTyp] = [];
+    groups[key][ev.quelleTyp].push(ev._id);
+  }
+  for (const group of Object.values(groups)) {
+    if (Object.keys(group).length > 1) {
+      for (const ids of Object.values(group)) {
+        for (const id of ids) multiConfirmedIds.add(id);
+      }
+    }
+  }
+}
+
+function deriveBezirkFromGemeinde(gem) {
+  if (!gem) return "";
+  const g = gem.trim();
+  const entry = Object.entries(GEMEINDEN).find(([bez, gems]) => gems.includes(g));
+  return entry ? entry[0] : "";
+}
+
+async function toggleGemeindeMeta(gem, bez) {
+  const existing = gemeindeMeta[gem];
+  try {
+    if (existing && existing.rechercheStatus === "nichts_gefunden") {
+      await db.collection("gemeinde_meta").doc(gem).delete();
+    } else {
+      await db.collection("gemeinde_meta").doc(gem).set({
+        rechercheStatus: "nichts_gefunden",
+        rechercheDatum: new Date().toLocaleDateString("de-AT", {day:"2-digit",month:"2-digit",year:"numeric"}),
+        bezirk: bez
+      });
+    }
+  } catch(e) { alert("Fehler: " + e.message); }
+}
+
+// ---- BEZIRKE INLINE ADD HELPERS ----
+function openBezInlineAdd(gem, bez, gKey) {
+  bezInlineAddGem = gKey;
+  bezInlineAddData = {username:"", displayName:"", vereinsTyp:"Zechgemeinschaft", status:"offen", gemeinde:gem, bezirk:bez, kiRecherche:false};
+  expandGem[gKey] = true;
+  renderBezirke();
+}
+
+function closeBezInlineAdd() {
+  bezInlineAddGem = null;
+  bezInlineAddData = {};
+  renderBezirke();
+}
+
+async function saveBezInlineAdd(gKey) {
+  if (!bezInlineAddData.username) { alert("Username darf nicht leer sein."); return; }
+  const uname = bezInlineAddData.username.replace(/^@/, "").trim();
+  const exists = igAccounts.some(a=>a.username===uname);
+  if (exists) { alert("Account @" + uname + " existiert bereits."); return; }
+  try {
+    await db.collection("ig_accounts").add({
+      username: uname,
+      displayName: bezInlineAddData.displayName || "",
+      vereinsTyp: bezInlineAddData.vereinsTyp || "Zechgemeinschaft",
+      gemeinde: bezInlineAddData.gemeinde || "",
+      bezirk: bezInlineAddData.bezirk || "",
+      status: bezInlineAddData.status || "offen",
+      kiRecherche: !!bezInlineAddData.kiRecherche,
+      manuellKontrolliert: false,
+      letzterTermin: "",
+      letzteEventNamen: "",
+      quelle: "",
+      zuletztGeprueftAm: "",
+      notizen: "",
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    bezInlineAddGem = null;
+    bezInlineAddData = {};
+  } catch(e) { alert("Fehler: " + e.message); }
+}
+
+async function setIgField(id, field, value) {
+  try {
+    const upd = {};
+    upd[field] = value;
+    await db.collection("ig_accounts").doc(id).update(upd);
+  } catch(e) { alert("Fehler: " + e.message); }
+}
+
+// ---- IG ACCOUNTS TAB ----
+const IG_TYPEN = ["Zechgemeinschaft","Landjugend","Feuerwehr","Stadtjugend","Trachtenkapelle","Krampus","Sonstige","Nicht relevant"];
+const IG_STATUS_LIST = [
+  ["offen","Offen"],
+  ["geprueft_kein_termin","Geprüft – kein Termin"],
+  ["termin_gefunden","Termin gefunden"],
+  ["nicht_relevant","Nicht relevant"]
+];
+const IG_STATUS_BADGE = {
+  "offen":"ig-offen",
+  "geprueft_kein_termin":"ig-geprueft",
+  "termin_gefunden":"ig-termin",
+  "nicht_relevant":"ig-irrelevant"
+};
+
+function renderAccounts() {
+  let accs = [...igAccounts];
+  if(igFilterStatus!=="Alle") accs=accs.filter(a=>a.status===igFilterStatus);
+  if(igFilterTyp!=="Alle") accs=accs.filter(a=>a.vereinsTyp===igFilterTyp);
+  if(igFilterBezirk!=="Alle") accs=accs.filter(a=>a.bezirk===igFilterBezirk);
+  if(igFilterKI) accs=accs.filter(a=>a.kiRecherche===true&&!a.manuellKontrolliert);
+  if(igSearch){const q=igSearch.toLowerCase();accs=accs.filter(a=>(a.username||"").toLowerCase().includes(q)||(a.displayName||"").toLowerCase().includes(q)||(a.gemeinde||"").toLowerCase().includes(q));}
+
+  accs.sort((a,b)=>{
+    const va=(a[igSortField]||"").toLowerCase();
+    const vb=(b[igSortField]||"").toLowerCase();
+    const cmp=va<vb?-1:va>vb?1:0;
+    return igSortDir==="asc"?cmp:-cmp;
+  });
+
+  const total=igAccounts.length;
+  const offen=igAccounts.filter(a=>a.status==="offen").length;
+  const geprueft=igAccounts.filter(a=>a.status==="geprueft_kein_termin").length;
+  const termin=igAccounts.filter(a=>a.status==="termin_gefunden").length;
+  const irrelevant=igAccounts.filter(a=>a.status==="nicht_relevant").length;
+  const kiUngeprueft=igAccounts.filter(a=>a.kiRecherche===true&&!a.manuellKontrolliert).length;
+
+  const thSort=(field,label)=>{
+    const active=igSortField===field;
+    const arrow=active?(igSortDir==="asc"?" ↑":" ↓"):"";
+    return `<th onclick="igToggleSort('${field}')" style="${active?"color:var(--text);":""}white-space:nowrap">${label}${arrow}</th>`;
+  };
+
+  const statusOpts=(cur)=>IG_STATUS_LIST.map(([v,l])=>`<option value="${v}" ${cur===v?"selected":""}>${l}</option>`).join("");
+
+  // Group by Bezirk
+  const bezOrder = BEZIRKE;
+  const byBez = {};
+  for (const b of bezOrder) byBez[b] = [];
+  const unknownBez = [];
+  for (const a of accs) {
+    if (byBez[a.bezirk]) byBez[a.bezirk].push(a);
+    else unknownBez.push(a);
+  }
+
+  let tableHtml = "";
+  for (const bez of bezOrder) {
+    const group = byBez[bez];
+    if (!group.length) continue;
+    const isOpen = igBezOpen[bez] !== false;
+    tableHtml += `<tr class="ig-bez-hdr" onclick="igBezOpen['${bez}']=igBezOpen['${bez}']===false?true:false;renderAccounts()">
+      <td colspan="9" style="font-weight:600;font-size:13px;cursor:pointer;user-select:none;padding:8px 12px">
+        <span style="margin-right:8px">${isOpen?"▼":"▶"}</span>${bez}
+        <span style="font-size:12px;font-weight:400;color:var(--text-3);margin-left:6px">${group.length} Account${group.length!==1?"s":""}</span>
+      </td>
+    </tr>`;
+    if (isOpen) {
+      for (const a of group) {
+        const terminFarbe=a.status==="termin_gefunden"?"#27AE60":"var(--text-2)";
+        const kiDone=a.kiRecherche&&a.manuellKontrolliert;
+        tableHtml += `<tr>
+          <td><span class="ig-username">@${esc(a.username||"")}</span></td>
+          <td style="font-weight:500;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.displayName||"")}</td>
+          <td style="white-space:nowrap"><span class="badge" style="background:var(--surface-2);color:var(--text-2);border-color:var(--border);font-size:11px">${esc(a.vereinsTyp||"")}</span></td>
+          <td style="font-size:12px;white-space:nowrap">${esc(a.gemeinde||"")}</td>
+          <td>
+            <select class="ig-status-select" onchange="setIgStatus('${a._id}',this.value)">${statusOpts(a.status)}</select>
+          </td>
+          <td style="font-size:12px;color:${terminFarbe};font-weight:${a.status==="termin_gefunden"?"600":"400"};white-space:nowrap">${esc(a.letzterTermin||"—")}</td>
+          <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--text-2)">${esc(a.letzteEventNamen||"")}</td>
+          <td style="white-space:nowrap;min-width:80px">
+            <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;margin-right:6px" title="KI-recherchiert">
+              <input type="checkbox" ${a.kiRecherche?"checked":""} onchange="setIgField('${a._id}','kiRecherche',this.checked)" style="width:13px;height:13px;accent-color:var(--accent)">
+              <span style="font-size:11px">🤖</span>
+            </label>
+            <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer" title="Manuell kontrolliert">
+              <input type="checkbox" ${a.manuellKontrolliert?"checked":""} onchange="setIgField('${a._id}','manuellKontrolliert',this.checked)" style="width:13px;height:13px;accent-color:var(--green)">
+              <span style="font-size:11px;color:${kiDone?"var(--green)":"var(--text-3)"}">✓</span>
+            </label>
+          </td>
+          <td>
+            <div style="display:flex;gap:4px;flex-wrap:nowrap">
+              <button class="small" onclick="openIgEdit('${a._id}')" title="Bearbeiten">✏</button>
+              ${a.status==="termin_gefunden"?`<button class="small primary" style="font-size:11px;padding:3px 8px;white-space:nowrap" onclick="igEventUebernehmen('${a._id}')">→ Event</button>`:""}
+              <button class="small danger" onclick="delIgAccount('${a._id}')">🗑</button>
+            </div>
+          </td>
+        </tr>`;
+      }
+    }
+  }
+  if (unknownBez.length) {
+    tableHtml += `<tr class="ig-bez-hdr"><td colspan="9" style="font-weight:600;font-size:13px;padding:8px 12px">Kein Bezirk <span style="font-size:12px;font-weight:400;color:var(--text-3);margin-left:6px">${unknownBez.length}</span></td></tr>`;
+    for (const a of unknownBez) {
+      const terminFarbe=a.status==="termin_gefunden"?"#27AE60":"var(--text-2)";
+      tableHtml += `<tr>
+        <td><span class="ig-username">@${esc(a.username||"")}</span></td>
+        <td>${esc(a.displayName||"")}</td>
+        <td>${esc(a.vereinsTyp||"")}</td>
+        <td>${esc(a.gemeinde||"")}</td>
+        <td><select class="ig-status-select" onchange="setIgStatus('${a._id}',this.value)">${statusOpts(a.status)}</select></td>
+        <td style="font-size:12px;color:${terminFarbe}">${esc(a.letzterTermin||"—")}</td>
+        <td style="font-size:12px;color:var(--text-2)">${esc(a.letzteEventNamen||"")}</td>
+        <td></td>
+        <td><button class="small" onclick="openIgEdit('${a._id}')">✏</button> <button class="small danger" onclick="delIgAccount('${a._id}')">🗑</button></td>
+      </tr>`;
+    }
+  }
+  if (!tableHtml) {
+    tableHtml = `<tr><td colspan="9" style="text-align:center;padding:4rem;color:var(--text-3)">Keine Accounts gefunden.</td></tr>`;
+  }
+
+  const hasFilter=igFilterStatus!=="Alle"||igFilterTyp!=="Alle"||igFilterBezirk!=="Alle"||igSearch||igFilterKI;
+
+  document.getElementById("content").innerHTML = `
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:1.5rem;align-items:stretch">
+      <div class="ig-stat-chip" style="border-color:var(--border)">
+        <div class="ig-stat-num" style="color:var(--accent)">${total}</div>
+        <div class="ig-stat-lbl">Gesamt</div>
+      </div>
+      <div class="ig-stat-chip" style="background:rgba(245,160,74,.08);border-color:rgba(245,160,74,.22)">
+        <div class="ig-stat-num" style="color:#B45309">${offen}</div>
+        <div class="ig-stat-lbl" style="color:#B45309">Offen</div>
+      </div>
+      <div class="ig-stat-chip" style="background:rgba(26,127,55,.07);border-color:rgba(26,127,55,.18)">
+        <div class="ig-stat-num" style="color:var(--green)">${termin}</div>
+        <div class="ig-stat-lbl" style="color:var(--green-t)">Termin gefunden</div>
+      </div>
+      <div class="ig-stat-chip">
+        <div class="ig-stat-num" style="color:var(--text-2)">${geprueft}</div>
+        <div class="ig-stat-lbl">Kein Termin</div>
+      </div>
+      <div class="ig-stat-chip">
+        <div class="ig-stat-num" style="color:var(--text-3)">${irrelevant}</div>
+        <div class="ig-stat-lbl">Nicht relevant</div>
+      </div>
+      ${kiUngeprueft?`<div class="ig-stat-chip" style="background:rgba(9,105,218,.06);border-color:rgba(9,105,218,.18);cursor:pointer" onclick="igFilterKI=!igFilterKI;renderAccounts()" title="KI-ungeprüft anzeigen">
+        <div class="ig-stat-num" style="color:var(--blue-t)">${kiUngeprueft}</div>
+        <div class="ig-stat-lbl" style="color:var(--blue-t)">🤖 KI-ungeprüft</div>
+      </div>`:""}
+    </div>
+
+    <div class="filter-bar" style="margin-bottom:14px">
+      <input type="text" placeholder="Username / Name / Ort…" value="${esc(igSearch)}" oninput="igSearch=this.value;renderAccounts()" style="width:200px">
+      <select onchange="igFilterStatus=this.value;renderAccounts()">
+        <option value="Alle" ${igFilterStatus==="Alle"?"selected":""}>Alle Status</option>
+        ${IG_STATUS_LIST.map(([v,l])=>`<option value="${v}" ${igFilterStatus===v?"selected":""}>${l}</option>`).join("")}
+      </select>
+      <select onchange="igFilterTyp=this.value;renderAccounts()">
+        <option value="Alle" ${igFilterTyp==="Alle"?"selected":""}>Alle Typen</option>
+        ${IG_TYPEN.map(t=>`<option value="${t}" ${igFilterTyp===t?"selected":""}>${t}</option>`).join("")}
+      </select>
+      <select onchange="igFilterBezirk=this.value;renderAccounts()">
+        <option value="Alle" ${igFilterBezirk==="Alle"?"selected":""}>Alle Bezirke</option>
+        ${BEZIRKE.map(b=>`<option value="${b}" ${igFilterBezirk===b?"selected":""}>${b}</option>`).join("")}
+      </select>
+      <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;white-space:nowrap;color:${igFilterKI?"var(--blue-t)":"var(--text-2)"}">
+        <input type="checkbox" ${igFilterKI?"checked":""} onchange="igFilterKI=this.checked;renderAccounts()" style="accent-color:var(--accent)">
+        🤖 KI-ungeprüft
+      </label>
+      ${hasFilter?`<button class="small danger" onclick="igFilterStatus='Alle';igFilterTyp='Alle';igFilterBezirk='Alle';igSearch='';igFilterKI=false;renderAccounts()">✕ Filter</button>`:""}
+      <span class="filter-count">${accs.length} von ${total}</span>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button class="small" onclick="igToggleImport()">📂 CSV Import</button>
+        <button class="small" onclick="exportIgCSV()">📥 CSV exportieren</button>
+        <button class="primary small" onclick="openIgAdd()">＋ Account</button>
+      </div>
+    </div>
+
+    <div class="ig-table-wrap">
+      <table class="ig-table">
+        <thead>
+          <tr>
+            ${thSort("username","Username")}
+            ${thSort("displayName","Anzeigename")}
+            ${thSort("vereinsTyp","Typ")}
+            ${thSort("gemeinde","Ort")}
+            ${thSort("status","Status")}
+            ${thSort("letzterTermin","Termin")}
+            <th>Event-Name</th>
+            <th style="white-space:nowrap">🤖 / ✓</th>
+            <th style="width:1%">Aktionen</th>
+          </tr>
+        </thead>
+        <tbody>${tableHtml}</tbody>
+      </table>
+    </div>
+
+    <div id="ig-csv-import-section" style="display:${igShowImport?"block":"none"};margin-top:1.5rem">
+      <div class="card" style="padding:1.5rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+          <h3 style="font-size:14px;font-weight:700;margin:0">CSV Import – IG Accounts</h3>
+          <button class="icon-btn" onclick="igShowImport=false;document.getElementById('ig-csv-import-section').style.display='none'">×</button>
+        </div>
+        <div style="background:var(--surface-2);border-radius:var(--rx);padding:8px 12px;font-family:monospace;font-size:11px;color:var(--text-3);margin-bottom:.75rem;line-height:1.8">
+          username,displayName,vereinsTyp,gemeinde,bezirk,status,letzterTermin,letzteEventNamen,quelle,zuletztGeprueftAm,notizen,kiRecherche,manuellKontrolliert
+        </div>
+        <p style="font-size:12px;color:var(--text-3);margin-bottom:.75rem;line-height:1.6">Duplikat-Check über <strong>username</strong> — vorhandene Einträge werden <strong>aktualisiert</strong> (Upsert). Leeres <code>bezirk</code>-Feld wird automatisch aus <code>gemeinde</code> abgeleitet. Fehlende <code>kiRecherche</code>-Spalte → <strong>true</strong>.</p>
+        <textarea id="ig-csv-input" rows="8" placeholder="CSV hier einfügen…" style="font-family:monospace;font-size:12px;margin-bottom:.75rem"></textarea>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="primary" onclick="importIgCSV()">↑ Importieren</button>
+          <span id="ig-csv-msg" style="font-size:13px"></span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function igToggleSort(field) {
+  if(igSortField===field) igSortDir=igSortDir==="asc"?"desc":"asc";
+  else{igSortField=field;igSortDir="asc";}
+  renderAccounts();
+}
+
+function igToggleImport() {
+  igShowImport=!igShowImport;
+  const sec=document.getElementById("ig-csv-import-section");
+  if(sec) sec.style.display=igShowImport?"block":"none";
+}
+
+function setIgStatus(id,status) {
+  db.collection("ig_accounts").doc(id).update({status}).catch(e=>console.error(e));
+}
+
+function igFormHTML() {
+  const d=igEditData;
+  const statusOpts=IG_STATUS_LIST.map(([v,l])=>`<option value="${v}" ${d.status===v?"selected":""}>${l}</option>`).join("");
+  const typOpts=IG_TYPEN.map(t=>`<option value="${t}" ${d.vereinsTyp===t?"selected":""}>${t}</option>`).join("");
+  const bezOpts=BEZIRKE.map(b=>`<option value="${b}" ${d.bezirk===b?"selected":""}>${b}</option>`).join("");
+  return `<div class="edit-grid">
+    <span class="edit-label">Username *</span>
+    <input value="${esc(d.username||"")}" placeholder="zechburschen_kaning (ohne @)" oninput="igEditData.username=this.value.replace(/^@/,'').trim()">
+    <span class="edit-label">Anzeigename</span>
+    <input value="${esc(d.displayName||"")}" placeholder="Zechburschen Kaning" oninput="igEditData.displayName=this.value">
+    <span class="edit-label">Typ</span>
+    <select onchange="igEditData.vereinsTyp=this.value">${typOpts}</select>
+    <span class="edit-label">Gemeinde</span>
+    <input value="${esc(d.gemeinde||"")}" placeholder="z.B. Kaning" oninput="igEditData.gemeinde=this.value">
+    <span class="edit-label">Bezirk</span>
+    <select onchange="igEditData.bezirk=this.value">
+      <option value="" ${!d.bezirk?"selected":""}>–</option>
+      ${bezOpts}
+    </select>
+    <span class="edit-label">Status</span>
+    <select onchange="igEditData.status=this.value">${statusOpts}</select>
+    <span class="edit-label">Letzter Termin</span>
+    <input value="${esc(d.letzterTermin||"")}" placeholder="16.08.2026" oninput="igEditData.letzterTermin=this.value">
+    <span class="edit-label">Event-Name</span>
+    <input value="${esc(d.letzteEventNamen||"")}" placeholder="Pöllaner Kirchtag" oninput="igEditData.letzteEventNamen=this.value">
+    <span class="edit-label">Quelle</span>
+    <textarea rows="2" oninput="igEditData.quelle=this.value" style="font-size:12px;padding:7px 10px">${esc(d.quelle||"")}</textarea>
+    <span class="edit-label">Geprüft am</span>
+    <input value="${esc(d.zuletztGeprueftAm||"")}" placeholder="17.06.2026" oninput="igEditData.zuletztGeprueftAm=this.value">
+    <span class="edit-label">Notizen</span>
+    <textarea rows="2" oninput="igEditData.notizen=this.value" style="font-size:12px;padding:7px 10px">${esc(d.notizen||"")}</textarea>
+    <span class="edit-label">KI-recherchiert</span>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+      <input type="checkbox" ${d.kiRecherche?"checked":""} onchange="igEditData.kiRecherche=this.checked" style="width:15px;height:15px;accent-color:var(--accent)">
+      🤖 Mit KI oder Browser-Extension recherchiert
+    </label>
+    <span class="edit-label">Manuell kontrolliert</span>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+      <input type="checkbox" ${d.manuellKontrolliert?"checked":""} onchange="igEditData.manuellKontrolliert=this.checked" style="width:15px;height:15px;accent-color:var(--green)">
+      ✓ Manuell geprüft und bestätigt
+    </label>
+  </div>`;
+}
+
+function openIgAdd() {
+  igEditId=null;
+  igEditData={username:"",displayName:"",vereinsTyp:"Zechgemeinschaft",gemeinde:"",bezirk:"",status:"offen",letzterTermin:"",letzteEventNamen:"",quelle:"",zuletztGeprueftAm:"",notizen:"",kiRecherche:false,manuellKontrolliert:false};
+  document.getElementById("ig-modal-title").textContent="Account hinzufügen";
+  document.getElementById("ig-modal-body").innerHTML=igFormHTML();
+  document.getElementById("modal-ig-account").style.display="flex";
+}
+
+function openIgEdit(id) {
+  const acc=igAccounts.find(a=>a._id===id);
+  if(!acc) return;
+  igEditId=id;
+  igEditData={...acc};
+  document.getElementById("ig-modal-title").textContent="@"+(acc.username||"")+" bearbeiten";
+  document.getElementById("ig-modal-body").innerHTML=igFormHTML();
+  document.getElementById("modal-ig-account").style.display="flex";
+}
+
+function closeIgModal() {
+  document.getElementById("modal-ig-account").style.display="none";
+}
+
+function saveIgAccount() {
+  if(!igEditData.username){alert("Username ist Pflicht.");return;}
+  const data={
+    username:(igEditData.username||"").replace(/^@/,"").trim(),
+    displayName:igEditData.displayName||"",
+    vereinsTyp:igEditData.vereinsTyp||"Sonstige",
+    gemeinde:igEditData.gemeinde||"",
+    bezirk:igEditData.bezirk||"",
+    status:igEditData.status||"offen",
+    letzterTermin:igEditData.letzterTermin||"",
+    letzteEventNamen:igEditData.letzteEventNamen||"",
+    quelle:igEditData.quelle||"",
+    zuletztGeprueftAm:igEditData.zuletztGeprueftAm||"",
+    notizen:igEditData.notizen||"",
+    kiRecherche:!!igEditData.kiRecherche,
+    manuellKontrolliert:!!igEditData.manuellKontrolliert
+  };
+  if(igEditId) {
+    db.collection("ig_accounts").doc(igEditId).update(data)
+      .then(()=>{closeIgModal();showToast("✓ Account gespeichert");})
+      .catch(e=>alert("Fehler: "+e.message));
+  } else {
+    if(igAccounts.some(a=>a.username===data.username)){
+      if(!confirm(`@${data.username} existiert bereits. Trotzdem hinzufügen?`)) return;
+    }
+    db.collection("ig_accounts").add({...data,createdAt:firebase.firestore.FieldValue.serverTimestamp()})
+      .then(()=>{closeIgModal();showToast("✓ Account hinzugefügt");})
+      .catch(e=>alert("Fehler: "+e.message));
+  }
+}
+
+function delIgAccount(id) {
+  const acc=igAccounts.find(a=>a._id===id);
+  if(!acc) return;
+  if(!confirm(`@${acc.username} löschen?`)) return;
+  db.collection("ig_accounts").doc(id).delete()
+    .then(()=>showToast("🗑 Gelöscht"))
+    .catch(e=>alert("Fehler: "+e.message));
+}
+
+function exportIgCSV() {
+  const headers=["username","displayName","vereinsTyp","gemeinde","bezirk","status","letzterTermin","letzteEventNamen","quelle","zuletztGeprueftAm","notizen","kiRecherche","manuellKontrolliert"];
+  const escape=v=>{
+    if(typeof v==="boolean") return v?"true":"false";
+    const s=String(v||"").replace(/"/g,'""');
+    return(s.includes(",")||s.includes("\n")||s.includes('"'))?`"${s}"`:s;
+  };
+  const rows=igAccounts.map(a=>headers.map(h=>{
+    if(h==="kiRecherche"||h==="manuellKontrolliert") return escape(!!a[h]);
+    return escape(a[h]||"");
+  }).join(","));
+  const csv=[headers.join(","),...rows].join("\n");
+  const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8;"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  const today=new Date();
+  const ds=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
+  a.href=url;a.download=`ig_accounts_export_${ds}.csv`;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast(`✓ ${igAccounts.length} Accounts exportiert`);
+}
+
+function importIgCSV() {
+  const text=(document.getElementById("ig-csv-input").value||"").trim();
+  const lines=text.split("\n").filter(l=>l.trim());
+  if(lines.length<2){igCsvMsg("Mind. Header + 1 Zeile nötig.","var(--red)");return;}
+
+  const sep=lines[0].includes(";")?";":","
+  const hdrs=splitCSVLine(lines[0],sep).map(h=>h.toLowerCase().trim());
+  const exactIdx=name=>hdrs.findIndex(h=>h===name.toLowerCase());
+  const iU=exactIdx("username");
+  const iDN=exactIdx("displayname");
+  const iT=exactIdx("vereinstyp");
+  const iG=exactIdx("gemeinde");
+  const iB=exactIdx("bezirk");
+  const iS=exactIdx("status");
+  const iLT=hdrs.findIndex(h=>h==="letzttermin"||h==="letztertermin"||h.includes("letzterterm"));
+  const iLN=hdrs.findIndex(h=>h==="letzteeventnamen"||h.includes("letzteevent"));
+  const iQ=exactIdx("quelle");
+  const iZG=hdrs.findIndex(h=>h==="zuletztgeprueftam"||h.includes("zuletzt"));
+  const iN=exactIdx("notizen");
+  const iKI=hdrs.findIndex(h=>h==="kirecherche"||h==="ki_recherche"||h.includes("kirecherche"));
+  const iMK=hdrs.findIndex(h=>h==="manuellkontrolliert"||h.includes("manuell"));
+
+  if(iU<0){igCsvMsg("Spalte 'username' fehlt.","var(--red)");return;}
+
+  const VALID_STATUS=new Set(["offen","geprueft_kein_termin","termin_gefunden","nicht_relevant"]);
+  let added=0,updated=0,skipped=0;
+  const batch=db.batch();
+  const usernameToDoc={};
+  igAccounts.forEach(a=>{ usernameToDoc[a.username]=a._id; });
+  const processedInBatch=new Set();
+
+  for(let i=1;i<lines.length;i++){
+    const c=splitCSVLine(lines[i],sep);
+    const username=(c[iU]||"").trim().replace(/^@/,"");
+    if(!username) continue;
+    if(processedInBatch.has(username)){skipped++;continue;}
+    processedInBatch.add(username);
+
+    const gemeindeVal=iG>=0?(c[iG]||"").trim():"";
+    let bezirkVal=iB>=0?(c[iB]||"").trim():"";
+    if(!bezirkVal && gemeindeVal) bezirkVal=deriveBezirkFromGemeinde(gemeindeVal);
+
+    const status=iS>=0&&VALID_STATUS.has((c[iS]||"").trim())?(c[iS]||"").trim():"offen";
+    const data={
+      username,
+      displayName:iDN>=0?(c[iDN]||"").trim():"",
+      vereinsTyp:iT>=0&&IG_TYPEN.includes((c[iT]||"").trim())?(c[iT]||"").trim():"Sonstige",
+      gemeinde:gemeindeVal,
+      bezirk:bezirkVal,
+      status,
+      letzterTermin:iLT>=0?(c[iLT]||"").trim():"",
+      letzteEventNamen:iLN>=0?(c[iLN]||"").trim():"",
+      quelle:iQ>=0?(c[iQ]||"").trim():"",
+      zuletztGeprueftAm:iZG>=0?(c[iZG]||"").trim():"",
+      notizen:iN>=0?(c[iN]||"").trim():"",
+      kiRecherche: iKI>=0 ? (c[iKI]||"").toLowerCase()==="true" : true,
+      manuellKontrolliert: iMK>=0 ? (c[iMK]||"").toLowerCase()==="true" : false,
+    };
+
+    const existingId=usernameToDoc[username];
+    if(existingId) {
+      batch.update(db.collection("ig_accounts").doc(existingId), data);
+      updated++;
+    } else {
+      batch.set(db.collection("ig_accounts").doc(), {...data, createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+      added++;
+    }
+  }
+
+  if(added===0&&updated===0){igCsvMsg(`Keine Änderungen.`,"var(--text-3)");return;}
+
+  igCsvMsg(`Speichere…`,"var(--text-2)");
+  batch.commit().then(()=>{
+    const el=document.getElementById("ig-csv-input");
+    if(el) el.value="";
+    igShowImport=false;
+    const parts=[];
+    if(added) parts.push(`${added} neu`);
+    if(updated) parts.push(`${updated} aktualisiert`);
+    if(skipped) parts.push(`${skipped} übersprungen`);
+    showToast(`✓ IG-Accounts: ${parts.join(" · ")}`);
+    igCsvMsg("","");
+  }).catch(e=>igCsvMsg("Fehler: "+e.message,"var(--red)"));
+}
+
+function igCsvMsg(msg,color) {
+  const el=document.getElementById("ig-csv-msg");
+  if(el){el.textContent=msg;el.style.color=color||"var(--text)";}
+}
+
+function igEventUebernehmen(id) {
+  const acc=igAccounts.find(a=>a._id===id);
+  if(!acc) return;
+  const eventName=acc.letzteEventNamen||acc.displayName||"";
+  if(!confirm(`Event "${eventName}" mit Datum ${acc.letzterTermin||"?"} in die Recherche-Liste übernehmen?`)) return;
+  const yr=getYear(acc.letzterTermin);
+  db.collection("pending_events").add({
+    name:eventName,
+    datum:acc.letzterTermin||"",
+    uhrzeit:"",
+    gemeinde:acc.gemeinde||"",
+    bezirk:acc.bezirk||"",
+    typ:"e1",
+    veranstalter:acc.displayName||"",
+    eintritt:"",
+    beschreibung:"",
+    quelle:acc.quelle||"Instagram: @"+(acc.username||""),
+    quelle2:"",
+    adresse:acc.gemeinde||"",
+    latitude:null,longitude:null,
+    status:yr>=2026?"confirmed":"check",
+    geprueft:false,inApp:false,
+    createdAt:firebase.firestore.FieldValue.serverTimestamp()
+  }).then(()=>{
+    showToast(`✓ "${eventName}" in Recherche übernommen`);
+  }).catch(e=>alert("Fehler: "+e.message));
+}
 
 // ---- GOOGLE MAPS READY MECHANISM (Places API New) ----
 let _gmapsPending = [];
