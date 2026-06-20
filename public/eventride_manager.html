@@ -399,6 +399,20 @@ select option{background:var(--surface);color:var(--text)}
   </div>
 </div>
 
+<div id="modal-quick-ig" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeQuickIgModal()">
+  <div class="modal" style="width:400px;max-width:95vw">
+    <div class="modal-header">
+      <h3 id="quick-ig-title" style="margin:0">Account verknüpfen</h3>
+      <button class="icon-btn" onclick="closeQuickIgModal()">×</button>
+    </div>
+    <div id="quick-ig-body"></div>
+    <div class="btn-row" style="margin-top:1rem">
+      <button onclick="closeQuickIgModal()">Abbrechen</button>
+      <button class="primary" id="quick-ig-submit" onclick="submitQuickIgAdd()">Zu Accounts hinzufügen</button>
+    </div>
+  </div>
+</div>
+
 <div id="mgr-toast"></div>
 
 <script>
@@ -1099,9 +1113,14 @@ function quellenHtml(ev) {
   quellen.forEach((q, i) => {
     const href = q.startsWith("http") ? q : "https://" + q;
     const isIg = /instagram\.com/i.test(q) || /^@/.test(q);
+    const igUser = extractInstagramUsername(q);
+    const showAccBtn = isIg && !igUser;
+    const gemQ = (ev.gemeinde||"").replace(/'/g,"\\'");
+    const bezQ = (ev.bezirk||"").replace(/'/g,"\\'");
     html += `<div style="display:flex;align-items:center;gap:6px;margin-top:6px;padding:5px 8px;background:var(--surface-2);border-radius:var(--rx)">
       <span style="font-size:13px;flex-shrink:0">${isIg ? '📱' : '🔗'}</span>
       <a href="${href}" target="_blank" rel="noopener" style="font-size:12px;color:var(--accent);flex:1;word-break:break-all;min-width:0">${esc(q)}</a>
+      ${showAccBtn ? `<button class="small" style="padding:2px 8px;font-size:11px;white-space:nowrap;flex-shrink:0;color:var(--blue-t);border-color:rgba(9,105,218,.2);background:var(--blue-bg)" title="Account manuell zuweisen" onclick="openQuickIgAdd('${gemQ}','${bezQ}')">📱 Account</button>` : ''}
       <button class="icon-btn" style="padding:2px 6px;font-size:11px;color:var(--red-t);flex-shrink:0" onclick="removeQuelle('${id}',${i})">✕</button>
     </div>`;
   });
@@ -1179,6 +1198,95 @@ async function autoAddIgAccount(username, gemeinde, bezirk) {
   } catch(e) {
     console.error("IG auto-add error", e);
     showToast("Fehler beim Hinzufügen des IG-Accounts", false);
+  }
+}
+
+// ---- QUICK IG ADD MODAL ----
+let _quickIgData = {};
+let _qigExistsTimer;
+
+function openQuickIgAdd(gemeinde, bezirk) {
+  _quickIgData = {
+    username: "",
+    displayName: "",
+    vereinsTyp: "Sonstige",
+    gemeinde: gemeinde || "",
+    bezirk: bezirk || deriveBezirkFromGemeinde(gemeinde) || ""
+  };
+  document.getElementById("quick-ig-title").textContent =
+    "Account verknüpfen" + (gemeinde ? " · " + gemeinde : "");
+  const typOpts = IG_TYPEN.map(t => `<option value="${t}" ${t==="Sonstige"?"selected":""}>${t}</option>`).join("");
+  document.getElementById("quick-ig-body").innerHTML = `
+    <div id="qig-exists-msg" style="display:none;margin-bottom:10px"></div>
+    <div class="edit-grid">
+      <span class="edit-label">Username *</span>
+      <input id="qig-username" placeholder="ohne @" oninput="_quickIgData.username=this.value.replace(/^@/,'').trim();qigCheckExists(this.value)">
+      <span class="edit-label">Anzeigename</span>
+      <input placeholder="z.B. Zechburschen XY" oninput="_quickIgData.displayName=this.value">
+      <span class="edit-label">Typ</span>
+      <select onchange="_quickIgData.vereinsTyp=this.value">${typOpts}</select>
+    </div>
+    <div style="margin-top:10px;font-size:12px;color:var(--text-3)">
+      Wird zugeordnet: <strong>${esc(gemeinde||"—")}</strong>${_quickIgData.bezirk?" · "+esc(_quickIgData.bezirk):""}
+    </div>`;
+  document.getElementById("quick-ig-submit").disabled = false;
+  document.getElementById("modal-quick-ig").style.display = "flex";
+  setTimeout(() => { const i = document.getElementById("qig-username"); if(i) i.focus(); }, 60);
+}
+
+function qigCheckExists(val) {
+  clearTimeout(_qigExistsTimer);
+  _qigExistsTimer = setTimeout(() => {
+    const username = val.replace(/^@/,"").trim();
+    const msg = document.getElementById("qig-exists-msg");
+    const btn = document.getElementById("quick-ig-submit");
+    if (!msg) return;
+    if (!username) { msg.style.display = "none"; if(btn) btn.disabled = false; return; }
+    const exists = igAccounts.find(a => a.username === username);
+    if (exists) {
+      msg.style.display = "block";
+      msg.innerHTML = `<div class="info-box">📱 @${esc(username)} ist bereits in Accounts${exists.gemeinde?" ("+esc(exists.gemeinde)+")":""}</div>`;
+      if(btn) btn.disabled = true;
+    } else {
+      msg.style.display = "none";
+      if(btn) btn.disabled = false;
+    }
+  }, 250);
+}
+
+function closeQuickIgModal() {
+  document.getElementById("modal-quick-ig").style.display = "none";
+}
+
+async function submitQuickIgAdd() {
+  const username = (_quickIgData.username||"").replace(/^@/,"").trim();
+  if (!username) { alert("Username ist Pflicht."); return; }
+  const exists = igAccounts.some(a => a.username === username);
+  if (exists) { showToast(`@${username} existiert bereits`, false); return; }
+  const btn = document.getElementById("quick-ig-submit");
+  if (btn) { btn.disabled = true; btn.textContent = "⏳ Speichert…"; }
+  try {
+    await db.collection("ig_accounts").add({
+      username,
+      displayName: _quickIgData.displayName || "",
+      vereinsTyp: _quickIgData.vereinsTyp || "Sonstige",
+      gemeinde: _quickIgData.gemeinde || "",
+      bezirk: _quickIgData.bezirk || "",
+      status: "offen",
+      letzterTermin: "",
+      letzteEventNamen: "",
+      quelle: "",
+      zuletztGeprueftAm: "",
+      notizen: "",
+      kiRecherche: false,
+      manuellKontrolliert: false,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    closeQuickIgModal();
+    showToast(`📱 @${username} zu Accounts hinzugefügt`);
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = "Zu Accounts hinzufügen"; }
+    alert("Fehler: " + e.message);
   }
 }
 
