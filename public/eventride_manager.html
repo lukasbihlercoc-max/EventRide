@@ -1107,13 +1107,11 @@ function quellenHtml(ev) {
     const href = url.startsWith("http") ? url : "https://" + url;
     const isIg = /instagram\.com/i.test(url) || /^@/.test(url);
     const igUser = extractInstagramUsername(url);
-    const accExists = igUser && igAccounts.some(a => a.username === igUser);
-    const showAccBtn = isIg && !accExists;
     const prefill = (igUser||"").replace(/'/g,"\\'");
     return `<div style="display:flex;align-items:center;gap:6px;margin-top:6px;padding:5px 8px;background:var(--surface-2);border-radius:var(--rx)">
       <span style="font-size:13px;flex-shrink:0">${isIg ? '📱' : '🔗'}</span>
       <a href="${href}" target="_blank" rel="noopener" style="font-size:12px;color:var(--accent);flex:1;word-break:break-all;min-width:0">${esc(url)}</a>
-      ${showAccBtn ? `<button class="small" style="padding:2px 8px;font-size:11px;white-space:nowrap;flex-shrink:0;color:var(--blue-t);border-color:rgba(9,105,218,.2);background:var(--blue-bg)" title="Account verknüpfen" onclick="openQuickIgAdd('${gemQ}','${bezQ}','${prefill}')">📱 Account</button>` : ''}
+      ${isIg ? `<button class="small" style="padding:2px 8px;font-size:11px;white-space:nowrap;flex-shrink:0;color:var(--blue-t);border-color:rgba(9,105,218,.2);background:var(--blue-bg)" title="Account zu Accounts hinzufügen" onclick="openQuickIgAdd('${gemQ}','${bezQ}','${prefill}')">📱 Account</button>` : ''}
       ${deleteBtn}
     </div>`;
   }
@@ -1145,16 +1143,7 @@ function addQuelle(id) {
   quellen.push(val);
   updPending(id, {quellen});
   inp.value = "";
-  // Instagram auto-add
-  const igUser = extractInstagramUsername(val);
-  if (igUser) {
-    const exists = igAccounts.some(a => a.username === igUser);
-    if (!exists) {
-      autoAddIgAccount(igUser, ev.gemeinde, ev.bezirk);
-    } else {
-      showToast(`📱 @${igUser} ist bereits in Accounts`);
-    }
-  }
+  // No silent auto-add — user uses the 📱 Account button manually
 }
 
 function removeQuelle(id, index) {
@@ -1246,15 +1235,19 @@ function qigCheckExists(val) {
     const msg = document.getElementById("qig-exists-msg");
     const btn = document.getElementById("quick-ig-submit");
     if (!msg) return;
-    if (!username) { msg.style.display = "none"; if(btn) btn.disabled = false; return; }
+    if (!username) {
+      msg.style.display = "none";
+      if(btn) { btn.disabled = false; btn.textContent = "Zu Accounts hinzufügen"; }
+      return;
+    }
     const exists = igAccounts.find(a => a.username === username);
     if (exists) {
       msg.style.display = "block";
-      msg.innerHTML = `<div class="info-box">📱 @${esc(username)} ist bereits in Accounts${exists.gemeinde?" ("+esc(exists.gemeinde)+")":""}</div>`;
-      if(btn) btn.disabled = true;
+      msg.innerHTML = `<div style="background:var(--green-bg);border:1px solid rgba(26,127,55,.25);border-radius:var(--rs);padding:10px 14px;font-size:13px;color:var(--green-t)">✓ @${esc(username)} ist bereits in Accounts gespeichert${exists.gemeinde?" · "+esc(exists.gemeinde):""}</div>`;
+      if(btn) { btn.disabled = true; btn.textContent = "Bereits gespeichert"; }
     } else {
       msg.style.display = "none";
-      if(btn) btn.disabled = false;
+      if(btn) { btn.disabled = false; btn.textContent = "Zu Accounts hinzufügen"; }
     }
   }, 250);
 }
