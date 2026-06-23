@@ -27,8 +27,15 @@ class FirestoreEventRepository implements IEventRepository {
   @override
   Stream<List<Event>> watch() {
     return _firestore.collection(_collection).snapshots().map((snap) {
+      final now = DateTime.now();
       final events = snap.docs
           .map((doc) => Event.fromMap({...doc.data(), 'id': doc.id}))
+          .where((e) {
+            // Event bleibt sichtbar bis 6:00 Uhr des Folgetags (lokale Zeit)
+            final local = e.datum.toLocal();
+            final hideAfter = DateTime(local.year, local.month, local.day + 1, 6, 0);
+            return now.isBefore(hideAfter);
+          })
           .toList();
       _cache
         ..clear()
