@@ -920,7 +920,7 @@
               <!-- Screen 2: Event Detail -->
               <div class="iscreen is-right" id="is-2">
                 <div class="is2-back" onclick="isNavigate(1)">‹ Zurück</div>
-                <div class="is2-cover" id="is-detail-cover" style="background-image:url(assets/image/kirchtag2.jpg)">
+                <div class="is2-cover" id="is-detail-cover" style="background-image:url(assets/image/kirchtag6.jpg)">
                   <div class="is2-cover-overlay"></div>
                   <div class="is2-cover-content">
                     <div class="is2-evname" id="is-detail-name">Event Name</div>
@@ -1068,7 +1068,7 @@
   ];
 
   const IMGS = {
-    e1: 'assets/image/kirchtag2.jpg',
+    e1: 'assets/image/kirchtag6.jpg',
     e2: 'assets/image/feuerwehr.png',
     e3: 'assets/image/disco.png',
     e4: 'assets/image/Ball.png',
@@ -1166,7 +1166,7 @@
     const ev   = (window._isEvents || [])[idx];
     if (!ev) { isNavigate(2); return; }
     const imgs = window._isImgs || {};
-    const img  = imgs[ev.typ] || imgs.e1 || 'assets/image/kirchtag2.jpg';
+    const img  = imgs[ev.typ] || imgs.e1 || 'assets/image/kirchtag6.jpg';
     const fmt  = window._fmtDate || (d => d);
     document.getElementById('is-detail-cover').style.backgroundImage = `url(${img})`;
     document.getElementById('is-detail-name').textContent = ev.name;

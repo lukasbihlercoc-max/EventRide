@@ -12,7 +12,7 @@ import 'package:my_app/data/notifiers.dart';
 String? getBackgroundImage(String typ) {
   switch (typ) {
     case "e1":
-      return "assets/image/kirchtag2.jpg";
+      return "assets/image/kirchtag6.png";
     case "e2":
       return "assets/image/feuerwehr.png";
     case "e3":
@@ -33,10 +33,14 @@ double hintergrundHelligkeit(String typ)  {
   switch (typ)  {
     case "e5":
       return 0.69;
+    case "e1":
+      return 0.35;
     default:
       return 0.5;
   }
 }
+
+
 
 class EventCard extends StatelessWidget {
   final Event event;
@@ -66,7 +70,7 @@ class EventCard extends StatelessWidget {
           image: DecorationImage(
             image: AssetImage(backgroundImage),
             fit: BoxFit.cover,
-            alignment: Alignment(0.1, 0.2),
+            alignment: Alignment(0.1, 0.05),
           ),
           borderRadius: BorderRadius.circular(16),
         ),

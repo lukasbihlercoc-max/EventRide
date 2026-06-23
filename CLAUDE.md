@@ -11,7 +11,7 @@
 |-------|--------|
 | `public/index.html` | Landing Page + interaktive App-Preview |
 | `public/eventride_manager.html` | Admin-Panel (Events anlegen) |
-| `public/assets/image/` | Event-Hintergrundbilder (kirchtag2.jpg etc.) |
+| `public/assets/image/` | Event-Hintergrundbilder (kirchtag6.jpg etc.) |
 
 **App-Preview** im `#screenshots`-Abschnitt: iPhone-Mockup mit 3 navigierbaren Screens,  
 lädt echte Events aus Firestore, Design 1:1 wie die App (Gradient `#B79B78→#52A1EF→#406CFB`, Akzent `#F5A04A`).

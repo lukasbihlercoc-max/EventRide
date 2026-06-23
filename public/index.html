@@ -738,7 +738,7 @@
 <!-- HERO -->
 <section class="hero" id="top">
   <div class="hero-bg">
-    <img src="assets/image/kirchtag2.jpg" alt="Villacher Kirchtag – gemeinsam feiern" />
+    <img src="assets/image/kirchtag6.jpg" alt="Villacher Kirchtag – gemeinsam feiern" />
     <div class="hero-overlay"></div>
   </div>
   <div class="hero-content">
@@ -817,7 +817,7 @@
   </div>
   <div class="event-strip">
     <div class="ev-tile">
-      <img src="assets/image/kirchtag2.jpg" alt="Kirchtag" />
+      <img src="assets/image/kirchtag6.jpg" alt="Kirchtag" />
       <div class="ev-tile-overlay"></div>
       <div class="ev-tile-info">
         <div class="ev-tile-name">Villacher Kirchtag</div>
@@ -955,7 +955,7 @@
             </div>
             <div class="iscreen is-right" id="is-2">
               <div class="is2-back" onclick="isNavigate(1)">‹ Zurück</div>
-              <div class="is2-cover" id="is-detail-cover" style="background-image:url(assets/image/kirchtag2.jpg)">
+              <div class="is2-cover" id="is-detail-cover" style="background-image:url(assets/image/kirchtag6.jpg)">
                 <div class="is2-cover-overlay"></div>
                 <div class="is2-cover-content">
                   <div class="is2-evname" id="is-detail-name">Event Name</div>
@@ -1137,7 +1137,7 @@
     { name: 'Disco Night Villach',       datum: '2026-06-28T22:00:00.000Z', standort: 'Villach',     typ: 'e3', fahrten: 6 },
   ];
   const IMGS = {
-    e1: 'assets/image/kirchtag2.jpg',
+    e1: 'assets/image/kirchtag6.jpg',
     e2: 'assets/image/feuerwehr.png',
     e3: 'assets/image/disco.png',
     e4: 'assets/image/Ball.png',
@@ -1235,7 +1235,7 @@
     const ev  = (window._isEvents || [])[idx];
     if (!ev) { isNavigate(2); return; }
     const imgs = window._isImgs || {};
-    const img  = imgs[ev.typ] || imgs.e1 || 'assets/image/kirchtag2.jpg';
+    const img  = imgs[ev.typ] || imgs.e1 || 'assets/image/kirchtag6.jpg';
     const fmt  = window._fmtDate || (d => d);
     document.getElementById('is-detail-cover').style.backgroundImage = `url(${img})`;
     document.getElementById('is-detail-name').textContent = ev.name;

@@ -554,7 +554,7 @@ class _HomePageState extends State<HomePage> {
 
   void _precacheImages() {
     const images = [
-      'assets/image/kirchtag2.jpg',
+      'assets/image/kirchtag6.png',
       'assets/image/feuerwehr.png',
       'assets/image/disco.png',
       'assets/image/Ball.png',
