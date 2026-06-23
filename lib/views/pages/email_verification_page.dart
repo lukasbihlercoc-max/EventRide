@@ -24,8 +24,6 @@ class _EmailVerificationPageState extends State<EmailVerificationPage>
   late String _currentEmail;
   final _scrollController = ScrollController();
   Timer? _autoCheckTimer;
-  Timer? _cooldownTimer;
-  int _cooldownSec = 0;
   late AnimationController _dotController;
 
   @override
@@ -68,21 +66,8 @@ class _EmailVerificationPageState extends State<EmailVerificationPage>
     WidgetsBinding.instance.removeObserver(this);
     _dotController.dispose();
     _autoCheckTimer?.cancel();
-    _cooldownTimer?.cancel();
     _scrollController.dispose();
     super.dispose();
-  }
-
-  void _startCooldown() {
-    _cooldownSec = 90;
-    _cooldownTimer?.cancel();
-    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!mounted) { t.cancel(); return; }
-      setState(() {
-        _cooldownSec--;
-        if (_cooldownSec <= 0) t.cancel();
-      });
-    });
   }
 
   Future<void> _resendEmail() async {
@@ -92,10 +77,7 @@ class _EmailVerificationPageState extends State<EmailVerificationPage>
     });
     try {
       await context.read<IAuthRepository>().sendEmailVerification();
-      if (mounted) {
-        setState(() => _resentSuccess = true);
-        _startCooldown();
-      }
+      if (mounted) setState(() => _resentSuccess = true);
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
       AppSnackbar.show(
@@ -273,36 +255,13 @@ class _EmailVerificationPageState extends State<EmailVerificationPage>
                       ],
                     ),
                   ),
-                  SizedBox(height: SizeHelper.h(context, 0.02)),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.blueAccent.withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.blueAccent.withValues(alpha: 0.30)),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Icon(Icons.info_outline, color: Colors.blueAccent, size: 18),
-                        SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Falls der Browser einen Fehler zeigt: Komm einfach zurück zur App – '
-                            'die Bestätigung kann trotzdem geklappt haben. Die App prüft automatisch.',
-                            style: TextStyle(color: Colors.blueAccent, fontSize: 13, height: 1.4),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                   SizedBox(height: SizeHelper.h(context, 0.04)),
                   _buildWaitingIndicator(),
                   const SizedBox(height: 28),
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton(
-                      onPressed: (_isResending || _cooldownSec > 0) ? null : _resendEmail,
+                      onPressed: _isResending ? null : _resendEmail,
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.white70,
                         side: const BorderSide(color: Colors.white30),
@@ -321,11 +280,9 @@ class _EmailVerificationPageState extends State<EmailVerificationPage>
                               ),
                             )
                           : Text(
-                              _cooldownSec > 0
-                                  ? 'Erneut senden (${_cooldownSec}s)'
-                                  : _resentSuccess
-                                      ? 'E-Mail erneut gesendet'
-                                      : 'E-Mail erneut senden',
+                              _resentSuccess
+                                  ? 'E-Mail erneut gesendet'
+                                  : 'E-Mail erneut senden',
                               style: const TextStyle(fontSize: 16),
                             ),
                     ),
