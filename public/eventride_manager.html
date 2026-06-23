@@ -2572,7 +2572,7 @@ function renderAccounts() {
         const terminFarbe=a.status==="termin_gefunden"?"#27AE60":"var(--text-2)";
         const kiDone=a.kiRecherche&&a.manuellKontrolliert;
         tableHtml += `<tr>
-          <td><span class="ig-username">@${esc(a.username||"")}</span></td>
+          <td><a class="ig-username" href="https://www.instagram.com/${esc(a.username||"")}/" target="_blank" rel="noopener">@${esc(a.username||"")}</a></td>
           <td style="font-weight:500;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.displayName||"")}</td>
           <td style="white-space:nowrap"><span class="badge" style="background:var(--surface-2);color:var(--text-2);border-color:var(--border);font-size:11px">${esc(a.vereinsTyp||"")}</span></td>
           <td style="font-size:12px;white-space:nowrap">${esc(a.gemeinde||"")}</td>
