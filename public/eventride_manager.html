@@ -87,6 +87,7 @@ button.primary:active{transform:none;box-shadow:none}
 button.danger{color:var(--red);border-color:transparent;background:transparent;font-size:12px;padding:4px 10px}
 button.danger:hover{background:var(--red-bg)}
 button.small{padding:4px 10px;font-size:12px}
+button.small.active-sort{background:var(--accent);color:#fff;border-color:var(--accent)}
 button.icon-btn{border:none;background:none;padding:6px;font-size:16px;line-height:1;border-radius:var(--rx);color:var(--text-2)}
 button.icon-btn:hover{background:var(--surface-2);color:var(--text)}
 .theme-toggle{gap:5px;font-size:12px;font-weight:500;color:var(--text-2)}
@@ -464,6 +465,7 @@ let appEvents = [];
 let pending = [];
 let curTab = "recherche";
 let selId = null;
+let appSortMode = "datum";
 let editMode = false;
 let editData = {};
 let expandBez = {};
@@ -558,7 +560,8 @@ function initFS() {
         beschreibung: data.beschreibung || "",
         lat: data.latitude ?? data.lat ?? null,
         lng: data.longitude ?? data.lng ?? null,
-        adresse: data.adresse || ""
+        adresse: data.adresse || "",
+        createdAt: data.createdAt?.toMillis?.() || 0
       };
     });
     render();
@@ -1356,13 +1359,20 @@ function submitAdd() {
 // ---- IN APP TAB ----
 function renderInApp() {
   const sel = selId ? appEvents.find(e=>e._id===selId) : null;
-  const sorted = [...appEvents].sort((a,b)=>monthDay(a.datum)-monthDay(b.datum));
+  const sorted = [...appEvents].sort((a,b) => {
+    if (appSortMode === "createdAt") return (b.createdAt||0) - (a.createdAt||0);
+    const da = parseDatum(a.datum), db2 = parseDatum(b.datum);
+    if (!da && !db2) return 0; if (!da) return 1; if (!db2) return -1;
+    return da - db2;
+  });
   const gridClass = sel ? "main-grid has-detail" : "main-grid";
   document.getElementById("content").innerHTML = `
   <div class="${gridClass}">
     <div>
-      <div style="font-size:12px;color:#999;margin-bottom:10px;padding:0 2px">
-        ${appEvents.length} Events live in Firebase — Echtzeit-Sync
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:0 2px">
+        <span style="font-size:12px;color:#999;flex:1">${appEvents.length} Events live in Firebase — Echtzeit-Sync</span>
+        <button class="small${appSortMode==='datum'?' active-sort':''}" onclick="appSortMode='datum';render()" style="font-size:11px;padding:2px 8px">Datum</button>
+        <button class="small${appSortMode==='createdAt'?' active-sort':''}" onclick="appSortMode='createdAt';render()" style="font-size:11px;padding:2px 8px">Hochgeladen</button>
       </div>
       <div class="event-list-wrap">
         ${sorted.length===0
@@ -2088,7 +2098,7 @@ function submitFlyerUpload() {
     const _eLines = eintrittText.split('\n').map(l => l.trim()).filter(Boolean);
     _flyerParts.push('Eintritt:\n' + _eLines.map(l => /€/.test(l) ? l : l + ' €').join('\n'));
   }
-  _flyerParts.push('Einlass ab: ' + uhr + ' Uhr');
+  _flyerParts.push('Einlass ab ' + uhr + ' Uhr');
   if (beschreibungText) _flyerParts.push(beschreibungText);
   const combinedBeschreibung = _flyerParts.join('\n\n');
 
@@ -2370,7 +2380,7 @@ function submitUpload() {
     const _eLines = eintrittText.split('\n').map(l => l.trim()).filter(Boolean);
     _uploadParts.push('Eintritt:\n' + _eLines.map(l => /€/.test(l) ? l : l + ' €').join('\n'));
   }
-  _uploadParts.push('Einlass ab: ' + uhr + ' Uhr');
+  _uploadParts.push('Einlass ab ' + uhr + ' Uhr');
   if (beschreibungText) _uploadParts.push(beschreibungText);
   const combinedBeschreibung = _uploadParts.join('\n\n');
 
