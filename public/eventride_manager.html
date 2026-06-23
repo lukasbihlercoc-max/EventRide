@@ -472,8 +472,11 @@ let editData = {};
 let expandBez = {};
 let expandGem = {};
 let fBez = "Alle", fTyp = "Alle", fStatus = "Alle", fSearch = "";
+let fInfoAusstehend = false;
 let sortDir = "asc";
 let showPast = false;
+let rechercheIgSearch = '';
+let bezInlineLinkSearch = '';
 let addFormData = {};
 let uploadData = {};
 let uploadPendingId = null;
@@ -782,6 +785,7 @@ function getFiltered() {
   else if(fStatus==="geprueft") evs = evs.filter(e=>e.geprueft);
   else if(fStatus==="ready") evs = evs.filter(e=>e.geprueft&&!isCheck(e)&&!e.inApp);
   else if(fStatus==="inApp") evs = evs.filter(e=>e.inApp);
+  if(fInfoAusstehend) evs = evs.filter(e=>e.infoAusstehend);
   if(fSearch) { const q=fSearch.toLowerCase(); evs=evs.filter(e=>(e.name||"").toLowerCase().includes(q)||(e.gemeinde||"").toLowerCase().includes(q)); }
   evs.sort((a,b)=>{
     const ma=monthDay(a.datum), mb=monthDay(b.datum);
@@ -798,7 +802,7 @@ function renderRecherche() {
   const evs = getFiltered();
   const sel = selId ? pending.find(e=>e._id===selId) : null;
   const gridClass = sel ? "main-grid has-detail" : "main-grid";
-  const hasFilter = fBez!=="Alle"||fTyp!=="Alle"||fStatus!=="Alle"||fSearch;
+  const hasFilter = fBez!=="Alle"||fTyp!=="Alle"||fStatus!=="Alle"||fSearch||fInfoAusstehend;
 
   document.getElementById("content").innerHTML = `
   <div class="${gridClass}">
@@ -827,7 +831,8 @@ function renderRecherche() {
         <button class="small" onclick="showPast=!showPast;render()" style="${showPast?"background:#f0f0ee;font-weight:600":""}">
           ${showPast?"Vergangene: an":"Vergangene: aus"}
         </button>
-        ${hasFilter?`<button class="small danger" onclick="fBez='Alle';fTyp='Alle';fStatus='Alle';fSearch='';render()">✕ Filter</button>`:""}
+        <button class="small" onclick="fInfoAusstehend=!fInfoAusstehend;render()" style="${fInfoAusstehend?"background:var(--accent);color:#fff;border-color:var(--accent)":""}">⏳ Ausstehend</button>
+        ${hasFilter?`<button class="small danger" onclick="fBez='Alle';fTyp='Alle';fStatus='Alle';fSearch='';fInfoAusstehend=false;render()">✕ Filter</button>`:""}
         <span class="filter-count">${evs.length} Events</span>
       </div>
       <div class="event-list-wrap">
@@ -856,6 +861,7 @@ function eventRow(ev, hasDupes=false) {
   const icons = [];
   if(ev.geprueft) icons.push(`<span class="icon-check" title="Manuell geprüft">✓</span>`);
   if(inApp) icons.push(`<span class="icon-upload" title="In App">↑</span>`);
+  if(ev.infoAusstehend) icons.push(`<span style="font-size:10px;color:#D97706" title="Info noch ausstehend">⏳</span>`);
   if(similarApp) icons.push(`<span style="font-size:10px;background:#E6F1FB;color:#0C447C;padding:1px 6px;border-radius:8px;font-weight:600" title="Ähnliches Event möglicherweise bereits in App">~App</span>`);
   if(hasDupes) icons.push(`<span style="font-size:10px;background:#FFF3D6;color:#7A4A00;padding:1px 6px;border-radius:8px;font-weight:600">ähnlich</span>`);
   if(multiConfirmedIds.has(ev._id)) icons.push(`<span style="font-size:10px;background:#D1FAE5;color:#065F46;padding:1px 6px;border-radius:8px;font-weight:600">✓✓ Mehrfach</span>`);
@@ -910,6 +916,48 @@ function selectEv(id) {
 }
 
 // ---- DETAIL PANEL ----
+function rechercheAccountsHtml(ev) {
+  const gem = (ev.gemeinde || '').toLowerCase();
+  const autoAccs = igAccounts.filter(a => a.gemeinde && a.gemeinde.toLowerCase() === gem);
+  const linked = ev.linkedIgAccount || '';
+  const linkedAcc = linked ? igAccounts.find(a => a.username === linked) : null;
+  const q = rechercheIgSearch.toLowerCase();
+  const searchable = igAccounts.filter(a =>
+    a.username !== linked &&
+    (!q || (a.username||'').toLowerCase().includes(q) || (a.displayName||'').toLowerCase().includes(q) || (a.gemeinde||'').toLowerCase().includes(q))
+  ).slice(0, 8);
+  const evId = ev._id;
+  let html = `<div class="detail-section">
+    <div class="detail-section-title">📱 Accounts</div>`;
+  if (linkedAcc) {
+    html += `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--surface-2);border-radius:var(--rx);margin-bottom:6px">
+      <a href="https://www.instagram.com/${esc(linkedAcc.username)}/" target="_blank" rel="noopener" class="ig-username" style="flex:1">@${esc(linkedAcc.username)}</a>
+      <span style="font-size:11px;color:var(--text-3)">${esc(linkedAcc.gemeinde||'')}</span>
+      <button class="icon-btn" style="font-size:11px;color:var(--red-t)" onclick="updPending('${evId}',{linkedIgAccount:''})">✕</button>
+    </div>`;
+  }
+  if (autoAccs.length && !linkedAcc) {
+    autoAccs.forEach(a => {
+      html += `<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--surface-2);border-radius:var(--rx);margin-bottom:4px;font-size:12px">
+        <a href="https://www.instagram.com/${esc(a.username)}/" target="_blank" rel="noopener" class="ig-username" style="flex:1">@${esc(a.username)}</a>
+        <span style="font-size:11px;color:var(--text-3)">${esc(a.vereinsTyp||'')}</span>
+        <button class="small" style="font-size:10px;padding:2px 7px" onclick="updPending('${evId}',{linkedIgAccount:'${a.username.replace(/'/g,"\\'")}''})">verknüpfen</button>
+      </div>`;
+    });
+  }
+  html += `<div style="margin-top:6px">
+    <input value="${esc(rechercheIgSearch)}" placeholder="Account suchen…" style="font-size:12px;width:100%;box-sizing:border-box" oninput="rechercheIgSearch=this.value;render()">
+    ${searchable.length ? `<div style="margin-top:4px;border:1px solid var(--border);border-radius:var(--rx);overflow:hidden">` +
+      searchable.map(a => `<div style="display:flex;align-items:center;gap:8px;padding:5px 10px;font-size:12px;cursor:pointer;border-bottom:1px solid var(--border-sub)" onclick="updPending('${evId}',{linkedIgAccount:'${a.username.replace(/'/g,"\\'")}''});rechercheIgSearch='';render()">
+        <a href="https://www.instagram.com/${esc(a.username)}/" target="_blank" rel="noopener" class="ig-username" onclick="event.stopPropagation()">@${esc(a.username)}</a>
+        <span style="flex:1;font-size:11px;color:var(--text-2)">${esc(a.displayName||'')}</span>
+        <span style="font-size:11px;color:var(--text-3)">${esc(a.gemeinde||'')}</span>
+      </div>`).join('') + `</div>` : rechercheIgSearch ? `<div style="font-size:12px;color:#999;padding:4px 0">Keine Accounts gefunden.</div>` : ''}
+  </div>
+  </div>`;
+  return html;
+}
+
 function detailPanel(ev) {
   const check = isCheck(ev);
   const inApp = appEvents.some(a=>a.name.trim().toLowerCase()===ev.name.trim().toLowerCase());
@@ -995,6 +1043,17 @@ function detailPanel(ev) {
       <div class="section-div"></div>
 
       <div class="detail-section">
+        <div class="detail-section-title">Notiz</div>
+        <textarea rows="2" style="width:100%;box-sizing:border-box;font-size:12px;padding:7px 10px;resize:vertical" placeholder="Interne Notiz…" onchange="updPending('${ev._id}',{notiz:this.value})">${esc(ev.notiz||"")}</textarea>
+        <label class="check-label" style="margin-top:6px">
+          <input type="checkbox" ${ev.infoAusstehend?"checked":""} onchange="updPending('${ev._id}',{infoAusstehend:this.checked})">
+          ⏳ Info noch ausstehend
+        </label>
+      </div>
+
+      ${rechercheAccountsHtml(ev)}
+
+      <div class="detail-section">
         <div class="detail-section-title">Status</div>
         <label class="check-label">
           <input type="checkbox" ${ev.geprueft?"checked":""} onchange="updPending('${ev._id}',{geprueft:this.checked})">
@@ -1035,6 +1094,14 @@ function editFormHTML(d) {
     <span class="edit-label">Veranstalter</span><input value="${esc(d.veranstalter||"")}" onchange="editData.veranstalter=this.value">
     <span class="edit-label">Eintritt</span><input value="${esc(d.eintritt||"")}" onchange="editData.eintritt=this.value">
     <span class="edit-label">Beschreibung</span><textarea onchange="editData.beschreibung=this.value" style="font-size:12px;padding:7px 10px;resize:vertical" rows="2">${esc(d.beschreibung||"")}</textarea>
+    <span class="edit-label">Notiz</span>
+    <div>
+      <textarea onchange="editData.notiz=this.value" style="font-size:12px;padding:7px 10px;resize:vertical" rows="2">${esc(d.notiz||"")}</textarea>
+      <label style="font-size:12px;display:flex;align-items:center;gap:6px;margin-top:4px;cursor:pointer">
+        <input type="checkbox" ${d.infoAusstehend?"checked":""} onchange="editData.infoAusstehend=this.checked" style="width:14px;height:14px;accent-color:var(--accent)">
+        ⏳ Info noch ausstehend
+      </label>
+    </div>
     <span class="edit-label">Quelle (alt)</span><input value="${esc(d.quelle||"")}" onchange="editData.quelle=this.value">
     <span class="edit-label">Quell-Typ</span>
     <select onchange="editData.quelleTyp=this.value">
@@ -1301,7 +1368,7 @@ async function submitQuickIgAdd() {
 
 // ---- ADD MODAL ----
 function openAdd(prefill) {
-  addFormData = Object.assign({name:"",datum:"",uhrzeit:"20:00",gemeinde:"",bezirk:"Spittal",veranstalter:"örtlich",eintritt:"",beschreibung:"",typ:"e1",quelle:"",quelleTyp:"",quelleLink:"",srcZitat:"",sicherheit:"mittel",adresse:"",latitude:null,longitude:null}, prefill||{});
+  addFormData = Object.assign({name:"",datum:"",uhrzeit:"20:00",gemeinde:"",bezirk:"Spittal",veranstalter:"örtlich",eintritt:"",beschreibung:"",typ:"e1",quelle:"",quelleTyp:"",quelleLink:"",srcZitat:"",sicherheit:"mittel",adresse:"",latitude:null,longitude:null,notiz:"",infoAusstehend:false}, prefill||{});
   const bezSelect = BEZIRKE.map(b=>`<option value="${b}" ${b===addFormData.bezirk?"selected":""}>${b}</option>`).join("");
   const typSelect = [['e1','Kirchtage/Feste'],['e2','Feuerwehr'],['e3','Disco/Party'],['e4','Ball'],['e5','Krampus'],['e6','Festival/Open-Air']]
     .map(([v,l])=>`<option value="${v}" ${v==="e1"?"selected":""}>${l}</option>`).join("");
@@ -1315,6 +1382,14 @@ function openAdd(prefill) {
     <span class="edit-label">Veranstalter</span><input value="örtlich" oninput="addFormData.veranstalter=this.value">
     <span class="edit-label">Eintritt</span><input placeholder="z.B. kostenlos / 12 €" oninput="addFormData.eintritt=this.value">
     <span class="edit-label">Beschreibung</span><textarea oninput="addFormData.beschreibung=this.value" style="font-size:12px;padding:7px 10px;resize:vertical" rows="2" placeholder="Kurzbeschreibung (optional)"></textarea>
+    <span class="edit-label">Notiz</span>
+    <div>
+      <textarea oninput="addFormData.notiz=this.value" style="font-size:12px;padding:7px 10px;resize:vertical" rows="2" placeholder="Interne Notiz (nur im Manager sichtbar)"></textarea>
+      <label style="font-size:12px;display:flex;align-items:center;gap:6px;margin-top:4px;cursor:pointer">
+        <input type="checkbox" onchange="addFormData.infoAusstehend=this.checked" style="width:14px;height:14px;accent-color:var(--accent)">
+        ⏳ Info noch ausstehend
+      </label>
+    </div>
     <span class="edit-label">Quelle</span><input placeholder="URL oder Quelle" oninput="addFormData.quelle=this.value">
     <span class="edit-label">Adresse</span><input id="add-adresse" placeholder="Adresse suchen…" oninput="addFormData.adresse=this.value">
     <span class="edit-label">Koordinaten</span>
@@ -1358,6 +1433,8 @@ function submitAdd() {
     longitude: addFormData.longitude || null,
     status: yr>=2026?"confirmed":"check",
     geprueft: false, inApp: false,
+    notiz: addFormData.notiz || '',
+    infoAusstehend: !!addFormData.infoAusstehend,
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   }).then(()=>closeAdd()).catch(e=>alert("Fehler: "+e.message));
 }
@@ -1710,7 +1787,19 @@ function renderBezirke() {
                 <button class="small" style="font-size:12px" onclick="event.stopPropagation();closeBezInlineAdd()">Abbrechen</button>
               </div>`:`
               <div style="font-size:11px;font-weight:600;color:var(--text-2);margin-bottom:8px">Account verknüpfen mit <strong>${esc(gem)}</strong></div>
-              <select onchange="event.stopPropagation();bezInlineLinkId=this.value" style="font-size:12px;padding:5px 9px;width:100%;margin-bottom:10px">${linkOpts}</select>
+              <input value="${esc(bezInlineLinkSearch)}" placeholder="Username oder Name suchen…" style="font-size:12px;padding:5px 9px;width:100%;box-sizing:border-box;margin-bottom:6px" oninput="event.stopPropagation();bezInlineLinkSearch=this.value;renderBezirke()">
+              ${(()=>{
+                const sq = bezInlineLinkSearch.toLowerCase();
+                const filtered = linkable.filter(a => !sq || (a.username||'').toLowerCase().includes(sq) || (a.displayName||'').toLowerCase().includes(sq) || (a.gemeinde||'').toLowerCase().includes(sq)).slice(0,8);
+                if (!filtered.length) return `<div style="font-size:12px;color:#999;padding:4px 0;margin-bottom:8px">${bezInlineLinkSearch?"Keine Accounts gefunden.":"Alle Accounts bereits verknüpft."}</div>`;
+                return `<div style="border:1px solid var(--border);border-radius:var(--rx);overflow:hidden;margin-bottom:10px">` +
+                  filtered.map(a => `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;cursor:pointer;background:${bezInlineLinkId===a._id?'var(--accent-soft)':'var(--surface)'};border-bottom:1px solid var(--border-sub)" onclick="event.stopPropagation();bezInlineLinkId='${a._id}';renderBezirke()">
+                    <span style="flex:1;font-weight:${bezInlineLinkId===a._id?'600':'400'}">@${esc(a.username||'')}</span>
+                    <span style="font-size:11px;color:var(--text-2)">${esc(a.displayName||'')}</span>
+                    <span style="font-size:11px;color:var(--text-3)">${esc(a.gemeinde||'—')}</span>
+                    ${bezInlineLinkId===a._id?`<span style="color:var(--accent);font-size:13px">✓</span>`:''}
+                  </div>`).join('') + `</div>`;
+              })()}
               <div style="display:flex;gap:8px">
                 <button class="small primary" style="font-size:12px" onclick="event.stopPropagation();linkExistingIgAccount('${gem}','${bez}')">Verknüpfen</button>
                 <button class="small" style="font-size:12px" onclick="event.stopPropagation();closeBezInlineAdd()">Abbrechen</button>
@@ -2503,17 +2592,19 @@ function closeBezInlineAdd() {
   bezInlineAddData = {};
   bezInlineMode = 'new';
   bezInlineLinkId = '';
+  bezInlineLinkSearch = '';
   renderBezirke();
 }
 
 async function linkExistingIgAccount(gem, bez) {
-  if (!bezInlineLinkId) { alert("Bitte einen Account auswählen."); return; }
+  if (!bezInlineLinkId) { alert("Bitte einen Account aus der Liste auswählen."); return; }
   try {
     await db.collection("ig_accounts").doc(bezInlineLinkId).update({ gemeinde: gem, bezirk: bez });
     bezInlineAddGem = null;
     bezInlineAddData = {};
     bezInlineMode = 'new';
     bezInlineLinkId = '';
+    bezInlineLinkSearch = '';
   } catch(e) { alert("Fehler: " + e.message); }
 }
 
