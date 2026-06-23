@@ -466,6 +466,7 @@ let pending = [];
 let curTab = "recherche";
 let selId = null;
 let appSortMode = "datum";
+let expandedIgIds = new Set();
 let editMode = false;
 let editData = {};
 let expandBez = {};
@@ -561,7 +562,10 @@ function initFS() {
         lat: data.latitude ?? data.lat ?? null,
         lng: data.longitude ?? data.lng ?? null,
         adresse: data.adresse || "",
-        createdAt: data.createdAt?.toMillis?.() || 0
+        createdAt: data.createdAt?.toMillis?.() || 0,
+        mgrSrcQuelleTyp: data.mgrSrcQuelleTyp || '',
+        mgrSrcQuelleLink: data.mgrSrcQuelleLink || '',
+        mgrSrcIgAccount: data.mgrSrcIgAccount || ''
       };
     });
     render();
@@ -1383,6 +1387,7 @@ function renderInApp() {
           <div style="flex:1;min-width:0">
             <div class="event-name">${esc(ev.name)}</div>
             <div class="event-meta">${esc(ev.gemeinde)}${ev.bezirk?" · "+esc(ev.bezirk):""}</div>
+            ${ev.mgrSrcIgAccount?`<div style="font-size:10px;color:#9D174D;margin-top:1px">📱 @${esc(ev.mgrSrcIgAccount)}</div>`:ev.mgrSrcQuelleTyp?`<div style="font-size:10px;color:#888;margin-top:1px">${{flyer:'📄 Flyer',web:'🌐 Web',instagram:'📱 Instagram'}[ev.mgrSrcQuelleTyp]||ev.mgrSrcQuelleTyp}</div>`:''}
           </div>
           <div class="event-date" style="color:${isPast(ev.datum)?"#e74c3c":"#555"}">${fmt(ev.datum)}</div>
         </div>`).join("")}
@@ -2054,6 +2059,7 @@ function openFlyerUpload(index) {
     igUsername: (ev.igUsername || '').replace(/^@/, '').trim(),
     igDisplayName: ev.igDisplayName || ev.veranstalter || '',
     igTyp: ev.igTyp || '',
+    quelleLink: ev.quelleLink || '',
   };
 
   const allOffen = flyerEvents.filter(e => e.status === "offen");
@@ -2109,6 +2115,7 @@ function submitFlyerUpload() {
     adresse: uploadData.adresse || uploadData.standort || '', bezirk: uploadData.bezirk || '',
     beschreibung: combinedBeschreibung, eintritt: uploadData.eintritt || '',
     typ: normalizeTyp(uploadData.typ), latitude: uploadData.latitude || null, longitude: uploadData.longitude || null,
+    mgrSrcQuelleTyp: 'flyer', mgrSrcQuelleLink: uploadData.quelleLink || '', mgrSrcIgAccount: uploadData.igUsername || '',
     id: _flyerRef.id, createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   }).then(() => {
     flyerEvents[flyerUploadIndex].status = "hochgeladen";
@@ -2165,6 +2172,8 @@ function openUpload(id) {
     beschreibung: ev.beschreibung || '',
     latitude: ev.latitude ?? ev.lat ?? null,
     longitude: ev.longitude ?? ev.lng ?? null,
+    quelleTyp: ev.quelleTyp || '',
+    quelleLink: ev.quelleLink || '',
   };
   document.getElementById('upload-form-content').innerHTML = uploadFormHTML();
   document.getElementById('up-eintritt').value = uploadData.eintritt;
@@ -2398,6 +2407,7 @@ function submitUpload() {
     typ: normalizeTyp(uploadData.typ),
     latitude: uploadData.latitude || null,
     longitude: uploadData.longitude || null,
+    mgrSrcQuelleTyp: uploadData.quelleTyp || '', mgrSrcQuelleLink: uploadData.quelleLink || '', mgrSrcIgAccount: '',
     id: _uploadRef.id,
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   }).then(() => db.collection('pending_events').doc(uploadPendingId).update({ inApp: true }))
@@ -2526,6 +2536,23 @@ const IG_STATUS_BADGE = {
   "nicht_relevant":"ig-irrelevant"
 };
 
+function toggleIgExpand(id) {
+  if (expandedIgIds.has(id)) expandedIgIds.delete(id);
+  else expandedIgIds.add(id);
+  renderAccounts();
+}
+
+function matchedAppEvents(acc) {
+  const gem = (acc.gemeinde || '').toLowerCase().trim();
+  if (!gem) return [];
+  return appEvents.filter(ev => {
+    if (acc.username && ev.mgrSrcIgAccount === acc.username) return true;
+    if ((ev.gemeinde || '').toLowerCase() === gem) return true;
+    if (gem.length >= 4 && (ev.name || '').toLowerCase().includes(gem)) return true;
+    return false;
+  });
+}
+
 function renderAccounts() {
   let accs = [...igAccounts];
   if(igFilterStatus!=="Alle") accs=accs.filter(a=>a.status===igFilterStatus);
@@ -2603,12 +2630,17 @@ function renderAccounts() {
           </td>
           <td>
             <div style="display:flex;gap:4px;flex-wrap:nowrap">
+              <button class="small" onclick="toggleIgExpand('${a._id}')" title="Events anzeigen" style="${expandedIgIds.has(a._id)?'background:var(--accent);color:#fff;border-color:var(--accent)':''}">${expandedIgIds.has(a._id)?'▲':'▼'}</button>
               <button class="small" onclick="openIgEdit('${a._id}')" title="Bearbeiten">✏</button>
               ${a.status==="termin_gefunden"?`<button class="small primary" style="font-size:11px;padding:3px 8px;white-space:nowrap" onclick="igEventUebernehmen('${a._id}')">→ Event</button>`:""}
               <button class="small danger" onclick="delIgAccount('${a._id}')">🗑</button>
             </div>
           </td>
-        </tr>`;
+        </tr>${expandedIgIds.has(a._id)?`<tr><td colspan="9" style="padding:0;background:var(--surface-2);border-bottom:2px solid var(--border)">${(()=>{
+          const evs=matchedAppEvents(a);
+          if(!evs.length) return '<div style="padding:8px 16px;font-size:12px;color:#999">Keine passenden In-App-Events gefunden.</div>';
+          return '<div style="padding:4px 8px">' + evs.map(ev=>`<div style="display:flex;align-items:center;gap:8px;padding:4px 6px;font-size:12px;border-radius:4px">${typBadge(ev.typ)}<span style="flex:1;font-weight:500">${esc(ev.name)}</span><span style="color:#888;white-space:nowrap">${fmt(ev.datum)}</span></div>`).join('') + '</div>';
+        })()}</td></tr>`:''}`;
       }
     }
   }
@@ -2617,7 +2649,7 @@ function renderAccounts() {
     for (const a of unknownBez) {
       const terminFarbe=a.status==="termin_gefunden"?"#27AE60":"var(--text-2)";
       tableHtml += `<tr>
-        <td><span class="ig-username">@${esc(a.username||"")}</span></td>
+        <td><a class="ig-username" href="https://www.instagram.com/${esc(a.username||"")}/" target="_blank" rel="noopener">@${esc(a.username||"")}</a></td>
         <td>${esc(a.displayName||"")}</td>
         <td>${esc(a.vereinsTyp||"")}</td>
         <td>${esc(a.gemeinde||"")}</td>
@@ -2625,8 +2657,18 @@ function renderAccounts() {
         <td style="font-size:12px;color:${terminFarbe}">${esc(a.letzterTermin||"—")}</td>
         <td style="font-size:12px;color:var(--text-2)">${esc(a.letzteEventNamen||"")}</td>
         <td></td>
-        <td><button class="small" onclick="openIgEdit('${a._id}')">✏</button> <button class="small danger" onclick="delIgAccount('${a._id}')">🗑</button></td>
-      </tr>`;
+        <td>
+          <div style="display:flex;gap:4px;flex-wrap:nowrap">
+            <button class="small" onclick="toggleIgExpand('${a._id}')" style="${expandedIgIds.has(a._id)?'background:var(--accent);color:#fff;border-color:var(--accent)':''}">${expandedIgIds.has(a._id)?'▲':'▼'}</button>
+            <button class="small" onclick="openIgEdit('${a._id}')">✏</button>
+            <button class="small danger" onclick="delIgAccount('${a._id}')">🗑</button>
+          </div>
+        </td>
+      </tr>${expandedIgIds.has(a._id)?`<tr><td colspan="9" style="padding:0;background:var(--surface-2);border-bottom:2px solid var(--border)">${(()=>{
+        const evs=matchedAppEvents(a);
+        if(!evs.length) return '<div style="padding:8px 16px;font-size:12px;color:#999">Keine passenden In-App-Events gefunden.</div>';
+        return '<div style="padding:4px 8px">'+evs.map(ev=>`<div style="display:flex;align-items:center;gap:8px;padding:4px 6px;font-size:12px;border-radius:4px">${typBadge(ev.typ)}<span style="flex:1;font-weight:500">${esc(ev.name)}</span><span style="color:#888;white-space:nowrap">${fmt(ev.datum)}</span></div>`).join('')+'</div>';
+      })()}</td></tr>`:''}`;
     }
   }
   if (!tableHtml) {
