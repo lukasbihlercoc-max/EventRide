@@ -498,6 +498,8 @@ let igFilterKI = false;
 let igBezOpen = {};
 let bezInlineAddGem = null;
 let bezInlineAddData = {};
+let bezInlineMode = 'new';
+let bezInlineLinkId = '';
 let multiConfirmedIds = new Set();
 let gemeindeMeta = {};
 
@@ -1671,7 +1673,15 @@ function renderBezirke() {
           if (isAddingAcc) {
             const tOpts=IG_TYPEN.map(t=>`<option value="${t}" ${bezInlineAddData.vereinsTyp===t?"selected":""}>${t}</option>`).join("");
             const sOpts=IG_STATUS_LIST.map(([v,l])=>`<option value="${v}" ${bezInlineAddData.status===v?"selected":""}>${l}</option>`).join("");
+            const alreadyLinked = new Set((gemAccounts||[]).map(a=>a._id));
+            const linkable = igAccounts.filter(a=>!alreadyLinked.has(a._id)).sort((a,b)=>(a.displayName||a.username||"").localeCompare(b.displayName||b.username||""));
+            const linkOpts = `<option value="">– Account wählen –</option>` + linkable.map(a=>`<option value="${a._id}" ${bezInlineLinkId===a._id?"selected":""}>${esc((a.displayName||"@"+a.username)+(a.gemeinde?" ("+a.gemeinde+")":""))}</option>`).join("");
             html += `<div class="bez-inline-add">
+              <div style="display:flex;gap:0;margin-bottom:10px;border-radius:6px;overflow:hidden;border:1px solid var(--border)">
+                <button onclick="event.stopPropagation();bezInlineMode='new';renderBezirke()" style="flex:1;padding:5px;font-size:12px;border:none;border-radius:0;background:${bezInlineMode==='new'?'var(--accent)':'var(--surface-2)'};color:${bezInlineMode==='new'?'#fff':'var(--text-2)'};cursor:pointer">Neu anlegen</button>
+                <button onclick="event.stopPropagation();bezInlineMode='existing';renderBezirke()" style="flex:1;padding:5px;font-size:12px;border:none;border-radius:0;background:${bezInlineMode==='existing'?'var(--accent)':'var(--surface-2)'};color:${bezInlineMode==='existing'?'#fff':'var(--text-2)'};cursor:pointer">Bestehenden wählen</button>
+              </div>
+              ${bezInlineMode==='new'?`
               <div style="font-size:11px;font-weight:600;color:var(--text-2);margin-bottom:8px">Neuer Account für <strong>${esc(gem)}</strong></div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
                 <div>
@@ -1698,7 +1708,13 @@ function renderBezirke() {
               <div style="display:flex;gap:8px">
                 <button class="small primary" style="font-size:12px" onclick="event.stopPropagation();saveBezInlineAdd('${gKey}')">Hinzufügen</button>
                 <button class="small" style="font-size:12px" onclick="event.stopPropagation();closeBezInlineAdd()">Abbrechen</button>
-              </div>
+              </div>`:`
+              <div style="font-size:11px;font-weight:600;color:var(--text-2);margin-bottom:8px">Account verknüpfen mit <strong>${esc(gem)}</strong></div>
+              <select onchange="event.stopPropagation();bezInlineLinkId=this.value" style="font-size:12px;padding:5px 9px;width:100%;margin-bottom:10px">${linkOpts}</select>
+              <div style="display:flex;gap:8px">
+                <button class="small primary" style="font-size:12px" onclick="event.stopPropagation();linkExistingIgAccount('${gem}','${bez}')">Verknüpfen</button>
+                <button class="small" style="font-size:12px" onclick="event.stopPropagation();closeBezInlineAdd()">Abbrechen</button>
+              </div>`}
             </div>`;
           }
 
@@ -2476,6 +2492,8 @@ async function toggleGemeindeMeta(gem, bez) {
 function openBezInlineAdd(gem, bez, gKey) {
   bezInlineAddGem = gKey;
   bezInlineAddData = {username:"", displayName:"", vereinsTyp:"Zechgemeinschaft", status:"offen", gemeinde:gem, bezirk:bez, kiRecherche:false};
+  bezInlineMode = 'new';
+  bezInlineLinkId = '';
   expandGem[gKey] = true;
   renderBezirke();
 }
@@ -2483,7 +2501,20 @@ function openBezInlineAdd(gem, bez, gKey) {
 function closeBezInlineAdd() {
   bezInlineAddGem = null;
   bezInlineAddData = {};
+  bezInlineMode = 'new';
+  bezInlineLinkId = '';
   renderBezirke();
+}
+
+async function linkExistingIgAccount(gem, bez) {
+  if (!bezInlineLinkId) { alert("Bitte einen Account auswählen."); return; }
+  try {
+    await db.collection("ig_accounts").doc(bezInlineLinkId).update({ gemeinde: gem, bezirk: bez });
+    bezInlineAddGem = null;
+    bezInlineAddData = {};
+    bezInlineMode = 'new';
+    bezInlineLinkId = '';
+  } catch(e) { alert("Fehler: " + e.message); }
 }
 
 async function saveBezInlineAdd(gKey) {
