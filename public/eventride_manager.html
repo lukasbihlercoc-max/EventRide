@@ -593,6 +593,8 @@ function parseDatum(s) {
   if(m) return new Date(+m[3], +m[2]-1, +m[1]);
   m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if(m) return new Date(+m[1], +m[2]-1, +m[3]);
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})T/);
+  if(m) return new Date(+m[1], +m[2]-1, +m[3]);
   return null;
 }
 function fmt(s) {
@@ -2033,8 +2035,8 @@ function openFlyerUpload(index) {
     bezirk: ev.bezirk || '', typ: normalizeTyp(ev.typ),
     eintritt: (ev.eintritt === 'k.A.' ? '' : ev.eintritt) || '',
     beschreibung: ev.beschreibung || '',
-    lat: ev.latitude ?? ev.lat ?? null,
-    lng: ev.longitude ?? ev.lng ?? null,
+    latitude: ev.latitude ?? ev.lat ?? null,
+    longitude: ev.longitude ?? ev.lng ?? null,
   };
 
   const allOffen = flyerEvents.filter(e => e.status === "offen");
@@ -2074,8 +2076,14 @@ function submitFlyerUpload() {
   btn.disabled = true; btn.textContent = '⏳ Speichert…';
   const eintrittText = uploadData.eintritt.trim();
   const beschreibungText = uploadData.beschreibung.trim();
-  const combinedBeschreibung = eintrittText && beschreibungText
-    ? eintrittText + '\n\n' + beschreibungText : eintrittText || beschreibungText;
+  const _flyerParts = [];
+  if (eintrittText) {
+    const _eLines = eintrittText.split('\n').map(l => l.trim()).filter(Boolean);
+    _flyerParts.push('Eintritt:\n' + _eLines.map(l => /€/.test(l) ? l : l + ' €').join('\n'));
+  }
+  _flyerParts.push('Einlass ab: ' + uhr + ' Uhr');
+  if (beschreibungText) _flyerParts.push(beschreibungText);
+  const combinedBeschreibung = _flyerParts.join('\n\n');
 
   const _flyerRef = db.collection('events').doc();
   _flyerRef.set({
@@ -2083,7 +2091,7 @@ function submitFlyerUpload() {
     standort: uploadData.standort, gemeinde: uploadData.standort,
     adresse: uploadData.adresse || uploadData.standort || '', bezirk: uploadData.bezirk || '',
     beschreibung: combinedBeschreibung, eintritt: uploadData.eintritt || '',
-    typ: normalizeTyp(uploadData.typ), latitude: uploadData.lat || null, longitude: uploadData.lng || null,
+    typ: normalizeTyp(uploadData.typ), latitude: uploadData.latitude || null, longitude: uploadData.longitude || null,
     id: _flyerRef.id, createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   }).then(() => {
     flyerEvents[flyerUploadIndex].status = "hochgeladen";
@@ -2186,7 +2194,7 @@ function uploadFormHTML() {
     <div>
       <input id="up-adresse" value="${esc(uploadData.adresse)}" placeholder="Adresse eingeben (Maps-Vorschläge)" oninput="uploadData.adresse=this.value;document.getElementById('up-no-coords-warn').style.display=this.value?'block':'none'">
       <div id="up-coords" style="font-size:11px;color:#27AE60;margin-top:3px;display:${uploadData.latitude?'block':'none'}">📍 <span id="up-coords-text">${uploadData.latitude?uploadData.latitude.toFixed(5)+', '+uploadData.longitude.toFixed(5):''}</span></div>
-      <div id="up-no-coords-warn" style="font-size:11px;color:#7A4A00;background:#FFFBF0;border:1px solid #FAC775;border-radius:6px;padding:5px 8px;margin-top:4px;display:${uploadData.adresse&&!uploadData.lat?'block':'none'}">⚠ Einen Vorschlag aus der Liste auswählen – erst dann werden Koordinaten gesetzt</div>
+      <div id="up-no-coords-warn" style="font-size:11px;color:#7A4A00;background:#FFFBF0;border:1px solid #FAC775;border-radius:6px;padding:5px 8px;margin-top:4px;display:${uploadData.adresse&&!uploadData.latitude?'block':'none'}">⚠ Einen Vorschlag aus der Liste auswählen – erst dann werden Koordinaten gesetzt</div>
     </div>
     <span class="edit-label" style="color:#bbb;font-size:11px">oder Koord.</span>
     <div>
@@ -2331,9 +2339,14 @@ function submitUpload() {
   btn.textContent = '⏳ Speichert…';
   const eintrittText = uploadData.eintritt.trim();
   const beschreibungText = uploadData.beschreibung.trim();
-  const combinedBeschreibung = eintrittText && beschreibungText
-    ? eintrittText + '\n\n' + beschreibungText
-    : eintrittText || beschreibungText;
+  const _uploadParts = [];
+  if (eintrittText) {
+    const _eLines = eintrittText.split('\n').map(l => l.trim()).filter(Boolean);
+    _uploadParts.push('Eintritt:\n' + _eLines.map(l => /€/.test(l) ? l : l + ' €').join('\n'));
+  }
+  _uploadParts.push('Einlass ab: ' + uhr + ' Uhr');
+  if (beschreibungText) _uploadParts.push(beschreibungText);
+  const combinedBeschreibung = _uploadParts.join('\n\n');
 
   const _uploadRef = db.collection('events').doc();
   _uploadRef.set({
