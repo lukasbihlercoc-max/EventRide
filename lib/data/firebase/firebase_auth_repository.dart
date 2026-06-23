@@ -415,7 +415,15 @@ class FirebaseAuthRepository implements IAuthRepository {
   Future<void> sendEmailVerification() async {
     final user = _auth.currentUser;
     if (user == null) return;
-    await user.sendEmailVerification();
+    await user.sendEmailVerification(
+      ActionCodeSettings(
+        url: 'https://eventride.at/auth/email-action.html',
+        handleCodeInApp: true,
+        iOSBundleId: 'at.eventride.app',
+        androidPackageName: 'at.eventride.app',
+        androidInstallApp: false,
+      ),
+    );
   }
 
   @override
