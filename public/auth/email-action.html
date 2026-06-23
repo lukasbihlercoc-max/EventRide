@@ -92,7 +92,8 @@
       color: rgba(255,255,255,0.4);
     }
 
-    #state-loading { display: block; }
+    #state-ready   { display: block; }
+    #state-loading { display: none; }
     #state-success { display: none; }
     #state-error   { display: none; }
     #state-invalid { display: none; }
@@ -102,10 +103,18 @@
 <div class="card">
   <div class="logo">EventRide</div>
 
+  <!-- Warten auf Klick -->
+  <div id="state-ready">
+    <div class="icon">✉️</div>
+    <h1>E-Mail bestätigen</h1>
+    <p>Klicke auf den Button um deine E-Mail-Adresse zu bestätigen.</p>
+    <button class="btn" onclick="verify()">Jetzt bestätigen</button>
+  </div>
+
   <!-- Loading -->
   <div id="state-loading">
     <div class="spinner"></div>
-    <h1>E-Mail wird bestätigt …</h1>
+    <h1>Wird bestätigt …</h1>
     <p>Bitte warte einen Moment.</p>
   </div>
 
@@ -114,8 +123,8 @@
     <div class="icon">✅</div>
     <h1>E-Mail bestätigt!</h1>
     <p>Deine E-Mail-Adresse wurde erfolgreich verifiziert.</p>
-    <p style="margin-top:8px">Du kannst jetzt die EventRide App verwenden.</p>
-    <p class="hint">Du kannst dieses Fenster schließen und zur App zurückkehren.</p>
+    <p style="margin-top:8px">Geh zurück zur EventRide App – du wirst automatisch weitergeleitet.</p>
+    <p class="hint">Du kannst dieses Fenster schließen.</p>
   </div>
 
   <!-- Error: already used / expired -->
@@ -124,18 +133,17 @@
     <h1>Link ungültig</h1>
     <p>Dieser Link wurde bereits verwendet oder ist abgelaufen.</p>
     <p style="margin-top:10px">
-      Falls du dich in der App bereits registriert hast, öffne die EventRide App –
-      wenn deine E-Mail schon bestätigt wurde, wirst du automatisch weitergeleitet.
-      Andernfalls kannst du in der App eine neue Bestätigungs-E-Mail anfordern.
+      Öffne die EventRide App und fordere eine neue Bestätigungs-E-Mail an.
+      Falls deine E-Mail schon bestätigt wurde, wirst du in der App automatisch weitergeleitet.
     </p>
     <p class="hint" id="error-detail"></p>
   </div>
 
-  <!-- Invalid URL (no oobCode / wrong mode) -->
+  <!-- Invalid URL -->
   <div id="state-invalid">
     <div class="icon">🔗</div>
     <h1>Ungültiger Link</h1>
-    <p>Dieser Link ist nicht gültig. Bitte öffne den Link direkt aus der Bestätigungs-E-Mail.</p>
+    <p>Bitte öffne den Link direkt aus der Bestätigungs-E-Mail von EventRide.</p>
   </div>
 </div>
 
@@ -156,7 +164,7 @@
   const auth = getAuth(app);
 
   function show(id) {
-    ["state-loading","state-success","state-error","state-invalid"]
+    ["state-ready","state-loading","state-success","state-error","state-invalid"]
       .forEach(s => document.getElementById(s).style.display = s === id ? "block" : "none");
   }
 
@@ -164,9 +172,13 @@
   const mode    = params.get("mode");
   const oobCode = params.get("oobCode");
 
-  if (oobCode && mode === "verifyEmail") {
-    // Direkter Aufruf als Custom Action URL (Firebase Console-Einstellung)
-    // → oobCode aus E-Mail-Link, Seite übernimmt die Verifikation
+  if (!oobCode || mode !== "verifyEmail") {
+    show("state-invalid");
+  }
+  // oobCode vorhanden → Button wird angezeigt, Verifikation erst bei Klick
+
+  window.verify = function() {
+    show("state-loading");
     applyActionCode(auth, oobCode)
       .then(() => show("state-success"))
       .catch(err => {
@@ -174,11 +186,7 @@
         const detail = document.getElementById("error-detail");
         if (err && err.code) detail.textContent = "(Code: " + err.code + ")";
       });
-  } else {
-    // Aufruf als continueUrl nach erfolgreicher Verifikation durch Firebase
-    // (kein oobCode vorhanden, Firebase hat den Code bereits verarbeitet)
-    show("state-success");
-  }
+  };
 </script>
 </body>
 </html>

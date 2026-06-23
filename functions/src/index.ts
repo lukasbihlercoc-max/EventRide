@@ -2,6 +2,7 @@ import * as admin from "firebase-admin";
 import {onDocumentCreated, onDocumentUpdated, onDocumentDeleted, onDocumentWritten} from "firebase-functions/v2/firestore";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {onSchedule} from "firebase-functions/v2/scheduler";
+import * as nodemailer from "nodemailer";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -814,5 +815,91 @@ export const cleanupAbgelaufeneEvents = onSchedule(
     }
 
     console.log(`[cleanupAbgelaufeneEvents] ${eventsSnap.size} Events + verknüpfte Daten gelöscht`);
+  }
+);
+
+// ──────────────────────────────────────────────────────────────────────────────
+// E-Mail-Verifikation (eigener Versand, umgeht Firebase Console)
+// ──────────────────────────────────────────────────────────────────────────────
+
+export const sendVerificationEmail = onCall(async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Nicht eingeloggt");
+    }
+
+    const uid = request.auth.uid;
+    const userRecord = await admin.auth().getUser(uid);
+    const email = userRecord.email;
+
+    if (!email) throw new HttpsError("not-found", "Keine E-Mail-Adresse");
+    if (userRecord.emailVerified) return {alreadyVerified: true};
+
+    // Firebase Admin generiert den oobCode – wir bauen daraus unsere eigene URL
+    const firebaseLink = await admin.auth().generateEmailVerificationLink(email, {
+      url: "https://eventride.at/auth/email-action.html",
+    });
+
+    const linkUrl = new URL(firebaseLink);
+    const oobCode = linkUrl.searchParams.get("oobCode") ?? "";
+    const apiKey = linkUrl.searchParams.get("apiKey") ?? "";
+
+    const verifyUrl =
+      `https://eventride.at/auth/email-action.html` +
+      `?mode=verifyEmail&oobCode=${encodeURIComponent(oobCode)}&apiKey=${encodeURIComponent(apiKey)}`;
+
+    const transporter = nodemailer.createTransport({
+      host: "smtp.world4you.com",
+      port: 587,
+      secure: false,
+      auth: {
+        user: "kontakt@eventride.at",
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    const htmlBody = `
+<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#0d1b3e;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0d1b3e;padding:40px 16px">
+    <tr><td align="center">
+      <table width="100%" style="max-width:480px;background:rgba(255,255,255,0.07);border-radius:20px;border:1px solid rgba(255,255,255,0.12);padding:40px 32px">
+        <tr><td align="center" style="padding-bottom:24px">
+          <span style="font-size:26px;font-weight:700;color:#52A1EF;letter-spacing:-0.5px">EventRide</span>
+        </td></tr>
+        <tr><td align="center" style="padding-bottom:12px">
+          <p style="font-size:22px;font-weight:600;color:#ffffff;margin:0">E-Mail bestätigen</p>
+        </td></tr>
+        <tr><td align="center" style="padding-bottom:28px">
+          <p style="font-size:15px;color:rgba(255,255,255,0.65);line-height:1.6;margin:0">
+            Klicke auf den Button um deine E-Mail-Adresse zu bestätigen<br>und EventRide zu nutzen.
+          </p>
+        </td></tr>
+        <tr><td align="center" style="padding-bottom:28px">
+          <a href="${verifyUrl}" style="display:inline-block;padding:16px 40px;background:linear-gradient(135deg,#52A1EF,#406CFB);color:#ffffff;border-radius:12px;font-size:16px;font-weight:600;text-decoration:none">
+            E-Mail bestätigen
+          </a>
+        </td></tr>
+        <tr><td align="center">
+          <p style="font-size:12px;color:rgba(255,255,255,0.35);line-height:1.5;margin:0">
+            Falls du dich nicht bei EventRide registriert hast, kannst du diese E-Mail ignorieren.<br>
+            Der Link ist 24 Stunden gültig.
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+    await transporter.sendMail({
+      from: '"EventRide" <kontakt@eventride.at>',
+      to: email,
+      subject: "EventRide – Bitte bestätige deine E-Mail-Adresse",
+      html: htmlBody,
+    });
+
+    return {success: true};
   }
 );

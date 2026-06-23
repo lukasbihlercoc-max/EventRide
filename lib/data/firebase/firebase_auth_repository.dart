@@ -4,6 +4,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:my_app/data/app_user.dart';
@@ -415,15 +416,8 @@ class FirebaseAuthRepository implements IAuthRepository {
   Future<void> sendEmailVerification() async {
     final user = _auth.currentUser;
     if (user == null) return;
-    await user.sendEmailVerification(
-      ActionCodeSettings(
-        url: 'https://eventride.at/auth/email-action.html',
-        handleCodeInApp: true,
-        iOSBundleId: 'at.eventride.app',
-        androidPackageName: 'at.eventride.app',
-        androidInstallApp: false,
-      ),
-    );
+    final fn = FirebaseFunctions.instance.httpsCallable('sendVerificationEmail');
+    await fn.call();
   }
 
   @override
