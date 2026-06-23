@@ -18,18 +18,21 @@ class EmailVerificationPage extends StatefulWidget {
 }
 
 class _EmailVerificationPageState extends State<EmailVerificationPage>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   bool _isResending = false;
   bool _resentSuccess = false;
   late String _currentEmail;
   final _scrollController = ScrollController();
   Timer? _autoCheckTimer;
+  Timer? _cooldownTimer;
+  int _cooldownSec = 0;
   late AnimationController _dotController;
 
   @override
   void initState() {
     super.initState();
     _currentEmail = widget.email;
+    WidgetsBinding.instance.addObserver(this);
     _dotController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
@@ -48,11 +51,38 @@ class _EmailVerificationPageState extends State<EmailVerificationPage>
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      context.read<IAuthRepository>().reloadAndCheckEmailVerified().then((verified) {
+        if (!mounted) return;
+        if (verified) {
+          _autoCheckTimer?.cancel();
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
+      }).catchError((_) {});
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _dotController.dispose();
     _autoCheckTimer?.cancel();
+    _cooldownTimer?.cancel();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _startCooldown() {
+    _cooldownSec = 90;
+    _cooldownTimer?.cancel();
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) { t.cancel(); return; }
+      setState(() {
+        _cooldownSec--;
+        if (_cooldownSec <= 0) t.cancel();
+      });
+    });
   }
 
   Future<void> _resendEmail() async {
@@ -62,7 +92,10 @@ class _EmailVerificationPageState extends State<EmailVerificationPage>
     });
     try {
       await context.read<IAuthRepository>().sendEmailVerification();
-      if (mounted) setState(() => _resentSuccess = true);
+      if (mounted) {
+        setState(() => _resentSuccess = true);
+        _startCooldown();
+      }
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
       AppSnackbar.show(
@@ -240,13 +273,36 @@ class _EmailVerificationPageState extends State<EmailVerificationPage>
                       ],
                     ),
                   ),
+                  SizedBox(height: SizeHelper.h(context, 0.02)),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.blueAccent.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blueAccent.withValues(alpha: 0.30)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Icon(Icons.info_outline, color: Colors.blueAccent, size: 18),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Falls der Browser einen Fehler zeigt: Komm einfach zurück zur App – '
+                            'die Bestätigung kann trotzdem geklappt haben. Die App prüft automatisch.',
+                            style: TextStyle(color: Colors.blueAccent, fontSize: 13, height: 1.4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   SizedBox(height: SizeHelper.h(context, 0.04)),
                   _buildWaitingIndicator(),
                   const SizedBox(height: 28),
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton(
-                      onPressed: _isResending ? null : _resendEmail,
+                      onPressed: (_isResending || _cooldownSec > 0) ? null : _resendEmail,
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.white70,
                         side: const BorderSide(color: Colors.white30),
@@ -265,9 +321,11 @@ class _EmailVerificationPageState extends State<EmailVerificationPage>
                               ),
                             )
                           : Text(
-                              _resentSuccess
-                                  ? 'E-Mail erneut gesendet'
-                                  : 'E-Mail erneut senden',
+                              _cooldownSec > 0
+                                  ? 'Erneut senden (${_cooldownSec}s)'
+                                  : _resentSuccess
+                                      ? 'E-Mail erneut gesendet'
+                                      : 'E-Mail erneut senden',
                               style: const TextStyle(fontSize: 16),
                             ),
                     ),

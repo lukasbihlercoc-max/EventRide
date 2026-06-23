@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EventRide – E-Mail bestätigen</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(160deg, #1a1228 0%, #0d1b3e 55%, #0a1a3a 100%);
+      color: #fff;
+      padding: 24px;
+    }
+
+    .card {
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 20px;
+      padding: 40px 32px;
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+      backdrop-filter: blur(12px);
+    }
+
+    .logo {
+      font-size: 28px;
+      font-weight: 700;
+      background: linear-gradient(90deg, #B79B78, #52A1EF, #406CFB);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 28px;
+      letter-spacing: -0.5px;
+    }
+
+    .icon {
+      font-size: 64px;
+      margin-bottom: 20px;
+      line-height: 1;
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #fff;
+    }
+
+    p {
+      font-size: 15px;
+      color: rgba(255,255,255,0.65);
+      line-height: 1.6;
+      margin-bottom: 8px;
+    }
+
+    .spinner {
+      width: 44px;
+      height: 44px;
+      border: 3px solid rgba(255,255,255,0.15);
+      border-top-color: #52A1EF;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .btn {
+      display: inline-block;
+      margin-top: 24px;
+      padding: 14px 32px;
+      background: linear-gradient(135deg, #52A1EF, #406CFB);
+      color: #fff;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+    }
+
+    .hint {
+      margin-top: 16px;
+      font-size: 13px;
+      color: rgba(255,255,255,0.4);
+    }
+
+    #state-loading { display: block; }
+    #state-success { display: none; }
+    #state-error   { display: none; }
+    #state-invalid { display: none; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">EventRide</div>
+
+  <!-- Loading -->
+  <div id="state-loading">
+    <div class="spinner"></div>
+    <h1>E-Mail wird bestätigt …</h1>
+    <p>Bitte warte einen Moment.</p>
+  </div>
+
+  <!-- Success -->
+  <div id="state-success">
+    <div class="icon">✅</div>
+    <h1>E-Mail bestätigt!</h1>
+    <p>Deine E-Mail-Adresse wurde erfolgreich verifiziert.</p>
+    <p style="margin-top:8px">Du kannst jetzt die EventRide App verwenden.</p>
+    <p class="hint">Du kannst dieses Fenster schließen und zur App zurückkehren.</p>
+  </div>
+
+  <!-- Error: already used / expired -->
+  <div id="state-error">
+    <div class="icon">⚠️</div>
+    <h1>Link ungültig</h1>
+    <p>Dieser Link wurde bereits verwendet oder ist abgelaufen.</p>
+    <p style="margin-top:10px">
+      Falls du dich in der App bereits registriert hast, öffne die EventRide App –
+      wenn deine E-Mail schon bestätigt wurde, wirst du automatisch weitergeleitet.
+      Andernfalls kannst du in der App eine neue Bestätigungs-E-Mail anfordern.
+    </p>
+    <p class="hint" id="error-detail"></p>
+  </div>
+
+  <!-- Invalid URL (no oobCode / wrong mode) -->
+  <div id="state-invalid">
+    <div class="icon">🔗</div>
+    <h1>Ungültiger Link</h1>
+    <p>Dieser Link ist nicht gültig. Bitte öffne den Link direkt aus der Bestätigungs-E-Mail.</p>
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getAuth, applyActionCode } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBAq6FHDB3s_mWcE7ZSNifhSiOxUWrxQac",
+    authDomain: "eventride-cd0e9.firebaseapp.com",
+    projectId: "eventride-cd0e9",
+    storageBucket: "eventride-cd0e9.firebasestorage.app",
+    messagingSenderId: "686951435694",
+    appId: "1:686951435694:web:b7ebb9bded06f1fa7e4c3f"
+  };
+
+  const app  = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+
+  function show(id) {
+    ["state-loading","state-success","state-error","state-invalid"]
+      .forEach(s => document.getElementById(s).style.display = s === id ? "block" : "none");
+  }
+
+  const params  = new URLSearchParams(window.location.search);
+  const mode    = params.get("mode");
+  const oobCode = params.get("oobCode");
+
+  if (mode !== "verifyEmail" || !oobCode) {
+    show("state-invalid");
+  } else {
+    applyActionCode(auth, oobCode)
+      .then(() => show("state-success"))
+      .catch(err => {
+        show("state-error");
+        const detail = document.getElementById("error-detail");
+        if (err && err.code) detail.textContent = "(Code: " + err.code + ")";
+      });
+  }
+</script>
+</body>
+</html>
