@@ -1900,6 +1900,7 @@ function importFlyerCSV() {
   const iN=exactIdx("name"),iD=exactIdx("datum"),iU=exactIdx("uhrzeit"),iG=exactIdx("gemeinde"),
         iB=exactIdx("bezirk"),iA=exactIdx("adresse"),iV=exactIdx("veranstalter"),iE=exactIdx("eintritt"),iT=exactIdx("typ"),iQ=exactIdx("quelle"),iDesc=exactIdx("beschreibung");
   const iQT=exactIdx("quelletyp"),iQL=exactIdx("quellelink"),iSZ=exactIdx("srczitat"),iSich=exactIdx("sicherheit");
+  const iIgUser=exactIdx("igusername"),iIgName=exactIdx("igdisplayname"),iIgTyp=exactIdx("igtyp");
   if (iN < 0 || iD < 0) { showToast("Spalten 'name' und 'datum' fehlen.", false); return; }
 
   let imported = 0, dupes = 0;
@@ -1942,6 +1943,9 @@ function importFlyerCSV() {
       quelleLink: iQL>=0?(c[iQL]||"").trim():"",
       srcZitat: iSZ>=0?(c[iSZ]||"").trim():"",
       sicherheit: iSich>=0&&(c[iSich]||"").trim()==="sicher"?"sicher":"mittel",
+      igUsername: iIgUser>=0?(c[iIgUser]||"").trim().replace(/^@/,""):"",
+      igDisplayName: iIgName>=0?(c[iIgName]||"").trim():"",
+      igTyp: iIgTyp>=0?(c[iIgTyp]||"").trim():"",
       status: "offen"
     });
     imported++;
@@ -2037,6 +2041,9 @@ function openFlyerUpload(index) {
     beschreibung: ev.beschreibung || '',
     latitude: ev.latitude ?? ev.lat ?? null,
     longitude: ev.longitude ?? ev.lng ?? null,
+    igUsername: (ev.igUsername || '').replace(/^@/, '').trim(),
+    igDisplayName: ev.igDisplayName || ev.veranstalter || '',
+    igTyp: ev.igTyp || '',
   };
 
   const allOffen = flyerEvents.filter(e => e.status === "offen");
@@ -2208,7 +2215,26 @@ function uploadFormHTML() {
     <textarea id="up-eintritt" rows="2" placeholder="z.B. VVK: 15 €&#10;AK: 18 €" oninput="uploadData.eintritt=this.value" style="font-size:12px;padding:7px 10px"></textarea>
     <span class="edit-label">Beschreibung</span>
     <textarea id="up-beschreibung" rows="2" oninput="uploadData.beschreibung=this.value" style="font-size:12px;padding:7px 10px"></textarea>
-  </div>`;
+  </div>${uploadData.igUsername ? (() => {
+    const exists = igAccounts.some(a => a.username === uploadData.igUsername);
+    const bez = uploadData.bezirk || deriveBezirkFromGemeinde(uploadData.standort) || '';
+    const dispEsc = esc(uploadData.igDisplayName || uploadData.igUsername);
+    const userEsc = esc(uploadData.igUsername);
+    const prefillEsc = uploadData.igUsername.replace(/'/g,"\\'");
+    const gemEsc = (uploadData.standort||'').replace(/'/g,"\\'");
+    const bezEsc = bez.replace(/'/g,"\\'");
+    return `<div style="margin-top:12px;padding:10px 12px;background:var(--surface-2);border-radius:var(--rx);display:flex;align-items:center;gap:10px">
+      <span style="font-size:18px;flex-shrink:0">📱</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:600">@${userEsc}</div>
+        ${dispEsc !== userEsc ? `<div style="font-size:11px;color:var(--text-2)">${dispEsc}</div>` : ''}
+      </div>
+      ${exists
+        ? `<span style="font-size:11px;color:#27AE60;font-weight:600;flex-shrink:0">✓ In Accounts</span>`
+        : `<button class="small" style="flex-shrink:0;color:var(--blue-t);border-color:rgba(9,105,218,.2);background:var(--blue-bg)" onclick="openQuickIgAdd('${gemEsc}','${bezEsc}','${prefillEsc}')">+ Account</button>`
+      }
+    </div>`;
+  })() : ''}`;
 }
 
 function initUploadAutocomplete() {
