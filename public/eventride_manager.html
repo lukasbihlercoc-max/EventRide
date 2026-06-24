@@ -2092,11 +2092,13 @@ function flyerListHTML() {
   if (flyerEvents.length === 0) return "";
   const offen = flyerEvents.filter(e => e.status === "offen").length;
   const hochgeladen = flyerEvents.filter(e => e.status === "hochgeladen").length;
+  const ausstehend = flyerEvents.filter(e => e.status === "ausstehend").length;
   const uebersprungen = flyerEvents.filter(e => e.status === "übersprungen").length;
 
   const rows = flyerEvents.map((ev, i) => {
     const past = isPast(ev.datum);
-    const statusColor = ev.status === "hochgeladen" ? "#27AE60" : ev.status === "übersprungen" ? "#bbb" : "#E88C2E";
+    const statusColor = ev.status === "hochgeladen" ? "#27AE60" : ev.status === "ausstehend" ? "#D98D00" : ev.status === "übersprungen" ? "#bbb" : "#E88C2E";
+    const statusLabel = ev.status === "ausstehend" ? "⏳ Recherche" : ev.status;
     return `<div class="event-row" style="opacity:${ev.status !== "offen" ? "0.55" : "1"}">
       ${typBadge(ev.typ)}
       <div style="flex:1;min-width:0">
@@ -2105,7 +2107,7 @@ function flyerListHTML() {
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
         <div class="event-date" style="color:${past && ev.status==="offen" ? "#e74c3c" : "#555"}">${fmt(ev.datum)}</div>
-        <span style="font-size:11px;font-weight:600;color:${statusColor};min-width:78px;text-align:right">${ev.status}</span>
+        <span style="font-size:11px;font-weight:600;color:${statusColor};min-width:90px;text-align:right">${statusLabel}</span>
         ${ev.status === "offen" ? `<button class="small primary" onclick="openFlyerUpload(${i})">↑</button>` : ""}
       </div>
     </div>`;
@@ -2117,7 +2119,8 @@ function flyerListHTML() {
         <span style="font-size:15px;font-weight:700">Importierte Events</span>
         <span style="font-size:12px;color:#aaa;margin-left:10px">
           ${offen > 0 ? `<span style="color:#E88C2E;font-weight:600">${offen} offen</span>` : ""}
-          ${hochgeladen > 0 ? `${offen > 0 ? " · " : ""}<span style="color:#27AE60;font-weight:600">${hochgeladen} hochgeladen</span>` : ""}
+          ${hochgeladen > 0 ? `${offen > 0 || ausstehend > 0 ? " · " : ""}<span style="color:#27AE60;font-weight:600">${hochgeladen} hochgeladen</span>` : ""}
+          ${ausstehend > 0 ? ` · <span style="color:#D98D00;font-weight:600">⏳ ${ausstehend} Recherche</span>` : ""}
           ${uebersprungen > 0 ? ` · <span style="color:#bbb">${uebersprungen} übersprungen</span>` : ""}
         </span>
       </div>
@@ -2165,6 +2168,9 @@ function openFlyerUpload(index) {
     igDisplayName: ev.igDisplayName || ev.veranstalter || '',
     igTyp: ev.igTyp || '',
     quelleLink: ev.quelleLink || '',
+    quellen: [],
+    infoAusstehend: false,
+    notiz: '',
   };
 
   const allOffen = flyerEvents.filter(e => e.status === "offen");
@@ -2199,9 +2205,54 @@ function submitFlyerUpload() {
   if (!uploadData.name || !uploadData.standort) { alert('Name und Standort sind Pflichtfelder.'); return; }
   if (!uploadData.datum) { alert('Bitte ein Datum eingeben.'); return; }
   const uhr = uploadData.uhrzeit || '20:00';
-  const datumISO = `${uploadData.datum}T${uhr}:00.000Z`;
   const btn = document.getElementById('btn-upload-submit');
   btn.disabled = true; btn.textContent = '⏳ Speichert…';
+
+  // Ausstehend: Event landet in der Recherche-Liste, nicht in der App
+  if (uploadData.infoAusstehend) {
+    const yr = getYear(uploadData.datum);
+    db.collection('pending_events').add({
+      name: uploadData.name,
+      datum: uploadData.datum,
+      uhrzeit: uhr,
+      gemeinde: uploadData.standort,
+      bezirk: uploadData.bezirk || '',
+      adresse: uploadData.adresse || uploadData.standort || '',
+      typ: normalizeTyp(uploadData.typ),
+      eintritt: uploadData.eintritt || '',
+      beschreibung: uploadData.beschreibung || '',
+      quelleTyp: 'flyer',
+      quelleLink: uploadData.quelleLink || '',
+      quellen: uploadData.quellen || [],
+      srcZitat: '',
+      sicherheit: 'mittel',
+      latitude: uploadData.latitude || null,
+      longitude: uploadData.longitude || null,
+      status: yr >= 2026 ? 'confirmed' : 'check',
+      geprueft: false,
+      inApp: false,
+      infoAusstehend: true,
+      notiz: uploadData.notiz || '',
+      mgrSrcIgAccount: uploadData.igUsername || '',
+      linkedIgAccount: uploadData.igUsername || '',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(() => {
+      flyerEvents[flyerUploadIndex].status = "ausstehend";
+      updateFlyerList();
+      showToast('⏳ ' + uploadData.name + ' → Recherche-Liste');
+      const nextIdx = flyerEvents.findIndex((e, i) => i > flyerUploadIndex && e.status === "offen");
+      if (nextIdx >= 0) { openFlyerUpload(nextIdx); return; }
+      const anyOffen = flyerEvents.findIndex(e => e.status === "offen");
+      if (anyOffen >= 0) { openFlyerUpload(anyOffen); return; }
+      showFlyerCompletion();
+    }).catch(e => {
+      btn.disabled = false; btn.textContent = '⏳ In Recherche speichern';
+      alert('Fehler: ' + e.message);
+    });
+    return;
+  }
+
+  const datumISO = `${uploadData.datum}T${uhr}:00.000Z`;
   const eintrittText = uploadData.eintritt.trim();
   const beschreibungText = uploadData.beschreibung.trim();
   const _flyerParts = [];
@@ -2239,6 +2290,7 @@ function submitFlyerUpload() {
 
 function showFlyerCompletion() {
   const hochgeladen = flyerEvents.filter(e => e.status === "hochgeladen").length;
+  const ausstehend = flyerEvents.filter(e => e.status === "ausstehend").length;
   const uebersprungen = flyerEvents.filter(e => e.status === "übersprungen").length;
   document.getElementById('upload-modal-title').textContent = 'Flyer-Import abgeschlossen';
   document.getElementById('upload-form-content').innerHTML = `
@@ -2247,7 +2299,8 @@ function showFlyerCompletion() {
       <div style="font-size:16px;font-weight:700;margin-bottom:10px">Alle Events verarbeitet</div>
       <div style="font-size:13px;color:#888;line-height:2">
         ${hochgeladen > 0 ? `<span style="color:#27AE60;font-weight:600">${hochgeladen} hochgeladen</span>` : ""}
-        ${uebersprungen > 0 ? `${hochgeladen > 0 ? " · " : ""}<span style="color:#bbb">${uebersprungen} übersprungen</span>` : ""}
+        ${ausstehend > 0 ? `${hochgeladen > 0 ? " · " : ""}<span style="color:#D98D00;font-weight:600">⏳ ${ausstehend} in Recherche</span>` : ""}
+        ${uebersprungen > 0 ? `${hochgeladen > 0 || ausstehend > 0 ? " · " : ""}<span style="color:#bbb">${uebersprungen} übersprungen</span>` : ""}
       </div>
     </div>`;
   document.getElementById('upload-btn-row').innerHTML =
@@ -2279,6 +2332,9 @@ function openUpload(id) {
     longitude: ev.longitude ?? ev.lng ?? null,
     quelleTyp: ev.quelleTyp || '',
     quelleLink: ev.quelleLink || '',
+    quellen: [],
+    infoAusstehend: false,
+    notiz: '',
   };
   document.getElementById('upload-form-content').innerHTML = uploadFormHTML();
   document.getElementById('up-eintritt').value = uploadData.eintritt;
@@ -2358,7 +2414,68 @@ function uploadFormHTML() {
         : `<button class="small" style="flex-shrink:0;color:var(--blue-t);border-color:rgba(9,105,218,.2);background:var(--blue-bg)" onclick="openQuickIgAdd('${gemEsc}','${bezEsc}','${prefillEsc}')">+ Account</button>`
       }
     </div>`;
-  })() : ''}`;
+  })() : ''}
+  ${uploadQuellenSection()}
+  <div style="margin-top:14px;padding:12px 14px;background:var(--surface-2);border-radius:var(--rs);border:1px solid var(--border)">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500;color:var(--text)">
+      <input type="checkbox" id="up-ausstehend" ${uploadData.infoAusstehend?'checked':''}
+        style="width:15px;height:15px;accent-color:var(--accent)"
+        onchange="uploadData.infoAusstehend=this.checked;const btn=document.getElementById('btn-upload-submit');if(btn){btn.textContent=this.checked?'⏳ In Recherche speichern':'↑ In App speichern';}document.getElementById('upload-ausstehend-hint').style.display=this.checked?'block':'none';">
+      ⏳ Info noch ausstehend
+    </label>
+    <textarea id="up-notiz" rows="2" placeholder="Interne Notiz für den Manager…"
+      style="font-size:12px;padding:7px 10px;resize:vertical;width:100%;box-sizing:border-box;margin-top:8px"
+      oninput="uploadData.notiz=this.value">${esc(uploadData.notiz||'')}</textarea>
+    <div id="upload-ausstehend-hint" style="display:${uploadData.infoAusstehend?'block':'none'};margin-top:8px;font-size:11px;color:#7A4A00;background:#FFFBF0;border:1px solid #FAC775;border-radius:6px;padding:6px 10px">
+      ⚠ Event landet in der Recherche-Liste — nicht direkt in der App
+    </div>
+  </div>`;
+}
+
+// ---- UPLOAD MODAL QUELLEN ----
+function _uploadQuellenItemsHTML() {
+  const quellen = uploadData.quellen || [];
+  const gem = (uploadData.standort || '').replace(/'/g, "\\'");
+  const bez = (uploadData.bezirk || deriveBezirkFromGemeinde(uploadData.standort) || '').replace(/'/g, "\\'");
+  return quellen.map((q, i) => {
+    const href = q.startsWith("http") ? q : "https://" + q;
+    const isIg = /instagram\.com/i.test(q) || /^@/.test(q);
+    const igUser = extractInstagramUsername(q);
+    const prefill = (igUser || '').replace(/'/g, "\\'");
+    return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;padding:5px 8px;background:var(--surface-2);border-radius:var(--rx)">
+      <span style="font-size:13px;flex-shrink:0">${isIg ? '📱' : '🔗'}</span>
+      <a href="${href}" target="_blank" rel="noopener" style="font-size:12px;color:var(--accent);flex:1;word-break:break-all;min-width:0">${esc(q)}</a>
+      ${isIg ? `<button class="small" style="padding:2px 8px;font-size:11px;white-space:nowrap;flex-shrink:0;color:var(--blue-t);border-color:rgba(9,105,218,.2);background:var(--blue-bg)" onclick="openQuickIgAdd('${gem}','${bez}','${prefill}')">📱 Account</button>` : ''}
+      <button class="icon-btn" style="padding:2px 6px;font-size:11px;color:var(--red-t);flex-shrink:0" onclick="uploadRemoveQuelle(${i})">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function uploadQuellenSection() {
+  return `<div style="margin-top:12px">
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-3);margin-bottom:6px">Quellen</div>
+    <div id="upload-quellen-list">${_uploadQuellenItemsHTML()}</div>
+    <div style="display:flex;gap:6px;margin-top:4px">
+      <input id="upload-quelle-inp" placeholder="Instagram, Website, Facebook…" style="font-size:12px;flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();uploadAddQuelle()}">
+      <button class="small primary" style="white-space:nowrap;flex-shrink:0;padding:5px 12px" onclick="uploadAddQuelle()">＋ Quelle</button>
+    </div>
+  </div>`;
+}
+
+function uploadAddQuelle() {
+  const inp = document.getElementById("upload-quelle-inp");
+  if (!inp || !inp.value.trim()) return;
+  uploadData.quellen = [...(uploadData.quellen || []), inp.value.trim()];
+  inp.value = "";
+  const listEl = document.getElementById("upload-quellen-list");
+  if (listEl) listEl.innerHTML = _uploadQuellenItemsHTML();
+}
+
+function uploadRemoveQuelle(index) {
+  uploadData.quellen = [...(uploadData.quellen || [])];
+  uploadData.quellen.splice(index, 1);
+  const listEl = document.getElementById("upload-quellen-list");
+  if (listEl) listEl.innerHTML = _uploadQuellenItemsHTML();
 }
 
 function initUploadAutocomplete() {
@@ -2483,10 +2600,27 @@ function submitUpload() {
   if (!uploadData.name || !uploadData.standort) { alert('Name und Standort sind Pflichtfelder.'); return; }
   if (!uploadData.datum) { alert('Bitte ein Datum eingeben.'); return; }
   const uhr = uploadData.uhrzeit || '20:00';
-  const datumISO = `${uploadData.datum}T${uhr}:00.000Z`;
   const btn = document.getElementById('btn-upload-submit');
   btn.disabled = true;
   btn.textContent = '⏳ Speichert…';
+
+  // Ausstehend: nur pending_event aktualisieren, nichts in App hochladen
+  if (uploadData.infoAusstehend && uploadPendingId) {
+    const ev = pending.find(e => e._id === uploadPendingId);
+    const existingQuellen = ev ? (ev.quellen || []) : [];
+    const newQuellen = uploadData.quellen && uploadData.quellen.length
+      ? [...existingQuellen, ...uploadData.quellen.filter(q => !existingQuellen.includes(q))]
+      : existingQuellen;
+    db.collection('pending_events').doc(uploadPendingId).update({
+      infoAusstehend: true,
+      notiz: uploadData.notiz || (ev ? ev.notiz || '' : ''),
+      ...(newQuellen.length ? { quellen: newQuellen } : {})
+    }).then(() => { closeUpload(); showToast('⏳ Als ausstehend markiert'); })
+      .catch(e => { btn.disabled = false; btn.textContent = '↑ In App speichern'; alert('Fehler: ' + e.message); });
+    return;
+  }
+
+  const datumISO = `${uploadData.datum}T${uhr}:00.000Z`;
   const eintrittText = uploadData.eintritt.trim();
   const beschreibungText = uploadData.beschreibung.trim();
   const _uploadParts = [];
