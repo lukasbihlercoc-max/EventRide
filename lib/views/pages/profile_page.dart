@@ -445,7 +445,7 @@ class _LoggedInViewState extends State<_LoggedInView> {
       if (mounted) {
         AppSnackbar.show(
           context,
-          message: 'Upload fehlgeschlagen: $e',
+          message: 'Profilbild konnte nicht hochgeladen werden. Bitte versuche es erneut.',
           accentColor: Colors.redAccent,
         );
       }
@@ -1458,7 +1458,7 @@ class _LicenseSheetState extends State<_LicenseSheet> {
             message: 'Führerschein hochgeladen. Wird in Kürze geprüft.');
       }
     } catch (e) {
-      if (mounted) setState(() => _error = 'Upload fehlgeschlagen: $e');
+      if (mounted) setState(() => _error = 'Führerschein konnte nicht hochgeladen werden. Bitte versuche es erneut.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }

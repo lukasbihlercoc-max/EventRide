@@ -6,6 +6,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:my_app/data/app_user.dart';
+import 'package:my_app/utils/app_route.dart';
 import 'package:my_app/data/block_service.dart';
 import 'package:my_app/data/review.dart';
 import 'package:my_app/views/widgets/app_card.dart';
@@ -109,34 +110,39 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
   }
 
   Future<void> _load() async {
-    try {
-      final db = FirebaseFirestore.instance;
-      final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    final db = FirebaseFirestore.instance;
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
 
+    // Schritt 1: User-Dokument laden (Schilde hängen nur davon ab)
+    DocumentSnapshot? userDoc;
+    try {
+      userDoc = await db.collection('users').doc(widget.userId).get();
+    } catch (_) {}
+
+    // Schritt 2: Counts + Reviews parallel laden (eigener try-catch)
+    int fahrtCount = 0;
+    int mitfahrerCount = 0;
+    QuerySnapshot? reviewSnap;
+    try {
       final results = await Future.wait([
-        db.collection('users').doc(widget.userId).get(),
         db.collection('fahrten').where('ownerId', isEqualTo: widget.userId).count().get(),
-        db
-            .collection('reviews')
-            .where('reviewedId', isEqualTo: widget.userId)
-            .limit(20)
-            .get(),
-        db
-            .collection('anfragen')
+        db.collection('reviews').where('reviewedId', isEqualTo: widget.userId).limit(20).get(),
+        db.collection('anfragen')
             .where('fahrtOwnerId', isEqualTo: widget.userId)
             .where('status', isEqualTo: 1)
             .count()
             .get(),
       ]);
+      fahrtCount = (results[0] as AggregateQuerySnapshot).count ?? 0;
+      reviewSnap = results[1] as QuerySnapshot;
+      mitfahrerCount = (results[2] as AggregateQuerySnapshot).count ?? 0;
+    } catch (_) {}
 
-      final userDoc = results[0] as DocumentSnapshot;
-      final fahrtCount = (results[1] as AggregateQuerySnapshot).count ?? 0;
-      final reviewSnap = results[2] as QuerySnapshot;
-      final mitfahrerCount = (results[3] as AggregateQuerySnapshot).count ?? 0;
-
-      bool canReview = false;
-      bool hasReviewed = false;
-      String? sharedFahrtId;
+    // Schritt 3: Bewertungs-Berechtigung prüfen (eigener try-catch)
+    bool canReview = false;
+    bool hasReviewed = false;
+    String? sharedFahrtId;
+    try {
       if (currentUid != null && currentUid != widget.userId) {
         final sharedSnap = await db
             .collection('anfragen')
@@ -145,9 +151,7 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
             .where('status', isEqualTo: 1)
             .get();
 
-        final allAnfragen = sharedSnap.docs;
-
-        for (final anfrageDoc in allAnfragen) {
+        for (final anfrageDoc in sharedSnap.docs) {
           final fahrtId = anfrageDoc.data()['fahrtId'] as String?;
           if (fahrtId == null) continue;
           final fahrtDoc = await db.collection('fahrten').doc(fahrtId).get();
@@ -157,8 +161,7 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
           if (eventId == null) continue;
           final eventDoc = await db.collection('events').doc(eventId).get();
           if (!eventDoc.exists) continue;
-          final rawDatum =
-              (eventDoc.data() as Map<String, dynamic>)['datum'];
+          final rawDatum = (eventDoc.data() as Map<String, dynamic>)['datum'];
           DateTime? eventDatum;
           if (rawDatum is String) {
             eventDatum = DateTime.tryParse(rawDatum);
@@ -182,70 +185,69 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
           canReview = true;
         }
       }
+    } catch (_) {}
 
-      if (!mounted) return;
+    if (!mounted) return;
 
-      if (userDoc.exists) {
-        final d = userDoc.data()! as Map<String, dynamic>;
-        final first = d['firstName'] as String? ?? '';
-        final last = d['lastName'] as String? ?? '';
-        final fullName = '$first $last'.trim();
+    if (userDoc != null && userDoc.exists) {
+      final d = userDoc.data()! as Map<String, dynamic>;
+      final first = d['firstName'] as String? ?? '';
+      final last = d['lastName'] as String? ?? '';
+      final fullName = '$first $last'.trim();
 
-        final theirBlockedIds = (d['blockedUserIds'] as List<dynamic>?)
-                ?.whereType<String>()
-                .toList() ??
-            const [];
-        final blockedByThem =
-            currentUid != null && theirBlockedIds.contains(currentUid);
+      final theirBlockedIds = (d['blockedUserIds'] as List<dynamic>?)
+              ?.whereType<String>()
+              .toList() ??
+          const [];
+      final blockedByThem =
+          currentUid != null && theirBlockedIds.contains(currentUid);
 
-        DateTime? memberSince;
-        final ts = d['createdAt'];
-        if (ts is Timestamp) memberSince = ts.toDate();
+      DateTime? memberSince;
+      final ts = d['createdAt'];
+      if (ts is Timestamp) memberSince = ts.toDate();
 
-        setState(() {
-          _isBlockedByThem = blockedByThem;
-          _name = fullName.isNotEmpty ? fullName : widget.name;
-          _photoUrl = (d['photoUrl'] as String?)?.isNotEmpty == true
-              ? d['photoUrl'] as String
-              : widget.photoUrl;
-          _homeTown =
-              (d['homeTown'] as String?)?.isNotEmpty == true ? d['homeTown'] as String : null;
-          _hasPhone = d['phoneVerified'] as bool? ?? false;
-          _emailVerified = d['emailVerified'] as bool? ?? false;
-          _licenseVerified = (d['licenseStatus'] as String?) == 'verified';
-          _memberSince = memberSince;
-          _fahrtCount = fahrtCount;
-          _mitfahrerCount = mitfahrerCount;
-          _ratingAvg = (d['ratingAvg'] as num?)?.toDouble();
-          _ratingCount = (d['ratingCount'] as num?)?.toInt() ?? 0;
-          final allReviews = reviewSnap.docs.map(Review.fromDoc).toList()
-            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          _reviews = allReviews.take(5).toList();
-          _canReview = canReview;
-          _hasReviewed = hasReviewed;
-          _sharedFahrtId = sharedFahrtId;
-          final carMap = d['car'] as Map<String, dynamic>?;
-          if (carMap != null) {
-            final ci = CarInfo.fromMap(carMap);
-            _car = (ci.make.isNotEmpty || ci.model.isNotEmpty) ? ci : null;
-          }
-          _loading = false;
-        });
-      } else {
-        setState(() {
-          _fahrtCount = fahrtCount;
-          _mitfahrerCount = mitfahrerCount;
-          final allReviews2 = reviewSnap.docs.map(Review.fromDoc).toList()
-            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          _reviews = allReviews2.take(5).toList();
-          _canReview = canReview;
-          _hasReviewed = hasReviewed;
-          _sharedFahrtId = sharedFahrtId;
-          _loading = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
+      setState(() {
+        _isBlockedByThem = blockedByThem;
+        _name = fullName.isNotEmpty ? fullName : widget.name;
+        _photoUrl = (d['photoUrl'] as String?)?.isNotEmpty == true
+            ? d['photoUrl'] as String
+            : widget.photoUrl;
+        _homeTown = (d['homeTown'] as String?)?.isNotEmpty == true
+            ? d['homeTown'] as String
+            : null;
+        _hasPhone = d['phoneVerified'] as bool? ?? false;
+        _emailVerified = d['emailVerified'] as bool? ?? false;
+        _licenseVerified = (d['licenseStatus'] as String?) == 'verified';
+        _memberSince = memberSince;
+        _fahrtCount = fahrtCount;
+        _mitfahrerCount = mitfahrerCount;
+        _ratingAvg = (d['ratingAvg'] as num?)?.toDouble();
+        _ratingCount = (d['ratingCount'] as num?)?.toInt() ?? 0;
+        final allReviews = (reviewSnap?.docs ?? []).map(Review.fromDoc).toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        _reviews = allReviews.take(5).toList();
+        _canReview = canReview;
+        _hasReviewed = hasReviewed;
+        _sharedFahrtId = sharedFahrtId;
+        final carMap = d['car'] as Map<String, dynamic>?;
+        if (carMap != null) {
+          final ci = CarInfo.fromMap(carMap);
+          _car = (ci.make.isNotEmpty || ci.model.isNotEmpty) ? ci : null;
+        }
+        _loading = false;
+      });
+    } else {
+      setState(() {
+        _fahrtCount = fahrtCount;
+        _mitfahrerCount = mitfahrerCount;
+        final allReviews2 = (reviewSnap?.docs ?? []).map(Review.fromDoc).toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        _reviews = allReviews2.take(5).toList();
+        _canReview = canReview;
+        _hasReviewed = hasReviewed;
+        _sharedFahrtId = sharedFahrtId;
+        _loading = false;
+      });
     }
   }
 
@@ -1054,6 +1056,16 @@ class _ReviewCard extends StatelessWidget {
     return ReviewCard(
       review: review,
       onReport: canReport ? () => _showReportSheet(context) : null,
+      onReviewerTap: () => Navigator.push(
+        context,
+        AppRoute(
+          builder: (_) => PublicProfilePage(
+            userId: review.reviewerId,
+            name: review.reviewerName,
+            photoUrl: review.reviewerPhotoUrl,
+          ),
+        ),
+      ),
     );
   }
 }

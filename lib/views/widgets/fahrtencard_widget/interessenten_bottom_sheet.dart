@@ -24,6 +24,15 @@ void showInteressentenSheet(BuildContext context, FahrtDaten fahrt, {bool istVer
   );
 }
 
+void showInteressentenSheetGast(BuildContext context, String eventId, String eventName) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => _InteressentenSheetGast(eventId: eventId, eventName: eventName),
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Sheet-Widget
 // ---------------------------------------------------------------------------
@@ -259,6 +268,149 @@ class _InteressentenSheetState extends State<_InteressentenSheet> {
 }
 
 // ---------------------------------------------------------------------------
+// Gast-Sheet — Liste anschauen ohne eigene Fahrt
+// ---------------------------------------------------------------------------
+class _InteressentenSheetGast extends StatefulWidget {
+  const _InteressentenSheetGast({required this.eventId, required this.eventName});
+  final String eventId;
+  final String eventName;
+
+  @override
+  State<_InteressentenSheetGast> createState() => _InteressentenSheetGastState();
+}
+
+class _InteressentenSheetGastState extends State<_InteressentenSheetGast> {
+  bool _abmeldenLoading = false;
+
+  Future<void> _abmelden(InteressentenDaten person) async {
+    setState(() => _abmeldenLoading = true);
+    try {
+      await context.read<InteressentenService>().toggle(
+            eventId: widget.eventId,
+            userId: person.userId,
+            userName: person.userName,
+            userPhotoUrl: person.userPhotoUrl,
+            bezirk: person.bezirk,
+          );
+    } finally {
+      if (mounted) setState(() => _abmeldenLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final currentUserId =
+        context.read<IAuthRepository>().currentUser?.userId;
+    final alleInteressenten =
+        context.watch<InteressentenService>().getForEvent(widget.eventId);
+
+    // Eigener Eintrag immer ganz oben
+    final sorted = [
+      ...alleInteressenten.where((i) => i.userId == currentUserId),
+      ...alleInteressenten.where((i) => i.userId != currentUserId),
+    ];
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.5,
+      minChildSize: 0.3,
+      maxChildSize: 0.85,
+      expand: false,
+      builder: (_, scrollController) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFF1A2744),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 12, bottom: 8),
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.people_outline, color: Colors.amber, size: 22),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Interessenten · ${widget.eventName}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(color: Colors.white12, height: 1),
+              Expanded(
+                child: sorted.isEmpty
+                    ? const Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.sentiment_neutral,
+                                color: Colors.white24, size: 48),
+                            SizedBox(height: 12),
+                            Text(
+                              'Niemand wartet auf eine Mitfahrt',
+                              style: TextStyle(
+                                  color: Colors.white38, fontSize: 15),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.separated(
+                        controller: scrollController,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        itemCount: sorted.length,
+                        separatorBuilder: (_, __) =>
+                            const Divider(color: Colors.white10, height: 1),
+                        itemBuilder: (_, i) {
+                          final person = sorted[i];
+                          final istIch = person.userId == currentUserId;
+                          return _InteressentTile(
+                            interessent: person,
+                            istIch: istIch,
+                            istEingeladen: false,
+                            isLoading: istIch && _abmeldenLoading,
+                            onEinladen: null,
+                            onBereitsEingeladen: () {},
+                            showAktion: true,
+                            onAbmelden:
+                                istIch ? () => _abmelden(person) : null,
+                            onKeineFahrt: istIch
+                                ? null
+                                : () => AppSnackbar.show(
+                                      context,
+                                      message:
+                                          'Erstelle zuerst eine eigene Fahrt zu diesem Event.',
+                                    ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Einzelner Eintrag
 // ---------------------------------------------------------------------------
 class _InteressentTile extends StatelessWidget {
@@ -269,6 +421,9 @@ class _InteressentTile extends StatelessWidget {
     required this.isLoading,
     required this.onEinladen,
     this.showAktion = true,
+    this.istIch = false,
+    this.onAbmelden,
+    this.onKeineFahrt,
   });
 
   final InteressentenDaten interessent;
@@ -277,6 +432,9 @@ class _InteressentTile extends StatelessWidget {
   final VoidCallback? onEinladen;
   final VoidCallback onBereitsEingeladen;
   final bool showAktion;
+  final bool istIch;
+  final VoidCallback? onAbmelden;
+  final VoidCallback? onKeineFahrt;
 
   @override
   Widget build(BuildContext context) {
@@ -304,34 +462,48 @@ class _InteressentTile extends StatelessWidget {
 
           // Name + Bezirk
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        interessent.userName,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 15,
+            child: GestureDetector(
+              onTap: istIch
+                  ? null
+                  : () => Navigator.push(
+                        context,
+                        AppRoute(
+                          builder: (_) => PublicProfilePage(
+                            userId: interessent.userId,
+                            name: interessent.userName,
+                            photoUrl: interessent.userPhotoUrl,
+                          ),
                         ),
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    TrustShieldsByUserId(userId: interessent.userId, size: 13),
-                  ],
-                ),
-                if (interessent.bezirk != null &&
-                    interessent.bezirk!.isNotEmpty)
-                  Text(
-                    interessent.bezirk!,
-                    style:
-                        const TextStyle(color: Colors.white54, fontSize: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          istIch ? 'Du' : interessent.userName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      TrustShieldsByUserId(userId: interessent.userId, size: 13),
+                    ],
                   ),
-              ],
+                  if (interessent.bezirk != null &&
+                      interessent.bezirk!.isNotEmpty)
+                    Text(
+                      interessent.bezirk!,
+                      style: const TextStyle(
+                          color: Colors.white54, fontSize: 12),
+                    ),
+                ],
+              ),
             ),
           ),
 
@@ -360,6 +532,38 @@ class _InteressentTile extends StatelessWidget {
                 'Angefragt',
                 style: TextStyle(color: Colors.white38, fontSize: 13),
               ),
+            )
+          else if (onAbmelden != null)
+            OutlinedButton(
+              onPressed: onAbmelden,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white70,
+                side: const BorderSide(color: Colors.white38),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text('Abmelden', style: TextStyle(fontSize: 13)),
+            )
+          else if (onKeineFahrt != null)
+            ElevatedButton(
+              onPressed: onKeineFahrt,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.grey.shade800,
+                foregroundColor: Colors.white38,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text('Einladen', style: TextStyle(fontSize: 13)),
             )
           else
             ElevatedButton(

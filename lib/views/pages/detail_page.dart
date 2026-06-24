@@ -575,6 +575,13 @@ class _InteressentenInlineState extends State<_InteressentenInline>
         widget.event.id, currentUser.userId);
 
     return _shell(
+      onTap: count > 0
+          ? () {
+              if (!requireVerified(context)) return;
+              showInteressentenSheetGast(
+                  context, widget.event.id, widget.event.name);
+            }
+          : null,
       bgColor: Colors.white.withValues(alpha: 0.06),
       borderColor: ichBinInteressiert
           ? Colors.amber.withValues(alpha: 0.35)
@@ -588,7 +595,7 @@ class _InteressentenInlineState extends State<_InteressentenInline>
                 : '$count wollen hin',
         subText: ichBinInteressiert
             ? 'Du willst hin'
-            : (count == 0 ? null : 'Tippe um dich einzutragen'),
+            : (count > 0 ? 'Tippe zum Anschauen' : null),
         right: ichBinInteressiert
             ? GestureDetector(
                 onTap: _loading ? null : () => _toggle(currentUser),
