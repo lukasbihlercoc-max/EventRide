@@ -3429,7 +3429,9 @@ function renderEventAnfragen() {
         name: sel.eventName || '',
         standort: sel.standort || '',
         datum: sel.datum || '',
+        uhrzeit: sel.uhrzeit || '',
         adresse: sel.adresse || '',
+        eintritt: sel.eintritt || '',
         beschreibung: sel.beschreibung || '',
         typ: sel.eventTyp || 'e0',
         latitude: sel.latitude || null,
@@ -3456,7 +3458,7 @@ function renderEventAnfragen() {
         ${isFlyer && sel.flyerPath ? `<div id="flyer-img-wrap" class="license-img-wrap"><span style="color:var(--text-3);font-size:13px">⏳ Lädt…</span></div>` : ''}
         ${isFlyer ? `<div style="margin-bottom:14px;padding:10px 12px;background:var(--surface-2);border:1px dashed var(--border);border-radius:var(--rs)">
           <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);margin-bottom:7px">📄 CSV aus KI-Analyse einfügen</div>
-          <textarea id="er-csv-input" rows="3" placeholder="name;datum;gemeinde;adresse;typ;beschreibung&#10;Kirchtag Feistritz;12.07.2026;Feistritz;..." style="width:100%;font-size:12px;padding:7px 9px;border:1px solid var(--border);border-radius:var(--rs);background:var(--surface);color:var(--text);font-family:monospace;resize:vertical"></textarea>
+          <textarea id="er-csv-input" rows="3" placeholder="name;datum;uhrzeit;gemeinde;adresse;typ;eintritt;beschreibung&#10;Kirchtag Feistritz;12.07.2026;20:00;Feistritz;Hauptplatz 1;Kirchtage/Feste;frei;..." style="width:100%;font-size:12px;padding:7px 9px;border:1px solid var(--border);border-radius:var(--rs);background:var(--surface);color:var(--text);font-family:monospace;resize:vertical"></textarea>
           <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
             <button onclick="importErCsv('${sel._id}')" class="primary" style="flex:none;font-size:12px;padding:5px 14px">Importieren</button>
             <div id="er-csv-status" style="font-size:12px;color:var(--text-3)"></div>
@@ -3469,10 +3471,14 @@ function renderEventAnfragen() {
           <input value="${esc(erEditData.name)}" oninput="erEditData.name=this.value">
           <span class="edit-label">Datum *</span>
           <input value="${esc(erEditData.datum)}" placeholder="TT.MM.JJJJ" oninput="erEditData.datum=this.value">
+          <span class="edit-label">Uhrzeit</span>
+          <input value="${esc(erEditData.uhrzeit)}" placeholder="z.B. 20:00" oninput="erEditData.uhrzeit=this.value">
           <span class="edit-label">Standort</span>
           <input value="${esc(erEditData.standort)}" oninput="erEditData.standort=this.value">
           <span class="edit-label">Adresse</span>
           <input value="${esc(erEditData.adresse)}" oninput="erEditData.adresse=this.value">
+          <span class="edit-label">Eintrittspreis</span>
+          <input value="${esc(erEditData.eintritt)}" placeholder="z.B. frei / 5€" oninput="erEditData.eintritt=this.value">
           <span class="edit-label">Typ</span>
           <select onchange="erEditData.typ=this.value">${typOpts}</select>
           <span class="edit-label">Beschreibung</span>
@@ -3536,8 +3542,10 @@ async function approveEventReq(requestId) {
     id: newRef.id,
     name: erEditData.name.trim(),
     datum: eventDate.toISOString(),
+    uhrzeit: (erEditData.uhrzeit||'').trim() || null,
     standort: (erEditData.standort||'').trim() || 'Unbekannt',
     typ: erEditData.typ || 'e0',
+    eintritt: (erEditData.eintritt||'').trim() || null,
     beschreibung: (erEditData.beschreibung||'').trim(),
     adresse: (erEditData.adresse||'').trim() || 'Adresse nicht angegeben',
     latitude: erEditData.latitude || null,
@@ -3679,8 +3687,10 @@ function importErCsv(reqId) {
 
   const iN    = exactIdx('name');
   const iD    = exactIdx('datum');
+  const iU    = exactIdx('uhrzeit');
   const iG    = exactIdx('gemeinde');
   const iA    = exactIdx('adresse');
+  const iE    = exactIdx('eintritt');
   const iT    = exactIdx('typ');
   const iDesc = exactIdx('beschreibung');
 
@@ -3689,8 +3699,10 @@ function importErCsv(reqId) {
 
   if (iN >= 0)             erEditData.name         = get(iN);
   if (iD >= 0)             erEditData.datum        = get(iD);
+  if (iU >= 0)             erEditData.uhrzeit      = get(iU);
   if (iG >= 0)             erEditData.standort     = get(iG);
   if (iA >= 0)             erEditData.adresse      = get(iA);
+  if (iE >= 0)             erEditData.eintritt     = get(iE);
   if (iDesc >= 0)          erEditData.beschreibung = get(iDesc);
   if (iT >= 0 && get(iT)) erEditData.typ          = normalizeTyp(get(iT));
   erEditData._id = reqId;
