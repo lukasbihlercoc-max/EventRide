@@ -8,6 +8,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
 <style>
 /* ── Design tokens ── */
 :root{
@@ -316,6 +317,18 @@ select option{background:var(--surface);color:var(--text)}
 /* Accounts tab – bezirk group headers in table */
 .ig-bez-hdr{background:var(--surface-2);padding:8px 14px;font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--text-2);text-transform:uppercase;border-bottom:1px solid var(--border);cursor:pointer;user-select:none}
 .ig-bez-hdr:hover{background:var(--surface-3)}
+/* ── Admin-Anfragen Tabs ── */
+.req-list-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.req-row{display:flex;align-items:center;gap:12px;padding:14px 18px;cursor:pointer;border-bottom:1px solid var(--border-sub);border-left:3px solid transparent;transition:background .1s}
+.req-row:last-child{border-bottom:none}
+.req-row:hover{background:var(--surface-2)}
+.req-row.selected{background:var(--accent-soft);border-left-color:var(--accent)}
+.req-avatar{width:38px;height:38px;border-radius:50%;background:var(--surface-3);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:var(--text-2);overflow:hidden}
+.req-detail{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);position:sticky;top:76px;max-height:calc(100vh - 92px);overflow-y:auto}
+.req-detail-body{padding:20px 22px}
+.license-img-wrap{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--rs);overflow:hidden;margin-bottom:12px;display:flex;align-items:center;justify-content:center;min-height:100px}
+.license-img-wrap img{max-width:100%;object-fit:contain;display:block}
+.tab-badge{display:inline-flex;align-items:center;justify-content:center;background:var(--accent);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:100px;margin-left:4px;line-height:1.4;vertical-align:middle}
 </style>
 </head>
 <body>
@@ -352,6 +365,8 @@ select option{background:var(--surface);color:var(--text)}
       <button class="tab-btn" onclick="switchTab('csv')" id="tab-csv">CSV Import</button>
       <button class="tab-btn" onclick="switchTab('flyer')" id="tab-flyer">Flyer</button>
       <button class="tab-btn" onclick="switchTab('accounts')" id="tab-accounts">📱 Accounts</button>
+      <button class="tab-btn" onclick="switchTab('eventanfragen')" id="tab-eventanfragen">Event-Anfragen <span class="tab-badge" id="badge-eventanfragen" style="display:none">0</span></button>
+      <button class="tab-btn" onclick="switchTab('fuehrerscheine')" id="tab-fuehrerscheine">Führerscheine <span class="tab-badge" id="badge-fuehrerscheine" style="display:none">0</span></button>
     </div>
 
     <div id="content"></div>
@@ -464,6 +479,11 @@ function normalizeTyp(v) { return VALID_TYP_CODES.has(v) ? v : (TYP_CODE[v] || '
 let appEvents = [];
 let pending = [];
 let curTab = "recherche";
+let appEventRequests = [];
+let appLicenseRequests = [];
+let selEventReqId = null;
+let erEditData = {};
+const storageUrlCache = {};
 let selId = null;
 let appSortMode = "datum";
 let expandedIgIds = new Set();
@@ -596,6 +616,20 @@ function initFS() {
     snap.docs.forEach(d => { gemeindeMeta[d.id] = d.data(); });
     if(curTab === "bezirke") renderBezirke();
   }, e => { console.warn("gemeinde_meta read error", e); });
+
+  db.collection("eventRequests").where("status","==","pending").onSnapshot(snap => {
+    appEventRequests = snap.docs.map(d => ({_id: d.id, ...d.data()}));
+    appEventRequests.sort((a,b) => (a.submittedAt?.seconds||0) - (b.submittedAt?.seconds||0));
+    updateAdminBadges();
+    if(curTab === "eventanfragen") renderEventAnfragen();
+  }, e => { console.warn("eventRequests read error", e); });
+
+  db.collection("licenseRequests").where("status","==","pending").onSnapshot(snap => {
+    appLicenseRequests = snap.docs.map(d => ({_uid: d.id, ...d.data()}));
+    appLicenseRequests.sort((a,b) => (a.submittedAt?.seconds||0) - (b.submittedAt?.seconds||0));
+    updateAdminBadges();
+    if(curTab === "fuehrerscheine") renderFuehrerscheine();
+  }, e => { console.warn("licenseRequests read error", e); });
 }
 
 // ---- DATE UTILS ----
@@ -765,10 +799,13 @@ function render() {
   else if(curTab==="csv") renderCSV();
   else if(curTab==="flyer") renderFlyer();
   else if(curTab==="accounts") renderAccounts();
+  else if(curTab==="eventanfragen") renderEventAnfragen();
+  else if(curTab==="fuehrerscheine") renderFuehrerscheine();
 }
 
 function switchTab(t) {
   curTab = t; selId = null; editMode = false;
+  selEventReqId = null; erEditData = {};
   document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
   document.getElementById("tab-"+t).classList.add("active");
   render();
@@ -3321,6 +3358,299 @@ function setupAutocompleteWhenReady(inputId, dataObj, coordsDisplayId, coordsTex
   };
   if (window.google && google.maps) run();
   else _gmapsPending.push(run);
+}
+
+// ════════════════════════════════════════════════════════════════
+// ─── ADMIN TABS: EVENT-ANFRAGEN & FÜHRERSCHEINE ─────────────────
+// ════════════════════════════════════════════════════════════════
+
+function updateAdminBadges() {
+  const erBadge = document.getElementById('badge-eventanfragen');
+  const lsBadge = document.getElementById('badge-fuehrerscheine');
+  if (erBadge) {
+    erBadge.textContent = appEventRequests.length;
+    erBadge.style.display = appEventRequests.length ? 'inline-flex' : 'none';
+  }
+  if (lsBadge) {
+    lsBadge.textContent = appLicenseRequests.length;
+    lsBadge.style.display = appLicenseRequests.length ? 'inline-flex' : 'none';
+  }
+}
+
+async function getStorageUrl(path) {
+  if (storageUrlCache[path]) return storageUrlCache[path];
+  const url = await firebase.storage().ref(path).getDownloadURL();
+  storageUrlCache[path] = url;
+  return url;
+}
+
+// ── EVENT-ANFRAGEN ───────────────────────────────────────────────
+
+function renderEventAnfragen() {
+  const reqs = appEventRequests;
+  const sel = selEventReqId ? reqs.find(r => r._id === selEventReqId) : null;
+  const hasDetail = !!sel;
+
+  let listHtml;
+  if (reqs.length === 0) {
+    listHtml = '<div style="padding:40px;text-align:center;color:var(--text-3)">✓ Keine offenen Event-Anfragen</div>';
+  } else {
+    listHtml = reqs.map(r => {
+      const isSel = selEventReqId === r._id;
+      const isFlyer = r.submissionType === 'flyer';
+      const ts = r.submittedAt;
+      const date = ts ? (ts.toDate ? ts.toDate() : new Date(ts.seconds * 1000)) : new Date();
+      const dateStr = date.toLocaleDateString('de-AT', {day:'2-digit',month:'2-digit',year:'numeric'});
+      const initials = (r.userName||'?')[0].toUpperCase();
+      const avatar = r.userPhotoUrl
+        ? `<img src="${esc(r.userPhotoUrl)}" style="width:38px;height:38px;border-radius:50%;object-fit:cover">`
+        : initials;
+      const badge = isFlyer
+        ? `<span style="font-size:11px;padding:2px 8px;border-radius:8px;font-weight:600;color:#fff;background:#E08930">Flyer</span>`
+        : `<span style="font-size:11px;padding:2px 8px;border-radius:8px;font-weight:600;color:#fff;background:var(--blue)">Manuell</span>`;
+      return `<div class="req-row${isSel?' selected':''}" onclick="selEventReq('${r._id}')">
+        <div class="req-avatar">${avatar}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(r.eventName||r.userName||'?')}</div>
+          <div style="font-size:12px;color:var(--text-2)">von ${esc(r.userName||'?')} · ${dateStr}</div>
+        </div>
+        ${badge}
+        <span style="color:var(--text-3);font-size:16px;margin-left:4px">›</span>
+      </div>`;
+    }).join('');
+  }
+
+  let detailHtml = '';
+  if (sel) {
+    const isFlyer = sel.submissionType === 'flyer';
+    if (!erEditData._id || erEditData._id !== sel._id) {
+      erEditData = {
+        _id: sel._id,
+        name: sel.eventName || '',
+        standort: sel.standort || '',
+        datum: sel.datum || '',
+        adresse: sel.adresse || '',
+        beschreibung: sel.beschreibung || '',
+        typ: sel.eventTyp || 'e0',
+        latitude: sel.latitude || null,
+        longitude: sel.longitude || null,
+      };
+    }
+    const typOpts = [['e0','Standard'],['e1','Kirchtage/Feste'],['e2','Feuerwehrfest'],['e3','Disco'],['e4','Ball'],['e5','Krampuslauf'],['e6','Festival/Open-Air']]
+      .map(([v,l]) => `<option value="${v}"${erEditData.typ===v?' selected':''}>${l}</option>`).join('');
+    const initials = (sel.userName||'?')[0].toUpperCase();
+    const avatar = sel.userPhotoUrl
+      ? `<img src="${esc(sel.userPhotoUrl)}" style="width:38px;height:38px;border-radius:50%;object-fit:cover">`
+      : initials;
+
+    detailHtml = `<div class="req-detail">
+      <div style="padding:14px 18px;border-bottom:1px solid var(--border-sub);display:flex;align-items:center;gap:10px">
+        <div class="req-avatar">${avatar}</div>
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:15px">${esc(sel.userName||'?')}</div>
+          <div style="font-size:12px;color:var(--text-2)">${isFlyer?'Flyer-Einreichung':'Manuelle Einreichung'}</div>
+        </div>
+        <button onclick="selEventReqId=null;erEditData={};renderEventAnfragen()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-3);line-height:1;padding:2px 6px">×</button>
+      </div>
+      <div class="req-detail-body">
+        ${isFlyer && sel.flyerPath ? `<div id="flyer-img-wrap" class="license-img-wrap"><span style="color:var(--text-3);font-size:13px">⏳ Lädt…</span></div>` : ''}
+        ${sel.note ? `<div style="font-size:12px;color:var(--text-2);margin-bottom:12px;padding:8px 10px;background:var(--surface-2);border-radius:var(--rs)">📝 ${esc(sel.note)}</div>` : ''}
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);margin-bottom:10px">${isFlyer?'Event-Daten eintragen':'Event-Daten prüfen'}</div>
+        <div class="edit-grid">
+          <span class="edit-label">Name *</span>
+          <input value="${esc(erEditData.name)}" oninput="erEditData.name=this.value">
+          <span class="edit-label">Datum *</span>
+          <input value="${esc(erEditData.datum)}" placeholder="TT.MM.JJJJ" oninput="erEditData.datum=this.value">
+          <span class="edit-label">Standort</span>
+          <input value="${esc(erEditData.standort)}" oninput="erEditData.standort=this.value">
+          <span class="edit-label">Adresse</span>
+          <input value="${esc(erEditData.adresse)}" oninput="erEditData.adresse=this.value">
+          <span class="edit-label">Typ</span>
+          <select onchange="erEditData.typ=this.value">${typOpts}</select>
+          <span class="edit-label">Beschreibung</span>
+          <textarea rows="3" style="font-size:12px;padding:7px 10px;resize:vertical;border:1px solid var(--border);border-radius:var(--rs);background:var(--surface);color:var(--text);font-family:inherit" oninput="erEditData.beschreibung=this.value">${esc(erEditData.beschreibung)}</textarea>
+        </div>
+        <div class="btn-row" style="margin-top:16px;justify-content:flex-end">
+          <button class="danger" onclick="discardEventReq('${sel._id}')">✕ Verwerfen</button>
+          <button class="primary" onclick="approveEventReq('${sel._id}')">✓ Veröffentlichen</button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  document.getElementById('content').innerHTML = `
+    <div style="display:grid;grid-template-columns:${hasDetail?'1fr 1fr':'1fr'};gap:16px;align-items:start">
+      <div class="req-list-wrap">${listHtml}</div>
+      ${detailHtml}
+    </div>`;
+
+  if (sel && sel.submissionType === 'flyer' && sel.flyerPath) {
+    loadStorageImage('flyer-img-wrap', sel.flyerPath);
+  }
+}
+
+function selEventReq(id) {
+  selEventReqId = selEventReqId === id ? null : id;
+  erEditData = {};
+  renderEventAnfragen();
+}
+
+async function loadStorageImage(elemId, path) {
+  const wrap = document.getElementById(elemId);
+  if (!wrap) return;
+  try {
+    const url = await getStorageUrl(path);
+    if (document.getElementById(elemId)) {
+      document.getElementById(elemId).innerHTML = `<img src="${url}" style="max-width:100%;max-height:420px;object-fit:contain">`;
+    }
+  } catch(e) {
+    if (document.getElementById(elemId)) {
+      document.getElementById(elemId).innerHTML = `<span style="color:var(--red);font-size:13px">Bild konnte nicht geladen werden</span>`;
+    }
+  }
+}
+
+async function approveEventReq(requestId) {
+  if (!erEditData.name || !erEditData.name.trim()) {
+    alert('Bitte einen Event-Namen eingeben.');
+    return;
+  }
+  if (!erEditData.datum || !erEditData.datum.trim()) {
+    alert('Bitte ein Datum eingeben (TT.MM.JJJJ).');
+    return;
+  }
+  const m = erEditData.datum.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  if (!m) { alert('Ungültiges Datumsformat. Bitte TT.MM.JJJJ verwenden.'); return; }
+  const eventDate = new Date(Date.UTC(+m[3], +m[2]-1, +m[1]));
+
+  const newRef = db.collection('events').doc();
+  const eventData = {
+    id: newRef.id,
+    name: erEditData.name.trim(),
+    datum: eventDate.toISOString(),
+    standort: (erEditData.standort||'').trim() || 'Unbekannt',
+    typ: erEditData.typ || 'e0',
+    beschreibung: (erEditData.beschreibung||'').trim(),
+    adresse: (erEditData.adresse||'').trim() || 'Adresse nicht angegeben',
+    latitude: erEditData.latitude || null,
+    longitude: erEditData.longitude || null,
+  };
+
+  const batch = db.batch();
+  batch.set(newRef, eventData);
+  batch.update(db.collection('eventRequests').doc(requestId), {
+    status: 'approved',
+    reviewedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+
+  try {
+    await batch.commit();
+    selEventReqId = null;
+    erEditData = {};
+    showToast('✓ Event veröffentlicht');
+  } catch(e) {
+    showToast('Fehler: ' + e.message, false);
+  }
+}
+
+async function discardEventReq(requestId) {
+  const reason = window.prompt('Ablehnungsgrund (optional):');
+  if (reason === null) return;
+  const update = {
+    status: 'discarded',
+    reviewedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  };
+  if (reason.trim()) update.rejectReason = reason.trim();
+  try {
+    await db.collection('eventRequests').doc(requestId).update(update);
+    selEventReqId = null;
+    erEditData = {};
+    showToast('Anfrage verworfen');
+  } catch(e) {
+    showToast('Fehler: ' + e.message, false);
+  }
+}
+
+// ── FÜHRERSCHEINE ────────────────────────────────────────────────
+
+function renderFuehrerscheine() {
+  const reqs = appLicenseRequests;
+  let html;
+  if (reqs.length === 0) {
+    html = '<div style="padding:40px;text-align:center;color:var(--text-3)">✓ Keine ausstehenden Führerschein-Prüfungen</div>';
+  } else {
+    html = reqs.map(r => {
+      const ts = r.submittedAt;
+      const date = ts ? (ts.toDate ? ts.toDate() : new Date(ts.seconds * 1000)) : new Date();
+      const dateStr = date.toLocaleDateString('de-AT', {day:'2-digit',month:'2-digit',year:'numeric'});
+      const initials = (r.userName||'?')[0].toUpperCase();
+      const avatar = r.userPhotoUrl
+        ? `<img src="${esc(r.userPhotoUrl)}" style="width:38px;height:38px;border-radius:50%;object-fit:cover">`
+        : initials;
+      return `<div style="padding:20px;border-bottom:1px solid var(--border-sub)">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+          <div class="req-avatar">${avatar}</div>
+          <div>
+            <div style="font-size:15px;font-weight:700">${esc(r.userName||'?')}</div>
+            <div style="font-size:12px;color:var(--text-2)">Eingereicht: ${dateStr}</div>
+          </div>
+        </div>
+        <div id="license-img-${esc(r._uid)}" class="license-img-wrap">
+          <span style="color:var(--text-3);font-size:13px">⏳ Lädt…</span>
+        </div>
+        <div class="btn-row" style="justify-content:flex-end">
+          <button class="danger" onclick="rejectLicenseReq('${esc(r._uid)}')">✕ Ablehnen</button>
+          <button class="primary" onclick="approveLicenseReq('${esc(r._uid)}')">✓ Genehmigen</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  document.getElementById('content').innerHTML = `<div class="req-list-wrap">${html}</div>`;
+
+  reqs.forEach(r => {
+    if (r.licensePath) loadStorageImage(`license-img-${r._uid}`, r.licensePath);
+  });
+}
+
+async function approveLicenseReq(uid) {
+  if (!confirm('Führerschein genehmigen?')) return;
+  const batch = db.batch();
+  batch.update(db.collection('licenseRequests').doc(uid), {
+    status: 'verified',
+    reviewedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    rejectReason: firebase.firestore.FieldValue.delete(),
+  });
+  batch.update(db.collection('users').doc(uid), {
+    licenseStatus: 'verified',
+    licenseRejectReason: firebase.firestore.FieldValue.delete(),
+  });
+  try {
+    await batch.commit();
+    showToast('✓ Führerschein genehmigt');
+  } catch(e) {
+    showToast('Fehler: ' + e.message, false);
+  }
+}
+
+async function rejectLicenseReq(uid) {
+  const reason = window.prompt('Ablehnungsgrund (Pflicht):');
+  if (!reason || !reason.trim()) return;
+  const batch = db.batch();
+  batch.update(db.collection('licenseRequests').doc(uid), {
+    status: 'rejected',
+    rejectReason: reason.trim(),
+    reviewedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+  batch.update(db.collection('users').doc(uid), {
+    licenseStatus: 'rejected',
+    licenseRejectReason: reason.trim(),
+  });
+  try {
+    await batch.commit();
+    showToast('Führerschein abgelehnt');
+  } catch(e) {
+    showToast('Fehler: ' + e.message, false);
+  }
 }
 </script>
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDxfF8EafFfT2jyoDHQ22c8n_kSnvDTUVk&callback=_onGmapsReady&v=weekly" async defer></script>

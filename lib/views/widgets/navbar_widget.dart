@@ -6,9 +6,11 @@ import 'package:my_app/data/app_user.dart';
 import 'package:my_app/data/block_service.dart';
 import 'package:my_app/data/chat_conversation.dart';
 import 'package:my_app/data/chat_service.dart';
+import 'package:my_app/data/event_request.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/data/anfrage_daten.dart';
 import 'package:my_app/data/anfrage_service.dart';
+import 'package:my_app/data/license_request.dart';
 import 'package:my_app/data/notifiers.dart';
 import 'package:my_app/data/seen_anfragen_service.dart';
 import 'package:my_app/views/widgets/sizehelper_widget.dart';
@@ -40,7 +42,6 @@ class NavBarWidget extends StatelessWidget {
                   height: SizeHelper.h(context, 0.085),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(24),
-                    // Dunkler Glass — schluckt sich in den unteren Bereich
                     color: const Color(0xFF140F0C).withValues(alpha: 0.62),
                     border: Border.all(
                       color: Colors.white.withValues(alpha: 0.10),
@@ -56,14 +57,13 @@ class NavBarWidget extends StatelessWidget {
                   child: LayoutBuilder(
                     builder: (context, constraints) {
                       final itemWidth = constraints.maxWidth / 3;
-                      // Schmale, dezente Pille — nicht über das ganze Item
                       final pillWidth = itemWidth * 0.78;
-                      final pillLeft  =
+                      final pillLeft =
                           selectedPage * itemWidth + (itemWidth - pillWidth) / 2;
 
                       return Stack(
                         children: [
-                          // Sliding Pill — DEZENT (low alpha, kein Glow)
+                          // Sliding Pill
                           AnimatedPositioned(
                             duration: _kDuration,
                             curve: _kCurve,
@@ -99,10 +99,7 @@ class NavBarWidget extends StatelessWidget {
                                 onTap: () => selectedPageNotifier.value = 1,
                                 context: context,
                               ),
-                              _NavItem(
-                                icon: Icons.person_outline_rounded,
-                                activeIcon: Icons.person_rounded,
-                                label: 'Profil',
+                              _NavItemProfil(
                                 isSelected: selectedPage == 2,
                                 onTap: () => selectedPageNotifier.value = 2,
                                 context: context,
@@ -265,7 +262,6 @@ class _NavItemFahrtenState extends State<_NavItemFahrten> {
                   hasAnfrageUnseen =
                       seenService.hasUnseenRequester(uid, requesterIds);
 
-                  // Nur Chats von aktiven Anfragen zählen (nicht storniert/abgelehnt/fahrtGeloescht)
                   final activePassengerFahrtIds = anfrageService.alleAnfragen
                       .where((a) =>
                           a.requesterId == uid &&
@@ -338,6 +334,136 @@ class _NavItemFahrtenState extends State<_NavItemFahrten> {
                     : Colors.white.withValues(alpha: 0.55),
               ),
               child: const Text('Fahrten'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+class _NavItemProfil extends StatefulWidget {
+  final bool isSelected;
+  final VoidCallback onTap;
+  final BuildContext context;
+
+  const _NavItemProfil({
+    required this.isSelected,
+    required this.onTap,
+    required this.context,
+  });
+
+  @override
+  State<_NavItemProfil> createState() => _NavItemProfilState();
+}
+
+class _NavItemProfilState extends State<_NavItemProfil> {
+  int _licenseCount = 0;
+  int _eventCount = 0;
+  StreamSubscription<List<LicenseRequest>>? _licenseSub;
+  StreamSubscription<List<EventRequest>>? _eventSub;
+  StreamSubscription<AppUser?>? _authSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _authSub = context.read<IAuthRepository>().authStateChanges.listen(
+      (user) {
+        _licenseSub?.cancel();
+        _eventSub?.cancel();
+        _licenseSub = null;
+        _eventSub = null;
+        if (!mounted) return;
+        setState(() {
+          _licenseCount = 0;
+          _eventCount = 0;
+        });
+        final auth = context.read<IAuthRepository>();
+        if (user != null && auth.isAdmin) {
+          _licenseSub = auth.pendingLicenseRequests.listen(
+            (list) { if (mounted) setState(() => _licenseCount = list.length); },
+            onError: (_) {},
+          );
+          _eventSub = auth.pendingEventRequests.listen(
+            (list) { if (mounted) setState(() => _eventCount = list.length); },
+            onError: (_) {},
+          );
+        }
+      },
+      onError: (_) {},
+    );
+  }
+
+  @override
+  void dispose() {
+    _authSub?.cancel();
+    _licenseSub?.cancel();
+    _eventSub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext _) {
+    final hasPending = _licenseCount > 0 || _eventCount > 0;
+    return Expanded(
+      child: GestureDetector(
+        onTap: widget.onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                AnimatedSwitcher(
+                  duration: _kDuration,
+                  transitionBuilder: (child, animation) => ScaleTransition(
+                    scale: animation,
+                    child: FadeTransition(opacity: animation, child: child),
+                  ),
+                  child: Icon(
+                    widget.isSelected
+                        ? Icons.person_rounded
+                        : Icons.person_outline_rounded,
+                    key: ValueKey(widget.isSelected),
+                    color: widget.isSelected
+                        ? _kOrange
+                        : Colors.white.withValues(alpha: 0.55),
+                    size: SizeHelper.w(widget.context, 0.065),
+                  ),
+                ),
+                if (hasPending)
+                  Positioned(
+                    right: -4,
+                    top: -2,
+                    child: Container(
+                      width: 9,
+                      height: 9,
+                      decoration: BoxDecoration(
+                        color: _kOrange,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.7),
+                          width: 1.2,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 3),
+            AnimatedDefaultTextStyle(
+              duration: _kDuration,
+              style: TextStyle(
+                fontSize: SizeHelper.w(widget.context, 0.028),
+                fontWeight:
+                    widget.isSelected ? FontWeight.w600 : FontWeight.w500,
+                color: widget.isSelected
+                    ? _kOrange
+                    : Colors.white.withValues(alpha: 0.55),
+              ),
+              child: const Text('Profil'),
             ),
           ],
         ),
