@@ -3524,6 +3524,18 @@ async function loadStorageImage(elemId, path) {
   }
 }
 
+function findApprovalDupes(name, datum) {
+  const d = parseDatum(datum);
+  if (!d) return [];
+  const dKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  return [...appEvents, ...pending].filter(e => {
+    if (!isSimilarName(e.name, name)) return false;
+    const ed = parseDatum(e.datum);
+    if (!ed) return false;
+    return `${ed.getFullYear()}-${ed.getMonth()}-${ed.getDate()}` === dKey;
+  });
+}
+
 async function approveEventReq(requestId) {
   if (!erEditData.name || !erEditData.name.trim()) {
     alert('Bitte einen Event-Namen eingeben.');
@@ -3535,6 +3547,13 @@ async function approveEventReq(requestId) {
   }
   const m = erEditData.datum.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
   if (!m) { alert('Ungültiges Datumsformat. Bitte TT.MM.JJJJ verwenden.'); return; }
+
+  const dupes = findApprovalDupes(erEditData.name.trim(), erEditData.datum.trim());
+  if (dupes.length > 0) {
+    const names = dupes.slice(0, 3).map(d => `"${d.name}"`).join(', ');
+    if (!confirm(`⚠ Mögliches Duplikat gefunden:\n${names}\n\nTrotzdem veröffentlichen?`)) return;
+  }
+
   const eventDate = new Date(Date.UTC(+m[3], +m[2]-1, +m[1]));
 
   const newRef = db.collection('events').doc();
