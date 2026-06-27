@@ -138,6 +138,11 @@ select option{background:var(--surface);color:var(--text)}
 .header-logo{font-size:15px;font-weight:700;letter-spacing:-.2px;color:var(--text)}
 .header-logo span{color:var(--accent)}
 .header-label{font-size:11px;font-weight:500;color:var(--text-3);letter-spacing:.4px;margin-left:8px;vertical-align:middle;text-transform:uppercase}
+/* ── Maps status badge ── */
+#_maps-badge{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;font-size:10px;font-weight:700;line-height:1;cursor:pointer;margin-left:6px;vertical-align:middle;flex-shrink:0;position:relative;border:1px solid transparent;transition:opacity .12s}
+#_maps-badge:hover{opacity:.8}
+#_maps-badge-tip{position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);white-space:nowrap;font-size:11px;font-weight:500;padding:4px 8px;border-radius:5px;color:#fff;pointer-events:none;opacity:0;transition:opacity .15s;z-index:200;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+#_maps-badge:hover #_maps-badge-tip{opacity:1}
 
 /* ── Stats — connected grid, no individual boxes ── */
 .stats-row{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:2.5rem}
@@ -347,7 +352,12 @@ select option{background:var(--surface);color:var(--text)}
 <div id="app" style="display:none">
   <div class="app-wrap">
     <div class="header">
-      <span class="header-logo">Event<span>Ride</span><span class="header-label">Manager</span></span>
+      <span style="display:inline-flex;align-items:center">
+        <span class="header-logo">Event<span>Ride</span><span class="header-label">Manager</span></span>
+        <span id="_maps-badge" title="" onclick="this.querySelector('#_maps-badge-tip').style.opacity=this.querySelector('#_maps-badge-tip').style.opacity==='1'?'0':'1'">
+          <span id="_maps-badge-tip"></span>
+        </span>
+      </span>
       <div style="display:flex;align-items:center;gap:8px">
         <span id="user-name" style="font-size:12px;color:var(--text-3)"></span>
         <button class="small theme-toggle" onclick="toggleTheme()" id="theme-btn">🌙 Dunkel</button>
@@ -3348,16 +3358,18 @@ function _onGmapsReady() {
   _showMapsStatus('✓ Google Maps geladen', 'green');
 }
 function _showMapsStatus(msg, color) {
-  let el = document.getElementById('_maps-status');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = '_maps-status';
-    el.style.cssText = 'position:fixed;bottom:70px;left:50%;transform:translateX(-50%);padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;color:#fff;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,.3)';
-    document.body.appendChild(el);
-  }
-  el.textContent = msg;
-  el.style.background = color === 'green' ? '#1a7f37' : '#cf222e';
-  el.style.display = 'block';
+  const badge = document.getElementById('_maps-badge');
+  const tip = document.getElementById('_maps-badge-tip');
+  if (!badge || !tip) return;
+  const isGreen = color === 'green';
+  badge.textContent = '';
+  badge.appendChild(tip);
+  badge.style.background = isGreen ? '#1a7f37' : '#cf222e';
+  badge.style.borderColor = isGreen ? '#0d4a1f' : '#82071e';
+  badge.style.color = '#fff';
+  badge.insertAdjacentText('afterbegin', isGreen ? '✓' : '✗');
+  tip.textContent = msg;
+  tip.style.background = isGreen ? '#1a7f37' : '#cf222e';
 }
 setTimeout(() => {
   if (!window.google || !google.maps) {
