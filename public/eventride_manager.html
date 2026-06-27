@@ -2403,14 +2403,18 @@ function uploadFormHTML() {
   const typOpts = [['e1','Kirchtage/Feste'],['e2','Feuerwehr'],['e3','Disco/Party'],['e4','Ball'],['e5','Krampus'],['e6','Festival/Open-Air']]
     .map(([v,l]) => `<option value="${v}" ${uploadData.typ===v?'selected':''}>${l}</option>`).join('');
   const similar = similarInApp(uploadData.name, uploadData.bezirk);
-  const warnHtml = similar.length > 0 ? `
+  const n = uploadData.name.trim().toLowerCase();
+  const exactMatches = [...appEvents, ...pending].filter(e => (e.name||'').trim().toLowerCase() === n);
+  const warnItems = exactMatches.length > 0 ? exactMatches : similar;
+  const warnHtml = warnItems.length > 0 ? `
     <div class="warn-box" style="margin-bottom:14px">
-      <div class="warn-box-title">⚠ Möglicherweise bereits in App (${similar.length})</div>
-      ${similar.map(e=>`<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid #f5e8c8;font-size:12px">
+      <div class="warn-box-title">⚠ Möglicherweise bereits vorhanden (${warnItems.length})</div>
+      ${warnItems.map(e=>`<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid #f5e8c8;font-size:12px">
         ${typBadge(e.typ)}
         <span style="flex:1;font-weight:500">${esc(e.name)}</span>
-        <span style="color:#888">${esc(e.gemeinde)}</span>
+        <span style="color:#888">${esc(e.gemeinde||e.standort||'')}</span>
         <span style="color:#888;margin-left:8px">${fmt(e.datum)}</span>
+        <span style="font-size:10px;padding:1px 6px;border-radius:8px;margin-left:4px;font-weight:600;${e._src==='app'?'background:#E6F1FB;color:#0C447C':'background:#F3F4F6;color:#57606A'}">${e._src==='app'?'In App':'Recherche'}</span>
       </div>`).join('')}
       <div style="font-size:11px;color:#7A4A00;margin-top:6px">Bitte prüfen ob es sich um das gleiche Event handelt, bevor du hochlädst.</div>
     </div>` : '';
