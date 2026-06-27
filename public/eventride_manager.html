@@ -2870,6 +2870,10 @@ function matchedAppEvents(acc) {
 }
 
 function renderAccounts() {
+  const searchEl = document.getElementById("ig-search-input");
+  const hadFocus = searchEl && document.activeElement === searchEl;
+  const cursorPos = hadFocus ? searchEl.selectionStart : -1;
+
   let accs = [...igAccounts];
   if(igFilterStatus!=="Alle") accs=accs.filter(a=>a.status===igFilterStatus);
   if(igFilterTyp!=="Alle") accs=accs.filter(a=>a.vereinsTyp===igFilterTyp);
@@ -3022,7 +3026,7 @@ function renderAccounts() {
     </div>
 
     <div class="filter-bar" style="margin-bottom:14px">
-      <input type="text" placeholder="Username / Name / Ort…" value="${esc(igSearch)}" oninput="igSearch=this.value;renderAccounts()" style="width:200px">
+      <input id="ig-search-input" type="text" placeholder="Username / Name / Ort…" value="${esc(igSearch)}" oninput="igSearch=this.value;renderAccounts()" style="width:200px">
       <select onchange="igFilterStatus=this.value;renderAccounts()">
         <option value="Alle" ${igFilterStatus==="Alle"?"selected":""}>Alle Status</option>
         ${IG_STATUS_LIST.map(([v,l])=>`<option value="${v}" ${igFilterStatus===v?"selected":""}>${l}</option>`).join("")}
@@ -3085,6 +3089,11 @@ function renderAccounts() {
       </div>
     </div>
   `;
+
+  if (hadFocus) {
+    const el = document.getElementById("ig-search-input");
+    if (el) { el.focus(); if (cursorPos >= 0) el.setSelectionRange(cursorPos, cursorPos); }
+  }
 }
 
 function igToggleSort(field) {
