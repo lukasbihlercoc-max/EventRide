@@ -2241,10 +2241,14 @@ function skipFlyerEvent() {
 function submitFlyerUpload() {
   if (!uploadData.name || !uploadData.standort) { alert('Name und Standort sind Pflichtfelder.'); return; }
   if (!uploadData.datum) { alert('Bitte ein Datum eingeben.'); return; }
-  const dupes = findApprovalDupes(uploadData.name, uploadData.datum);
-  if (dupes.length > 0) {
-    const names = dupes.slice(0, 3).map(d => `"${d.name}"`).join(', ');
-    if (!confirm(`⚠ Mögliches Duplikat gefunden:\n${names}\n\nTrotzdem hochladen?`)) return;
+  if (isDupe(uploadData.name)) {
+    if (!confirm(`"${uploadData.name}" scheint bereits zu existieren. Trotzdem hochladen?`)) return;
+  } else {
+    const dupes = findApprovalDupes(uploadData.name, uploadData.datum);
+    if (dupes.length > 0) {
+      const names = dupes.slice(0, 3).map(d => `"${d.name}"`).join(', ');
+      if (!confirm(`⚠ Mögliches Duplikat gefunden:\n${names}\n\nTrotzdem hochladen?`)) return;
+    }
   }
   const uhr = uploadData.uhrzeit || '20:00';
   const btn = document.getElementById('btn-upload-submit');
