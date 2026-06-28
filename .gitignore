@@ -3,6 +3,11 @@
 dist_key.pem
 dist_key_b64.txt
 
+# Lokale Test- und Export-Dateien (nie committen)
+test_*.ps1
+test_*.sh
+*_export.csv
+
 # Firebase credentials (never commit these)
 ios/Runner/GoogleService-Info.plist
 scripts/serviceAccountKey.json
