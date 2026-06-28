@@ -1,7 +1,7 @@
 const String kDatenschutzText = '''
 Datenschutzerklärung – EventRide
 
-Stand: 03.05.2026
+Stand: 28.06.2026
 
 1. Verantwortlicher
 
@@ -21,6 +21,7 @@ Im Rahmen der Nutzung der App werden folgende Daten erhoben:
 • Telefonnummer (optional, zur Verifizierung)
 • Heimatgemeinde inkl. GPS-Koordinaten (optional)
 • Fahrzeugdaten: Marke, Modell, Farbe, Sitzanzahl (optional)
+• Kfz-Kennzeichen (optional, für akzeptierte Mitfahrer 24 h vor Fahrtantritt sichtbar)
 • Führerschein-Foto (optional, zur Fahrer-Verifizierung)
 • Event- und Fahrtdaten (erstellte oder angefragte Fahrten)
 • Chat-Nachrichten zwischen Nutzern
@@ -37,9 +38,10 @@ Die Daten werden auf folgenden Rechtsgrundlagen verarbeitet:
   Kommunikation innerhalb der App.
 
 • Art. 6 Abs. 1 lit. a DSGVO (Einwilligung):
-  Führerschein-Foto, Telefonnummer und GPS-Koordinaten
-  werden nur mit ausdrücklicher Zustimmung des Nutzers
-  erhoben. Die Einwilligung kann jederzeit widerrufen werden.
+  Führerschein-Foto, Telefonnummer, Kfz-Kennzeichen und
+  GPS-Koordinaten werden nur mit ausdrücklicher Zustimmung
+  des Nutzers erhoben. Die Einwilligung kann jederzeit
+  widerrufen werden.
 
 ──────────────────────────────────────
 
@@ -158,7 +160,7 @@ Die jeweils aktuelle Version ist in der App verfügbar.
 const String kAgbText = '''
 Allgemeine Geschäftsbedingungen (AGB) – EventRide
 
-Stand: 03.05.2026
+Stand: 28.06.2026
 
 ──────────────────────────────────────
 
@@ -224,7 +226,25 @@ Nutzer verpflichten sich:
 
 ──────────────────────────────────────
 
-7. Inhalte & Events
+7. Kfz-Kennzeichen (optional)
+
+Fahrer können optional ihr Kfz-Kennzeichen hinterlegen.
+
+• Das Hinterlegen ist freiwillig und kann jederzeit in
+  den Einstellungen rückgängig gemacht werden.
+• Der Fahrer ist für die Richtigkeit des Kennzeichens
+  selbst verantwortlich.
+• Das Kennzeichen wird ausschließlich bestätigten
+  Mitfahrern innerhalb von 24 Stunden vor Fahrtantritt
+  angezeigt.
+• EventRide übernimmt keine Haftung für Schäden, die aus
+  einem falschen oder fehlenden Kennzeichen entstehen.
+• Mitfahrer sind selbst dafür verantwortlich, das
+  Kennzeichen vor Fahrtantritt zu überprüfen.
+
+──────────────────────────────────────
+
+8. Inhalte & Events
 
 • Nutzer können Events vorschlagen.
 • EventRide behält sich vor, Inhalte zu prüfen,
@@ -233,7 +253,7 @@ Nutzer verpflichten sich:
 
 ──────────────────────────────────────
 
-8. Accounts und Kündigung
+9. Accounts und Kündigung
 
 • Nutzer sind für ihre Zugangsdaten selbst verantwortlich.
 • Missbrauch ist untersagt.
@@ -243,28 +263,28 @@ Nutzer verpflichten sich:
 
 ──────────────────────────────────────
 
-9. Ausschluss von Nutzern
+10. Ausschluss von Nutzern
 
 EventRide behält sich vor, Nutzer bei Verstößen gegen
 diese AGB zu sperren oder zu löschen.
 
 ──────────────────────────────────────
 
-10. Haftung
+11. Haftung
 
 EventRide haftet nur für Schäden, die durch vorsätzliches
 oder grob fahrlässiges Verhalten verursacht wurden.
 
 ──────────────────────────────────────
 
-11. Anwendbares Recht / Gerichtsstand
+12. Anwendbares Recht / Gerichtsstand
 
 Es gilt österreichisches Recht. Gerichtsstand ist
 Klagenfurt am Wörthersee, Österreich.
 
 ──────────────────────────────────────
 
-12. Änderungen der AGB
+13. Änderungen der AGB
 
 EventRide kann diese AGB jederzeit anpassen.
 Die aktuelle Version ist in der App verfügbar.
@@ -272,7 +292,7 @@ Wesentliche Änderungen werden den Nutzern mitgeteilt.
 
 ──────────────────────────────────────
 
-13. Kontakt
+14. Kontakt
 
 E-Mail: kontakt@eventride.at
 Website: eventride.at

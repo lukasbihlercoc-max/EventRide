@@ -625,20 +625,22 @@ class _AngeboteneFahrtenTabState extends State<_AngeboteneFahrtenTab>
         final meineFahrten = List<FahrtDaten>.from(
           fahrtService.getFahrtenByUser(widget.userId),
         )..sort((a, b) =>
-            (datumCache[a.eventId] ?? DateTime(9999))
-                .compareTo(datumCache[b.eventId] ?? DateTime(9999)));
+            (datumCache[a.eventId] ?? a.eventDatum ?? DateTime(9999))
+                .compareTo(datumCache[b.eventId] ?? b.eventDatum ?? DateTime(9999)));
 
         // Aktive vs. vergangene Fahrten trennen
+        // Primär: fahrt.eventDatum (in Fahrt gespeichert, bleibt auch wenn Event aus Cache fällt)
+        // Fallback: datumCache aus EventService (nur solange Event noch sichtbar ist)
         final aktiveFahrten = meineFahrten
             .where((f) =>
-                !_istVergangen(datumCache[f.eventId] ?? DateTime(9999)))
+                !_istVergangen(datumCache[f.eventId] ?? f.eventDatum ?? DateTime(9999)))
             .toList();
         final vergangeneFahrten = meineFahrten
             .where((f) =>
-                _istVergangen(datumCache[f.eventId] ?? DateTime(9999)))
+                _istVergangen(datumCache[f.eventId] ?? f.eventDatum ?? DateTime(9999)))
             .toList()
-          ..sort((a, b) => (datumCache[b.eventId] ?? DateTime(2000))
-              .compareTo(datumCache[a.eventId] ?? DateTime(2000)));
+          ..sort((a, b) => (datumCache[b.eventId] ?? b.eventDatum ?? DateTime(2000))
+              .compareTo(datumCache[a.eventId] ?? a.eventDatum ?? DateTime(2000)));
 
         if (aktiveFahrten.isEmpty && vergangeneFahrten.isEmpty) {
           return const _EmptyState(
@@ -1089,17 +1091,18 @@ class _AngefragteFahrtenTabState extends State<_AngefragteFahrtenTab>
             .toList();
 
         // Vergangene: akzeptiert + Event vorbei + innerhalb 30 Tage
+        // Primär: fahrt.eventDatum (bleibt auch wenn Event aus EventService-Cache fällt)
         final vergangeneAnfragen = alleNormal
             .where((i) =>
                 i.fahrt != null &&
                 i.anfrage.status == AnfrageStatus.akzeptiert &&
                 _istVergangen(
-                    eventDatumCache[i.fahrt!.eventId] ?? DateTime(9999)))
+                    eventDatumCache[i.fahrt!.eventId] ?? i.fahrt!.eventDatum ?? DateTime(9999)))
             .toList()
           ..sort((a, b) =>
-              (eventDatumCache[b.fahrt!.eventId] ?? DateTime(2000))
+              (eventDatumCache[b.fahrt!.eventId] ?? b.fahrt!.eventDatum ?? DateTime(2000))
                   .compareTo(
-                      eventDatumCache[a.fahrt!.eventId] ?? DateTime(2000)));
+                      eventDatumCache[a.fahrt!.eventId] ?? a.fahrt!.eventDatum ?? DateTime(2000)));
 
         // Aktive: alles andere (ohne vergangene + ohne inaktive nach Event-Ablauf)
         final vergangeneSet = vergangeneAnfragen.toSet();
@@ -1112,7 +1115,7 @@ class _AngefragteFahrtenTabState extends State<_AngefragteFahrtenTab>
                   i.anfrage.status == AnfrageStatus.fahrtGeloescht;
               if (!inaktiv) return true;
               if (i.fahrt == null) return false;
-              final datum = eventDatumCache[i.fahrt!.eventId];
+              final datum = eventDatumCache[i.fahrt!.eventId] ?? i.fahrt!.eventDatum;
               if (datum == null) return true;
               return datum.add(const Duration(hours: 3)).isAfter(now);
             })
@@ -1458,7 +1461,7 @@ class _EinladungsCardState extends State<_EinladungsCard> {
           (e) => e.id == fahrt.eventId,
           orElse: () => Event(
             name: fahrt.eventName,
-            datum: DateTime(2000),
+            datum: fahrt.eventDatum ?? DateTime(2000),
             standort: fahrt.standort,
             beschreibung: '',
             typ: '',
@@ -1666,7 +1669,7 @@ class _FahrerGlassCard extends StatelessWidget {
           (e) => e.id == fahrt.eventId,
           orElse: () => Event(
             name: fahrt.eventName,
-            datum: DateTime(2000),
+            datum: fahrt.eventDatum ?? DateTime(2000),
             standort: fahrt.standort,
             beschreibung: '',
             typ: '',
@@ -2052,7 +2055,7 @@ class _RequestedRideCardState extends State<_RequestedRideCard> {
           (e) => e.id == fahrt.eventId,
           orElse: () => Event(
             name: fahrt.eventName,
-            datum: DateTime(2000),
+            datum: fahrt.eventDatum ?? DateTime(2000),
             standort: fahrt.standort,
             beschreibung: '',
             typ: '',
@@ -3825,6 +3828,7 @@ class _VergangeneAnfragenSectionState
               fahrt: items[i].fahrt!,
               eventDatum:
                   widget.eventDatumCache[items[i].fahrt!.eventId] ??
+                      items[i].fahrt!.eventDatum ??
                       DateTime(2000),
             ),
           ),
@@ -3843,6 +3847,7 @@ class _VergangeneAnfragenSectionState
                           fahrt: item.fahrt!,
                           eventDatum:
                               widget.eventDatumCache[item.fahrt!.eventId] ??
+                                  item.fahrt!.eventDatum ??
                                   DateTime(2000),
                         ),
                       ),
@@ -4099,7 +4104,7 @@ class _VergangeneGlassSectionState extends State<_VergangeneGlassSection>
           RepaintBoundary(
             child: _VergangeneGlassCard(
               fahrt: fahrten[i],
-              eventDatum: widget.datumCache[fahrten[i].eventId] ?? DateTime(2000),
+              eventDatum: widget.datumCache[fahrten[i].eventId] ?? fahrten[i].eventDatum ?? DateTime(2000),
             ),
           ),
         // Ausklappbare Karten
@@ -4116,7 +4121,7 @@ class _VergangeneGlassSectionState extends State<_VergangeneGlassSection>
                         child: _VergangeneGlassCard(
                           fahrt: fahrt,
                           eventDatum:
-                              widget.datumCache[fahrt.eventId] ?? DateTime(2000),
+                              widget.datumCache[fahrt.eventId] ?? fahrt.eventDatum ?? DateTime(2000),
                         ),
                       ),
                   ],
