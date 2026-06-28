@@ -62,7 +62,7 @@ const _kTypLabels = {
   'e4': 'Ball',
   'e5': 'Krampuslauf',
   'e6': 'Festival/Open-Air',
-  'e7': 'Strand & Sommer',
+  'e7': 'Sommer/Strand',
 };
 
 class EventsPage extends StatefulWidget {
