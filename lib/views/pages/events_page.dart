@@ -77,6 +77,7 @@ class _EventsPageState extends State<EventsPage> {
   final nameController = TextEditingController();
   final standortController = TextEditingController();
   final datumController = TextEditingController();
+  final uhrzeitController = TextEditingController(text: '20:00');
   String? typ = "e0";
   final beschreibungController = TextEditingController();
   final adresseController = TextEditingController();
@@ -94,6 +95,7 @@ class _EventsPageState extends State<EventsPage> {
       nameController.text = widget.event!.name;
       standortController.text = widget.event!.standort;
       datumController.text = DateFormat("dd.MM.yyyy").format(widget.event!.datum.toLocal());
+      uhrzeitController.text = widget.event!.uhrzeit ?? '20:00';
       typ = _kTypLabels.containsKey(widget.event!.typ) ? widget.event!.typ : "e0";
       beschreibungController.text = widget.event!.beschreibung;
       adresseController.text = widget.event!.adresse;
@@ -111,6 +113,7 @@ class _EventsPageState extends State<EventsPage> {
     nameController.dispose();
     standortController.dispose();
     datumController.dispose();
+    uhrzeitController.dispose();
     beschreibungController.dispose();
     adresseController.dispose();
     super.dispose();
@@ -201,12 +204,14 @@ class _EventsPageState extends State<EventsPage> {
           DateFormat("dd.MM.yyyy").parseStrict(datumController.text, true);
       final eventService = context.read<EventService>();
 
+      final uhrzeit = uhrzeitController.text.trim().isEmpty ? null : uhrzeitController.text.trim();
       if (widget.event == null) {
         final newEvent = Event(
           name: nameController.text.trim().isEmpty
               ? "Unbenanntes Event"
               : nameController.text.trim(),
           datum: parsedDate,
+          uhrzeit: uhrzeit,
           standort: standortController.text.isNotEmpty
               ? standortController.text.trim()
               : "Unbekannt",
@@ -225,6 +230,7 @@ class _EventsPageState extends State<EventsPage> {
               ? widget.event!.name
               : nameController.text.trim(),
           datum: parsedDate,
+          uhrzeit: uhrzeit,
           standort: standortController.text.trim().isNotEmpty
               ? standortController.text.trim()
               : widget.event!.standort,
@@ -405,6 +411,13 @@ class _EventsPageState extends State<EventsPage> {
                     }
                     return null;
                   },
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: uhrzeitController,
+                  style: inputTextStyle,
+                  decoration: getInputStyle("Uhrzeit (HH:MM)"),
+                  keyboardType: TextInputType.datetime,
                 ),
                 const SizedBox(height: 16),
                 TextField(

@@ -13,6 +13,7 @@ class EventRequest {
   final String? eventName;
   final String? standort;
   final String? datum; // "dd.MM.yyyy"
+  final String? uhrzeit;
   final String? eventTyp;
   final String? beschreibung;
   final String? adresse;
@@ -37,6 +38,7 @@ class EventRequest {
     this.eventName,
     this.standort,
     this.datum,
+    this.uhrzeit,
     this.eventTyp,
     this.beschreibung,
     this.adresse,
@@ -61,6 +63,7 @@ class EventRequest {
       eventName: d['eventName'] as String?,
       standort: d['standort'] as String?,
       datum: d['datum'] as String?,
+      uhrzeit: d['uhrzeit'] as String?,
       eventTyp: d['eventTyp'] as String?,
       beschreibung: d['beschreibung'] as String?,
       adresse: d['adresse'] as String?,

@@ -3,6 +3,7 @@ class Event {
   final String id; // 🔑 endgültige, unveränderliche ID
   final String name;
   final DateTime datum;
+  final String? uhrzeit;
   final String standort;
   final String typ;
   final String beschreibung;
@@ -17,6 +18,7 @@ class Event {
     String? id,
     required this.name,
     required DateTime datum,
+    this.uhrzeit,
     required this.standort,
     required this.beschreibung,
     required this.typ,
@@ -31,6 +33,7 @@ class Event {
   Event copyWith({
     String? name,
     DateTime? datum,
+    String? uhrzeit,
     String? standort,
     String? typ,
     String? beschreibung,
@@ -43,6 +46,7 @@ class Event {
       id: id,
       name: name ?? this.name,
       datum: (datum ?? this.datum).toUtc(),
+      uhrzeit: uhrzeit ?? this.uhrzeit,
       standort: standort ?? this.standort,
       beschreibung: beschreibung ?? this.beschreibung,
       typ: typ ?? this.typ,
@@ -59,6 +63,7 @@ class Event {
       'name': name,
       // Datum als ISO8601 in UTC
       'datum': datum.toUtc().toIso8601String(),
+      'uhrzeit': uhrzeit,
       'standort': standort,
       'typ': typ,
       'beschreibung': beschreibung,
@@ -97,6 +102,7 @@ class Event {
       id: map['id'] as String?,
       name: map['name'] as String? ?? 'Unbenanntes Event',
       datum: parsedDatum,
+      uhrzeit: map['uhrzeit'] as String?,
       standort: map['standort'] as String? ?? '',
       beschreibung: map['beschreibung'] as String? ?? '',
       typ: map['typ'] as String? ?? '',

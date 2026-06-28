@@ -254,6 +254,7 @@ class _ReviewSheetState extends State<_ReviewSheet> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _standortCtrl;
   late final TextEditingController _datumCtrl;
+  late final TextEditingController _uhrzeitCtrl;
   late final TextEditingController _adresseCtrl;
   late final TextEditingController _beschreibungCtrl;
   late String _typ;
@@ -278,6 +279,7 @@ class _ReviewSheetState extends State<_ReviewSheet> {
     _nameCtrl = TextEditingController(text: req.eventName ?? '');
     _standortCtrl = TextEditingController(text: req.standort ?? '');
     _datumCtrl = TextEditingController(text: req.datum ?? '');
+    _uhrzeitCtrl = TextEditingController(text: req.uhrzeit ?? '20:00');
     _adresseCtrl = TextEditingController(text: req.adresse ?? '');
     _beschreibungCtrl = TextEditingController(text: req.beschreibung ?? '');
     _typ = _kTypLabels.containsKey(req.eventTyp) ? req.eventTyp! : 'e0';
@@ -298,6 +300,7 @@ class _ReviewSheetState extends State<_ReviewSheet> {
     _nameCtrl.dispose();
     _standortCtrl.dispose();
     _datumCtrl.dispose();
+    _uhrzeitCtrl.dispose();
     _adresseCtrl.dispose();
     _beschreibungCtrl.dispose();
     super.dispose();
@@ -459,6 +462,7 @@ class _ReviewSheetState extends State<_ReviewSheet> {
             ? 'Unbenanntes Event'
             : _nameCtrl.text.trim(),
         datum: parsedDate,
+        uhrzeit: _uhrzeitCtrl.text.trim().isEmpty ? null : _uhrzeitCtrl.text.trim(),
         standort: _standortCtrl.text.trim().isEmpty
             ? 'Unbekannt'
             : _standortCtrl.text.trim(),
@@ -645,6 +649,13 @@ class _ReviewSheetState extends State<_ReviewSheet> {
               _updateSimilarEvents();
             }
           },
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _uhrzeitCtrl,
+          style: _kInputText,
+          decoration: _inputStyle('Uhrzeit (HH:MM)'),
+          keyboardType: TextInputType.datetime,
         ),
         const SizedBox(height: 12),
         TextField(

@@ -145,6 +145,22 @@ class DetailPage extends StatelessWidget {
                               ),
                             ],
                           ),
+                          if (event.uhrzeit != null) ...[
+                            SizedBox(height: height * 0.008),
+                            Row(
+                              children: [
+                                Icon(Icons.access_time,
+                                    color: Colors.amber, size: width * 0.06),
+                                SizedBox(width: width * 0.016),
+                                Text(
+                                  event.uhrzeit!,
+                                  style: TextStyle(
+                                      fontSize: width * 0.043,
+                                      color: Colors.white),
+                                ),
+                              ],
+                            ),
+                          ],
                           SizedBox(height: height * 0.013),
 
                           Row(

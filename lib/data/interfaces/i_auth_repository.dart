@@ -109,6 +109,7 @@ abstract class IAuthRepository {
     required String name,
     required String standort,
     required String datum,
+    String? uhrzeit,
     required String eventTyp,
     required String beschreibung,
     required String adresse,

@@ -75,6 +75,7 @@ class _EventSubmitPageState extends State<EventSubmitPage> {
   final _nameCtrl = TextEditingController();
   final _standortCtrl = TextEditingController();
   final _datumCtrl = TextEditingController();
+  final _uhrzeitCtrl = TextEditingController(text: '20:00');
   final _adresseCtrl = TextEditingController();
   final _beschreibungCtrl = TextEditingController();
   String _typ = 'e0';
@@ -102,6 +103,7 @@ class _EventSubmitPageState extends State<EventSubmitPage> {
     _nameCtrl.dispose();
     _standortCtrl.dispose();
     _datumCtrl.dispose();
+    _uhrzeitCtrl.dispose();
     _adresseCtrl.dispose();
     _beschreibungCtrl.dispose();
     _noteCtrl.dispose();
@@ -169,6 +171,7 @@ class _EventSubmitPageState extends State<EventSubmitPage> {
                 ? 'Unbekannt'
                 : _standortCtrl.text.trim(),
             datum: _datumCtrl.text.trim(),
+            uhrzeit: _uhrzeitCtrl.text.trim().isEmpty ? null : _uhrzeitCtrl.text.trim(),
             eventTyp: _typ,
             beschreibung: _beschreibungCtrl.text.trim(),
             adresse: _adresseCtrl.text.trim().isEmpty
@@ -397,6 +400,13 @@ class _EventSubmitPageState extends State<EventSubmitPage> {
               _updateSimilarEvents();
             }
           },
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _uhrzeitCtrl,
+          style: _kInputTextStyle,
+          decoration: _inputStyle('Uhrzeit (HH:MM)'),
+          keyboardType: TextInputType.datetime,
         ),
         const SizedBox(height: 16),
         TextField(
