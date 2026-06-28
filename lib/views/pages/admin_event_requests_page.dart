@@ -651,11 +651,30 @@ class _ReviewSheetState extends State<_ReviewSheet> {
           },
         ),
         const SizedBox(height: 12),
-        TextField(
+        TextFormField(
           controller: _uhrzeitCtrl,
           style: _kInputText,
-          decoration: _inputStyle('Uhrzeit (HH:MM)'),
-          keyboardType: TextInputType.datetime,
+          decoration: _inputStyle(
+            'Uhrzeit',
+            suffixIcon: const Icon(Icons.access_time, color: Colors.white38, size: 18),
+          ),
+          readOnly: true,
+          onTap: () async {
+            final parts = _uhrzeitCtrl.text.split(':');
+            final initial = parts.length == 2
+                ? TimeOfDay(
+                    hour: int.tryParse(parts[0])?.clamp(0, 23) ?? 20,
+                    minute: int.tryParse(parts[1])?.clamp(0, 59) ?? 0,
+                  )
+                : const TimeOfDay(hour: 20, minute: 0);
+            final picked = await showPlatformTimePicker(context, initialTime: initial);
+            if (picked != null) {
+              setState(() {
+                _uhrzeitCtrl.text =
+                    '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+              });
+            }
+          },
         ),
         const SizedBox(height: 12),
         TextField(

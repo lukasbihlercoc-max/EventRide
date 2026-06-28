@@ -413,11 +413,30 @@ class _EventsPageState extends State<EventsPage> {
                   },
                 ),
                 const SizedBox(height: 16),
-                TextField(
+                TextFormField(
                   controller: uhrzeitController,
                   style: inputTextStyle,
-                  decoration: getInputStyle("Uhrzeit (HH:MM)"),
-                  keyboardType: TextInputType.datetime,
+                  decoration: getInputStyle(
+                    "Uhrzeit",
+                    suffixIcon: const Icon(Icons.access_time, color: Colors.white38, size: 20),
+                  ),
+                  readOnly: true,
+                  onTap: () async {
+                    final parts = uhrzeitController.text.split(':');
+                    final initial = parts.length == 2
+                        ? TimeOfDay(
+                            hour: int.tryParse(parts[0])?.clamp(0, 23) ?? 20,
+                            minute: int.tryParse(parts[1])?.clamp(0, 59) ?? 0,
+                          )
+                        : const TimeOfDay(hour: 20, minute: 0);
+                    final picked = await showPlatformTimePicker(context, initialTime: initial);
+                    if (picked != null) {
+                      setState(() {
+                        uhrzeitController.text =
+                            '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+                      });
+                    }
+                  },
                 ),
                 const SizedBox(height: 16),
                 TextField(
