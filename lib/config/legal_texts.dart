@@ -19,12 +19,19 @@ Im Rahmen der Nutzung der App werden folgende Daten erhoben:
 • Vor- und Nachname / Benutzername
 • Profilbild (optional)
 • Telefonnummer (optional, zur Verifizierung)
-• Heimatgemeinde inkl. GPS-Koordinaten (optional)
+• Heimatgemeinde als Ortsname (optional, für eingeloggte Nutzer
+  auf öffentlichen Profilen sichtbar); GPS-Koordinaten werden
+  ausschließlich lokal zur Entfernungsberechnung verwendet und
+  nicht an andere Nutzer weitergegeben
 • Fahrzeugdaten: Marke, Modell, Farbe, Sitzanzahl (optional)
 • Kfz-Kennzeichen (optional, für akzeptierte Mitfahrer 24 h vor Fahrtantritt sichtbar)
 • Führerschein-Foto (optional, zur Fahrer-Verifizierung)
 • Event- und Fahrtdaten (erstellte oder angefragte Fahrten)
 • Chat-Nachrichten zwischen Nutzern
+• Bewertungen (Sternebewertung 1–5 und Kommentar nach
+  gemeinsamer Fahrt, für eingeloggte Nutzer sichtbar)
+• Interessentenmarkierungen (welche Events du als
+  interessant markiert hast, inkl. Ortsname)
 • Push-Benachrichtigungs-Token (gerätebezogen)
 
 ──────────────────────────────────────
@@ -42,6 +49,10 @@ Die Daten werden auf folgenden Rechtsgrundlagen verarbeitet:
   GPS-Koordinaten werden nur mit ausdrücklicher Zustimmung
   des Nutzers erhoben. Die Einwilligung kann jederzeit
   widerrufen werden.
+
+Die App richtet sich an Nutzer ab 16 Jahren. Für die Nutzung
+als Fahrer ist ein gültiger Führerschein erforderlich
+(Mindestalter 17 Jahre).
 
 ──────────────────────────────────────
 
@@ -83,7 +94,29 @@ Aufbewahrungspflichten entgegenstehen.
 
 ──────────────────────────────────────
 
-7. Weitergabe von Daten
+7. Sichtbarkeit von Profildaten
+
+Folgende Profilfelder sind für andere eingeloggte Nutzer
+sichtbar (Zweck: Vertrauensaufbau für Mitfahrten):
+
+• Name und Profilbild
+• Heimatort (Ortsname)
+• Führerschein-Verifizierungsstatus (ja/nein)
+• Fahrzeugdaten (Marke, Modell, Farbe, Sitzanzahl)
+• Kennzeichen-Indikator (ob ein Kennzeichen hinterlegt ist;
+  das Kennzeichen selbst nur 24 h vor Fahrtantritt für
+  akzeptierte Mitfahrer)
+• Bewertungen (Sternebewertung + Kommentar)
+• Trust-Level (0–3, berechnet aus verifizierten Daten)
+
+GPS-Koordinaten, Telefonnummer und das vollständige
+Kennzeichen sind ausschließlich dem Nutzer selbst
+(bzw. im Fall des Kennzeichens: akzeptierten Mitfahrern)
+zugänglich.
+
+──────────────────────────────────────
+
+8. Weitergabe von Daten an Dritte
 
 Es erfolgt keine Weitergabe personenbezogener Daten an Dritte,
 außer:
@@ -94,7 +127,7 @@ außer:
 
 ──────────────────────────────────────
 
-8. Push-Benachrichtigungen
+9. Push-Benachrichtigungen
 
 Die App kann Push-Benachrichtigungen senden (z. B. bei neuen
 Anfragen oder Nachrichten). Diese können jederzeit in den
@@ -102,7 +135,7 @@ Geräteeinstellungen deaktiviert werden.
 
 ──────────────────────────────────────
 
-9. Rechte der Nutzer
+10. Rechte der Nutzer
 
 Nutzer haben folgende Rechte nach der DSGVO:
 
@@ -126,7 +159,7 @@ dsb.gv.at
 
 ──────────────────────────────────────
 
-10. Datensicherheit
+11. Datensicherheit
 
 Es werden technische und organisatorische Maßnahmen getroffen,
 um Daten vor Verlust, Missbrauch oder unbefugtem Zugriff
@@ -134,7 +167,7 @@ zu schützen.
 
 ──────────────────────────────────────
 
-11. Kennzeichen (optional)
+12. Kennzeichen (optional)
 
 Wenn ein Nutzer freiwillig ein Kfz-Kennzeichen hinterlegt, wird
 dieses ausschließlich bestätigten Mitfahrern innerhalb von
@@ -151,7 +184,7 @@ Es wird gelöscht, sobald der Account des Fahrers gelöscht wird.
 
 ──────────────────────────────────────
 
-12. Änderungen
+13. Änderungen
 
 Diese Datenschutzerklärung kann bei Bedarf angepasst werden.
 Die jeweils aktuelle Version ist in der App verfügbar.

@@ -95,8 +95,9 @@ class FirebaseAuthRepository implements IAuthRepository {
       phoneVerified: data['phoneVerified'] as bool? ?? false,
       licenseStatus: data['licenseStatus'] as String? ?? 'none',
       homeTown: data['homeTown'] as String?,
-      homeTownLat: (data['homeTownLat'] as num?)?.toDouble(),
-      homeTownLng: (data['homeTownLng'] as num?)?.toDouble(),
+      // Koordinaten aus private doc (datenschutzkonform); Fallback auf public für Altdaten
+      homeTownLat: ((privateData?['homeTownLat'] ?? data['homeTownLat']) as num?)?.toDouble(),
+      homeTownLng: ((privateData?['homeTownLng'] ?? data['homeTownLng']) as num?)?.toDouble(),
       car: carData != null ? CarInfo.fromMap(carData) : null,
       licenseRejectReason: licenseRejectReason,
       licensePlate: licensePlate,
@@ -390,10 +391,21 @@ class FirebaseAuthRepository implements IAuthRepository {
   Future<void> setHomeTown(String town, {double? lat, double? lng}) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
-    final update = <String, dynamic>{'homeTown': town};
-    if (lat != null) update['homeTownLat'] = lat;
-    if (lng != null) update['homeTownLng'] = lng;
-    await _firestore.collection('users').doc(uid).update(update);
+    final userRef = _firestore.collection('users').doc(uid);
+    // homeTown (Ortsname) bleibt öffentlich; alte GPS-Felder aus public entfernen
+    await userRef.update({
+      'homeTown': town,
+      'homeTownLat': FieldValue.delete(),
+      'homeTownLng': FieldValue.delete(),
+    });
+    // GPS-Koordinaten ausschließlich in private doc (nur für den Nutzer selbst lesbar)
+    await userRef.collection('private').doc('data').set(
+      {
+        'homeTownLat': lat ?? FieldValue.delete(),
+        'homeTownLng': lng ?? FieldValue.delete(),
+      },
+      SetOptions(merge: true),
+    );
   }
 
   @override
@@ -408,7 +420,12 @@ class FirebaseAuthRepository implements IAuthRepository {
   Future<({double? lat, double? lng})> getHomeTownCoords() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return (lat: null, lng: null);
-    final doc = await _firestore.collection('users').doc(uid).get();
+    final doc = await _firestore
+        .collection('users')
+        .doc(uid)
+        .collection('private')
+        .doc('data')
+        .get();
     final data = doc.data();
     return (
       lat: (data?['homeTownLat'] as num?)?.toDouble(),

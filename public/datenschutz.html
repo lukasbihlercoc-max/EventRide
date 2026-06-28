@@ -128,12 +128,14 @@
       <li>Vor- und Nachname / Benutzername</li>
       <li>Profilbild (optional)</li>
       <li>Telefonnummer (optional, zur Verifizierung)</li>
-      <li>Heimatgemeinde inkl. GPS-Koordinaten (optional)</li>
+      <li>Heimatgemeinde als Ortsname (optional, für eingeloggte Nutzer auf öffentlichen Profilen sichtbar); GPS-Koordinaten werden ausschließlich lokal zur Entfernungsberechnung verwendet und nicht an andere Nutzer weitergegeben</li>
       <li>Fahrzeugdaten: Marke, Modell, Farbe, Sitzanzahl (optional)</li>
       <li>Kfz-Kennzeichen (optional, für akzeptierte Mitfahrer 24 h vor Fahrtantritt sichtbar)</li>
       <li>Führerschein-Foto (optional, zur Fahrer-Verifizierung)</li>
       <li>Event- und Fahrtdaten (erstellte oder angefragte Fahrten)</li>
       <li>Chat-Nachrichten zwischen Nutzern</li>
+      <li>Bewertungen (Sternebewertung 1–5 und Kommentar nach gemeinsamer Fahrt, für eingeloggte Nutzer sichtbar)</li>
+      <li>Interessentenmarkierungen (welche Events du als interessant markiert hast, inkl. Ortsname)</li>
       <li>Push-Benachrichtigungs-Token (gerätebezogen)</li>
     </ul>
 
@@ -145,6 +147,7 @@
       <li><strong>Art. 6 Abs. 1 lit. b DSGVO</strong> (Vertragserfüllung): Vermittlung von Mitfahrten, Anzeige von Events, Kommunikation innerhalb der App.</li>
       <li><strong>Art. 6 Abs. 1 lit. a DSGVO</strong> (Einwilligung): Führerschein-Foto, Telefonnummer, Kfz-Kennzeichen und GPS-Koordinaten werden nur mit ausdrücklicher Zustimmung des Nutzers erhoben. Die Einwilligung kann jederzeit widerrufen werden.</li>
     </ul>
+    <p>Die App richtet sich an Nutzer ab 16 Jahren. Für die Nutzung als Fahrer ist ein gültiger Führerschein erforderlich (Mindestalter 17 Jahre).</p>
 
     <hr>
 
@@ -182,7 +185,22 @@
 
     <hr>
 
-    <h2>7. Weitergabe von Daten</h2>
+    <h2>7. Sichtbarkeit von Profildaten</h2>
+    <p>Folgende Profilfelder sind für andere eingeloggte Nutzer sichtbar (Zweck: Vertrauensaufbau für Mitfahrten):</p>
+    <ul>
+      <li>Name und Profilbild</li>
+      <li>Heimatort (Ortsname)</li>
+      <li>Führerschein-Verifizierungsstatus (ja/nein)</li>
+      <li>Fahrzeugdaten (Marke, Modell, Farbe, Sitzanzahl)</li>
+      <li>Kennzeichen-Indikator (ob ein Kennzeichen hinterlegt ist; das vollständige Kennzeichen nur 24 h vor Fahrtantritt für akzeptierte Mitfahrer)</li>
+      <li>Bewertungen (Sternebewertung + Kommentar)</li>
+      <li>Trust-Level (0–3, berechnet aus verifizierten Daten)</li>
+    </ul>
+    <p>GPS-Koordinaten, Telefonnummer und das vollständige Kennzeichen sind ausschließlich dem Nutzer selbst (bzw. im Fall des Kennzeichens: akzeptierten Mitfahrern) zugänglich.</p>
+
+    <hr>
+
+    <h2>8. Weitergabe von Daten an Dritte</h2>
     <p>Es erfolgt keine Weitergabe personenbezogener Daten an Dritte, außer:</p>
     <ul>
       <li>soweit technisch zur Bereitstellung der App notwendig (Firebase, Google Places API)</li>
@@ -191,7 +209,7 @@
 
     <hr>
 
-    <h2>8. Push-Benachrichtigungen</h2>
+    <h2>9. Push-Benachrichtigungen</h2>
     <p>
       Die App kann Push-Benachrichtigungen senden (z. B. bei neuen Anfragen oder Nachrichten).
       Diese können jederzeit in den Geräteeinstellungen deaktiviert werden.
@@ -199,7 +217,7 @@
 
     <hr>
 
-    <h2>9. Rechte der Nutzer</h2>
+    <h2>10. Rechte der Nutzer</h2>
     <p>Nutzer haben folgende Rechte nach der DSGVO:</p>
     <ul>
       <li>Auskunft (Art. 15 DSGVO)</li>
@@ -222,7 +240,7 @@
 
     <hr>
 
-    <h2>10. Datensicherheit</h2>
+    <h2>11. Datensicherheit</h2>
     <p>
       Es werden technische und organisatorische Maßnahmen getroffen, um Daten vor Verlust,
       Missbrauch oder unbefugtem Zugriff zu schützen.
@@ -230,7 +248,7 @@
 
     <hr>
 
-    <h2>11. Kennzeichen (optional)</h2>
+    <h2>12. Kennzeichen (optional)</h2>
     <p>
       Wenn ein Nutzer freiwillig ein Kfz-Kennzeichen hinterlegt, wird dieses ausschließlich
       bestätigten Mitfahrern innerhalb von 24 Stunden vor Fahrtantritt angezeigt.
@@ -248,7 +266,7 @@
 
     <hr>
 
-    <h2>12. Änderungen</h2>
+    <h2>13. Änderungen</h2>
     <p>
       Diese Datenschutzerklärung kann bei Bedarf angepasst werden. Die jeweils aktuelle
       Version ist in der App und auf dieser Seite verfügbar. Stand: Juni 2026.
