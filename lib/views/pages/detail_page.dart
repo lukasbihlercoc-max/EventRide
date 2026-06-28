@@ -13,6 +13,7 @@ import 'package:my_app/data/anfrage_service.dart';
 import 'package:my_app/utils/app_route.dart';
 import 'package:my_app/data/chat_service.dart';
 import 'package:my_app/data/event_daten.dart';
+import 'package:my_app/data/event_service.dart';
 import 'package:my_app/data/fahrt_daten.dart';
 import 'package:my_app/data/fahrt_service.dart';
 import 'package:my_app/data/interessenten_service.dart';
@@ -268,21 +269,62 @@ class DetailPage extends StatelessWidget {
                           }),
                           SizedBox(height: height * 0.043),
                           if (context.read<IAuthRepository>().isAdmin)
-                            Center(
-                              child: OutlinedButton(
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    AppRoute(
-                                      builder: (_) => EventsPage(event: event),
-                                    ),
-                                  );
-                                },
-                                child: Text(
-                                  "Bearbeiten",
-                                  style: TextStyle(fontSize: width * 0.043),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                OutlinedButton(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      AppRoute(
+                                        builder: (_) => EventsPage(event: event),
+                                      ),
+                                    );
+                                  },
+                                  child: Text(
+                                    "Bearbeiten",
+                                    style: TextStyle(fontSize: width * 0.043),
+                                  ),
                                 ),
-                              ),
+                                SizedBox(width: width * 0.04),
+                                OutlinedButton(
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFFE63946),
+                                    side: const BorderSide(color: Color(0xFFE63946)),
+                                  ),
+                                  onPressed: () async {
+                                    final confirmed = await showDialog<bool>(
+                                      context: context,
+                                      builder: (ctx) => AlertDialog(
+                                        title: const Text("Event löschen?"),
+                                        content: Text(
+                                            '"${event.name}" wird unwiderruflich gelöscht.'),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(ctx, false),
+                                            child: const Text("Abbrechen"),
+                                          ),
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(ctx, true),
+                                            child: const Text(
+                                              "Löschen",
+                                              style: TextStyle(color: Color(0xFFE63946)),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    if (confirmed == true && context.mounted) {
+                                      await context.read<EventService>().delete(event.id);
+                                      if (context.mounted) Navigator.pop(context);
+                                    }
+                                  },
+                                  child: Text(
+                                    "Löschen",
+                                    style: TextStyle(fontSize: width * 0.043),
+                                  ),
+                                ),
+                              ],
                             ),
                         ],
                       ),
