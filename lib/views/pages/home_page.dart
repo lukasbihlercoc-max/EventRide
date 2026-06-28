@@ -486,6 +486,7 @@ class _HomePageState extends State<HomePage> {
     'e4': 'Ball',
     'e5': 'Krampus',
     'e6': 'Festival/Open-Air',
+    'e7': 'Strand & Sommer',
   };
 
   String _radiusLabel(int? value) {
