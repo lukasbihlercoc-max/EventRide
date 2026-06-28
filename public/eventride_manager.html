@@ -928,6 +928,7 @@ function eventRow(ev, hasDupes=false) {
       <div class="event-date" style="color:${past?"#e74c3c":"#555"}">${fmt(ev.datum)}</div>
       <div class="event-icons">${icons.join("")}</div>
     </div>
+    <button class="small danger" style="flex-shrink:0;opacity:.7" onclick="event.stopPropagation();delPending('${ev._id}')">🗑</button>
   </div>`;
 }
 
