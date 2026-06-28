@@ -478,7 +478,88 @@ export const acceptInvitation = onCall(async (request) => {
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Callable 7: Bewertung abgeben
+// Callable 7: Kennzeichen abrufen (Sicherheits-Feature)
+//   – Gibt das aktuelle Kennzeichen des Fahrers zurück
+//   – Nur für bestätigte Mitfahrer (akzeptierte Anfrage für diese Fahrt)
+//   – Nur innerhalb von 24h vor Abfahrt (server-seitig geprüft)
+//   – Gibt releasedAt zurück wenn noch zu früh, expired wenn Fahrt vorbei
+// ──────────────────────────────────────────────────────────────────────────────
+
+export const getLicensePlate = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Nicht eingeloggt");
+  }
+
+  const callerId = request.auth.uid;
+  const data = request.data as {fahrtId?: unknown};
+  if (typeof data.fahrtId !== "string" || !data.fahrtId) {
+    throw new HttpsError("invalid-argument", "fahrtId fehlt");
+  }
+  const fahrtId = data.fahrtId;
+
+  // 1. Akzeptierte Anfrage des Callers für diese Fahrt prüfen
+  const anfragenSnap = await db
+    .collection("anfragen")
+    .where("fahrtId", "==", fahrtId)
+    .where("requesterId", "==", callerId)
+    .where("status", "==", 1)
+    .limit(1)
+    .get();
+
+  if (anfragenSnap.empty) {
+    throw new HttpsError("permission-denied", "Keine akzeptierte Anfrage für diese Fahrt");
+  }
+
+  // 2. Fahrt laden
+  const fahrtDoc = await db.doc(`fahrten/${fahrtId}`).get();
+  if (!fahrtDoc.exists) throw new HttpsError("not-found", "Fahrt nicht gefunden");
+  const fahrtData = fahrtDoc.data()!;
+
+  // 3. Event-Datum laden
+  const eventId = fahrtData["eventId"] as string;
+  const uhrzeitHour = (fahrtData["uhrzeitHour"] as number | undefined) ?? 0;
+  const uhrzeitMinute = (fahrtData["uhrzeitMinute"] as number | undefined) ?? 0;
+
+  const eventDoc = await db.doc(`events/${eventId}`).get();
+  if (!eventDoc.exists) throw new HttpsError("not-found", "Event nicht gefunden");
+
+  const rawDatum = eventDoc.data()!["datum"];
+  let eventDatum: Date;
+  if (rawDatum && typeof rawDatum.toDate === "function") {
+    eventDatum = rawDatum.toDate();
+  } else if (typeof rawDatum === "string") {
+    eventDatum = new Date(rawDatum);
+  } else {
+    throw new HttpsError("internal", "Ungültiges Event-Datum");
+  }
+
+  // 4. Abfahrtszeit berechnen und 24h-Fenster prüfen (server-seitig)
+  const departure = new Date(eventDatum);
+  departure.setHours(uhrzeitHour, uhrzeitMinute, 0, 0);
+
+  const now = new Date();
+  const hoursUntilDeparture = (departure.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+  if (hoursUntilDeparture > 24) {
+    // Noch zu früh: Freigabezeitpunkt zurückgeben
+    const releasedAt = new Date(departure.getTime() - 24 * 60 * 60 * 1000).toISOString();
+    return {plate: null, releasedAt};
+  }
+  // 6 Stunden nach Abfahrt: Fahrt ist vorbei (Rückfahrt-Puffer inbegriffen)
+  if (hoursUntilDeparture < -6) {
+    return {plate: null, expired: true};
+  }
+
+  // 5. Kennzeichen aus private doc des Fahrers lesen (Admin SDK hat vollen Zugriff)
+  const ownerId = fahrtData["ownerId"] as string;
+  const privateDoc = await db.doc(`users/${ownerId}/private/data`).get();
+  const plate = (privateDoc.data()?.["licensePlate"] as string | undefined) ?? null;
+
+  return {plate};
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Callable 8: Bewertung abgeben
 //   – Vollständige serverseitige Validierung:
 //     1. Authentifizierung
 //     2. reviewer !== reviewed

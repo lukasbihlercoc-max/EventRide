@@ -132,7 +132,24 @@ zu schützen.
 
 ──────────────────────────────────────
 
-11. Änderungen
+11. Kennzeichen (optional)
+
+Wenn ein Nutzer freiwillig ein Kfz-Kennzeichen hinterlegt, wird
+dieses ausschließlich bestätigten Mitfahrern innerhalb von
+24 Stunden vor Fahrtantritt angezeigt. Das Kennzeichen dient
+ausschließlich der Verifizierung des Fahrzeugs und der Erhöhung
+der Sicherheit während der Mitfahrt.
+
+Mitfahrer sind selbst dafür verantwortlich, vor Fahrtantritt zu
+überprüfen, ob das angezeigte Kennzeichen mit dem tatsächlichen
+Fahrzeug übereinstimmt.
+
+Das Kennzeichen wird nach Ablauf der Fahrt nicht mehr angezeigt.
+Es wird gelöscht, sobald der Account des Fahrers gelöscht wird.
+
+──────────────────────────────────────
+
+12. Änderungen
 
 Diese Datenschutzerklärung kann bei Bedarf angepasst werden.
 Die jeweils aktuelle Version ist in der App verfügbar.

@@ -88,6 +88,10 @@ abstract class IAuthRepository {
   Future<void> updateCarInfo(
       String make, String model, String? color, int? seats);
 
+  /// Speichert das Kennzeichen in private Subcollection und setzt
+  /// car.hasLicensePlate im public doc. null = Kennzeichen entfernen.
+  Future<void> updateLicensePlate(String? plate);
+
   // ── Admin: Führerschein-Prüfung ──────────────────────────────────────────
 
   /// Stream aller offenen Führerschein-Anfragen (nur für Admins).

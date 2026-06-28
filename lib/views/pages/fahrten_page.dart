@@ -2245,6 +2245,16 @@ class _RequestedRideCardState extends State<_RequestedRideCard> {
                                     ? '${anfrage.seatsAccepted} / ${anfrage.seatsRequested} Plätze'
                                     : '${anfrage.seatsRequested} Plätze',
                               ),
+                              _KennzeichenSection(
+                                fahrtId: fahrt.id,
+                                departure: DateTime(
+                                  event.datum.year,
+                                  event.datum.month,
+                                  event.datum.day,
+                                  fahrt.uhrzeit.hour,
+                                  fahrt.uhrzeit.minute,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -3227,6 +3237,106 @@ class _TimeBadge extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// _KennzeichenSection
+// Ruft die getLicensePlate CF ab und zeigt je nach Status:
+//  – vor 24h-Fenster: Sperrhinweis mit Freigabe-Zeitpunkt
+//  – im Fenster + Plate vorhanden: echtes Kennzeichen
+//  – im Fenster + kein Plate: Hinweis "nicht hinterlegt"
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _KennzeichenSection extends StatefulWidget {
+  final String fahrtId;
+  final DateTime departure;
+
+  const _KennzeichenSection({
+    required this.fahrtId,
+    required this.departure,
+  });
+
+  @override
+  State<_KennzeichenSection> createState() => _KennzeichenSectionState();
+}
+
+class _KennzeichenSectionState extends State<_KennzeichenSection> {
+  // null = lädt noch; '' = kein Plate; 'LOCKED:ISO' = noch gesperrt
+  String? _plate;
+  DateTime? _releasedAt;
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final result = await FirebaseFunctions.instance
+          .httpsCallable('getLicensePlate')
+          .call({'fahrtId': widget.fahrtId});
+      final data = result.data as Map<String, dynamic>;
+      if (!mounted) return;
+      final plate = data['plate'] as String?;
+      final releasedAtStr = data['releasedAt'] as String?;
+      setState(() {
+        _plate = plate ?? '';
+        _releasedAt =
+            releasedAtStr != null ? DateTime.tryParse(releasedAtStr) : null;
+        _loaded = true;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loaded = true);
+    }
+  }
+
+  String _formatDate(DateTime dt) {
+    final local = dt.toLocal();
+    return '${local.day.toString().padLeft(2, '0')}.${local.month.toString().padLeft(2, '0')}. '
+        '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')} Uhr';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_loaded) return const SizedBox.shrink();
+
+    // Noch nicht im 24h-Fenster
+    if (_releasedAt != null) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 5),
+        child: _TimeBadge(
+          icon: Icons.lock_clock_outlined,
+          text: 'Kennzeichen ab ${_formatDate(_releasedAt!)} sichtbar',
+        ),
+      );
+    }
+
+    // Im Fenster, echtes Kennzeichen
+    if (_plate != null && _plate!.isNotEmpty) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 5),
+        child: _TimeBadge(
+          icon: Icons.credit_card_outlined,
+          text: 'Kennzeichen: $_plate',
+        ),
+      );
+    }
+
+    // Im Fenster, kein Kennzeichen hinterlegt
+    if (_plate != null && _plate!.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 5),
+        child: _TimeBadge(
+          icon: Icons.credit_card_off_outlined,
+          text: 'Kein Kennzeichen hinterlegt',
+        ),
+      );
+    }
+
+    return const SizedBox.shrink();
   }
 }
 

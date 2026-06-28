@@ -21,6 +21,11 @@ class FirebaseAuthRepository implements IAuthRepository {
   bool _isAdmin = false;
   AppUser? _cachedUser;
 
+  // Kombinierte Dokument-Snapshots für den authStateChanges-Stream
+  DocumentSnapshot? _latestUserDoc;
+  Map<String, dynamic>? _latestPrivateData;
+  StreamSubscription<DocumentSnapshot>? _firestorePrivateSub;
+
   FirebaseAuthRepository({
     FirebaseAuth? auth,
     FirebaseFirestore? firestore,
@@ -63,10 +68,18 @@ class FirebaseAuthRepository implements IAuthRepository {
         emailVerified: fbUser.emailVerified,
       );
 
-  // Vollständiges AppUser-Objekt aus Firebase Auth + Firestore-Dokument.
-  AppUser _toAppUser(User fbUser, DocumentSnapshot doc) {
+  // Vollständiges AppUser-Objekt aus Firebase Auth + Firestore-Dokument + private doc.
+  // privateData: Inhalt von users/{uid}/private/data (phone, licenseRejectReason, licensePlate)
+  AppUser _toAppUser(User fbUser, DocumentSnapshot doc,
+      [Map<String, dynamic>? privateData]) {
     final data = doc.data() as Map<String, dynamic>? ?? {};
     final carData = data['car'] as Map<String, dynamic>?;
+    // Fallback auf main doc für bestehende Nutzer, bis private doc befüllt ist
+    final phone = privateData?['phone'] as String?
+        ?? data['phone'] as String?;
+    final licenseRejectReason = privateData?['licenseRejectReason'] as String?
+        ?? data['licenseRejectReason'] as String?;
+    final licensePlate = privateData?['licensePlate'] as String?;
     return AppUser(
       userId: fbUser.uid,
       name: () {
@@ -78,14 +91,15 @@ class FirebaseAuthRepository implements IAuthRepository {
       email: fbUser.email ?? '',
       photoUrl: data['photoUrl'] as String? ?? fbUser.photoURL,
       emailVerified: data['emailVerified'] as bool? ?? fbUser.emailVerified,
-      phone: data['phone'] as String?,
+      phone: phone,
       phoneVerified: data['phoneVerified'] as bool? ?? false,
       licenseStatus: data['licenseStatus'] as String? ?? 'none',
       homeTown: data['homeTown'] as String?,
       homeTownLat: (data['homeTownLat'] as num?)?.toDouble(),
       homeTownLng: (data['homeTownLng'] as num?)?.toDouble(),
       car: carData != null ? CarInfo.fromMap(carData) : null,
-      licenseRejectReason: data['licenseRejectReason'] as String?,
+      licenseRejectReason: licenseRejectReason,
+      licensePlate: licensePlate,
       ratingAvg: (data['ratingAvg'] as num?)?.toDouble(),
       ratingCount: (data['ratingCount'] as num?)?.toInt() ?? 0,
     );
@@ -99,11 +113,11 @@ class FirebaseAuthRepository implements IAuthRepository {
     return _mapUser(fbUser);
   }
 
-  // Kombiniert Firebase Auth-Stream mit dem Firestore-Nutzerdokument.
-  // Jede Änderung am Firestore-Dokument (Telefon, Führerschein, Auto, ...)
-  // löst automatisch einen Rebuild in der UI aus.
+  // Kombiniert Firebase Auth-Stream mit dem Firestore-Nutzerdokument
+  // (public doc + private subcollection). Jede Änderung an einem der beiden
+  // Dokumente löst automatisch einen Rebuild in der UI aus.
   //
-  // switchMap-Verhalten: beim Logout wird der Firestore-Stream sofort
+  // switchMap-Verhalten: beim Logout werden beide Firestore-Streams sofort
   // abgebrochen, damit der nächste Login-Event nicht gepuffert bleibt.
   @override
   Stream<AppUser?> get authStateChanges {
@@ -111,39 +125,60 @@ class FirebaseAuthRepository implements IAuthRepository {
     StreamSubscription<User?>? authSub;
     late final StreamController<AppUser?> controller;
 
+    void emitUser(User fbUser) {
+      final doc = _latestUserDoc;
+      if (doc == null) return;
+      _isAdmin = (doc.data() as Map<String, dynamic>?)?['isAdmin'] == true;
+      _cachedUser = _toAppUser(fbUser, doc, _latestPrivateData);
+      controller.add(_cachedUser);
+    }
+
     controller = StreamController<AppUser?>(
       onListen: () {
         authSub = _auth.userChanges().listen(
           (fbUser) {
             firestoreSub?.cancel();
+            _firestorePrivateSub?.cancel();
             firestoreSub = null;
+            _firestorePrivateSub = null;
+            _latestUserDoc = null;
+            _latestPrivateData = null;
             if (fbUser == null) {
               _cachedUser = null;
               controller.add(null);
               return;
             }
             _backfillCreatedAt(fbUser);
-            firestoreSub = _firestore
-                .collection('users')
-                .doc(fbUser.uid)
+            final userRef = _firestore.collection('users').doc(fbUser.uid);
+
+            // Listener 1: public user doc
+            firestoreSub = userRef.snapshots().listen(
+              (doc) {
+                _latestUserDoc = doc;
+                emitUser(fbUser);
+              },
+              onError: (_) {},
+            );
+
+            // Listener 2: private subcollection (phone, licenseRejectReason, licensePlate)
+            _firestorePrivateSub = userRef
+                .collection('private')
+                .doc('data')
                 .snapshots()
                 .listen(
-                  (doc) {
-                    _isAdmin = doc.data()?['isAdmin'] == true;
-                    _cachedUser = _toAppUser(fbUser, doc);
-                    controller.add(_cachedUser!);
-                  },
-                  onError: (_) {
-                    // Firestore-Fehler (z.B. PERMISSION_DENIED kurz nach Logout)
-                    // nicht an Subscriber propagieren – kein onError-Handler dort.
-                  },
-                );
+              (doc) {
+                _latestPrivateData = doc.data();
+                if (_latestUserDoc != null) emitUser(fbUser);
+              },
+              onError: (_) {},
+            );
           },
           onError: controller.addError,
         );
       },
       onCancel: () {
         firestoreSub?.cancel();
+        _firestorePrivateSub?.cancel();
         authSub?.cancel();
       },
     );
@@ -193,7 +228,6 @@ class FirebaseAuthRepository implements IAuthRepository {
       'firstName': firstName,
       'lastName': lastName,
       'email': email,
-      'phone': '',
       'phoneVerified': false,
       'homeTown': '',
       'emailVerified': false,
@@ -350,8 +384,12 @@ class FirebaseAuthRepository implements IAuthRepository {
     }
 
     // Firestore-Dokumente des Users löschen (User-Doc enthält auch FCM-Token)
+    // private doc explizit löschen (DSGVO: phone, licenseRejectReason, licensePlate)
     final userBatch = _firestore.batch();
     userBatch.delete(_firestore.collection('users').doc(uid));
+    userBatch.delete(
+      _firestore.collection('users').doc(uid).collection('private').doc('data'),
+    );
     userBatch.delete(_firestore.collection('licenseRequests').doc(uid));
     await userBatch.commit();
 
@@ -466,10 +504,15 @@ class FirebaseAuthRepository implements IAuthRepository {
   Future<void> savePhone(String phone) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
-    await _firestore.collection('users').doc(uid).update({
-      'phone': phone,
-      'phoneVerified': true,
-    });
+    final ref = _firestore.collection('users').doc(uid);
+    // phone geht in private doc; phoneVerified (öffentlicher Schild) bleibt im main doc
+    await Future.wait([
+      ref.collection('private').doc('data').set(
+        {'phone': phone},
+        SetOptions(merge: true),
+      ),
+      ref.update({'phoneVerified': true}),
+    ]);
   }
 
   @override
@@ -546,8 +589,13 @@ class FirebaseAuthRepository implements IAuthRepository {
     final batch = _firestore.batch();
     batch.update(_firestore.collection('users').doc(uid), {
       'licenseStatus': 'pending',
-      'licenseRejectReason': FieldValue.delete(),
     });
+    // licenseRejectReason aus private doc löschen (falls vorhanden)
+    batch.set(
+      _firestore.collection('users').doc(uid).collection('private').doc('data'),
+      {'licenseRejectReason': FieldValue.delete()},
+      SetOptions(merge: true),
+    );
     batch.set(_firestore.collection('licenseRequests').doc(uid), {
       'uid': uid,
       'userName': userInfo.name,
@@ -604,8 +652,13 @@ class FirebaseAuthRepository implements IAuthRepository {
     });
     batch.update(_firestore.collection('users').doc(userId), {
       'licenseStatus': 'rejected',
-      'licenseRejectReason': reason,
     });
+    // licenseRejectReason in private doc (nicht im public user doc)
+    batch.set(
+      _firestore.collection('users').doc(userId).collection('private').doc('data'),
+      {'licenseRejectReason': reason},
+      SetOptions(merge: true),
+    );
     await batch.commit();
   }
 
@@ -616,10 +669,36 @@ class FirebaseAuthRepository implements IAuthRepository {
       String make, String model, String? color, int? seats) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
+    // hasLicensePlate aus aktuellem Zustand übernehmen (nicht überschreiben)
+    final existing = _cachedUser?.car;
+    final carInfo = CarInfo(
+      make: make,
+      model: model,
+      color: color,
+      seats: seats,
+      hasLicensePlate: existing?.hasLicensePlate ?? false,
+    );
     await _firestore.collection('users').doc(uid).update({
-      'car': CarInfo(make: make, model: model, color: color, seats: seats)
-          .toMap(),
+      'car': carInfo.toMap(),
     });
+  }
+
+  @override
+  Future<void> updateLicensePlate(String? plate) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+    final normalized =
+        (plate == null || plate.trim().isEmpty) ? null : plate.trim().toUpperCase();
+    final ref = _firestore.collection('users').doc(uid);
+    final batch = _firestore.batch();
+    batch.set(
+      ref.collection('private').doc('data'),
+      {'licensePlate': normalized},
+      SetOptions(merge: true),
+    );
+    // car.hasLicensePlate im public doc aktualisieren
+    batch.update(ref, {'car.hasLicensePlate': normalized != null});
+    await batch.commit();
   }
 
   // ── Event-Anfragen ─────────────────────────────────────────────────────────

@@ -48,6 +48,18 @@ service cloud.firestore {
                         && request.resource.data.get('email', '') == resource.data.get('email', '')
                         && request.resource.data.get('isAdmin', false) == resource.data.get('isAdmin', false));
       allow delete: if isOwner(uid);
+
+      // ----------------------------------------------------------------
+      // users/{uid}/private/{doc}
+      //
+      // Sensible Felder: phone, licenseRejectReason, licensePlate
+      // Lesen/Schreiben: Nur Eigentümer oder Admin
+      // Admin-Writes via Cloud Functions (Admin SDK, umgeht Rules)
+      // ----------------------------------------------------------------
+      match /private/{doc} {
+        allow read:  if isOwner(uid) || isAdmin();
+        allow write: if isOwner(uid);
+      }
     }
 
     // ----------------------------------------------------------------

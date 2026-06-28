@@ -511,7 +511,10 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
                       ),
                       if (_car != null) ...[
                         const SizedBox(height: 12),
-                        _CarCard(car: _car!),
+                        _CarCard(
+                          car: _car!,
+                          hasLicensePlate: _car!.hasLicensePlate,
+                        ),
                       ],
                       const SizedBox(height: 20),
                       _ReviewsSection(
@@ -756,7 +759,47 @@ class _StatCell extends StatelessWidget {
 
 class _CarCard extends StatelessWidget {
   final CarInfo car;
-  const _CarCard({required this.car});
+  final bool hasLicensePlate;
+  const _CarCard({required this.car, required this.hasLicensePlate});
+
+  void _showInfo(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1F2E),
+        title: Row(
+          children: [
+            const Icon(Icons.credit_card_outlined,
+                color: Color(0xFFF5A04A), size: 20),
+            const SizedBox(width: 8),
+            const Text(
+              'Kennzeichen',
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
+        content: Text(
+          hasLicensePlate
+              ? 'Der Fahrer hat sein Kennzeichen hinterlegt. Du kannst es '
+                '24 Stunden vor der Fahrt auf deiner Mitfahrt-Seite einsehen '
+                'und das Fahrzeug vor dem Einsteigen prüfen.'
+              : 'Dieser Fahrer hat noch kein Kennzeichen hinterlegt.',
+          style: const TextStyle(
+              color: Colors.white70, fontSize: 13, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK',
+                style: TextStyle(color: Color(0xFFF5A04A))),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -778,80 +821,141 @@ class _CarCard extends StatelessWidget {
             ),
           ),
         ),
-        AppCard(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: color.withValues(alpha: 0.25)),
-                ),
-                child: Center(
-                  child: Icon(
-                    Icons.directions_car_rounded,
-                    size: 40,
-                    color: color,
+        GestureDetector(
+          onTap: () => _showInfo(context),
+          child: AppCard(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: color.withValues(alpha: 0.25)),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      Icons.directions_car_rounded,
+                      size: 40,
+                      color: color,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (carName.isNotEmpty)
-                      Text(
-                        carName,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (carName.isNotEmpty)
+                        Text(
+                          carName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        if (car.color != null) ...[
-                          Container(
-                            width: 10,
-                            height: 10,
-                            decoration: BoxDecoration(
-                              color: color,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white38, width: 0.5),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          if (car.color != null) ...[
+                            Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                color: color,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: Colors.white38, width: 0.5),
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            car.color!,
-                            style: const TextStyle(color: Colors.white60, fontSize: 13),
-                          ),
+                            const SizedBox(width: 5),
+                            Text(
+                              car.color!,
+                              style: const TextStyle(
+                                  color: Colors.white60, fontSize: 13),
+                            ),
+                          ],
+                          if (car.color != null && car.seats != null)
+                            const Text(
+                              ' · ',
+                              style: TextStyle(
+                                  color: Colors.white38, fontSize: 13),
+                            ),
+                          if (car.seats != null)
+                            Text(
+                              '${car.seats} Plätze',
+                              style: const TextStyle(
+                                  color: Colors.white60, fontSize: 13),
+                            ),
                         ],
-                        if (car.color != null && car.seats != null)
-                          const Text(
-                            ' · ',
-                            style: TextStyle(color: Colors.white38, fontSize: 13),
-                          ),
-                        if (car.seats != null)
-                          Text(
-                            '${car.seats} Plätze',
-                            style: const TextStyle(color: Colors.white60, fontSize: 13),
-                          ),
-                      ],
-                    ),
-                  ],
+                      ),
+                      const SizedBox(height: 8),
+                      _LicensePlateIndicator(hasPlate: hasLicensePlate),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.info_outline,
+                  color: Colors.white24,
+                  size: 16,
+                ),
+              ],
+            ),
           ),
         ),
       ],
+    );
+  }
+}
+
+// Stilisierte Kennzeichen-Plakette — aktiv wenn hasPlate, grayed-out wenn nicht
+class _LicensePlateIndicator extends StatelessWidget {
+  final bool hasPlate;
+  const _LicensePlateIndicator({required this.hasPlate});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 22,
+      constraints: const BoxConstraints(maxWidth: 120),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: hasPlate ? 0.06 : 0.02),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: hasPlate ? Colors.white24 : Colors.white12,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 7,
+            decoration: BoxDecoration(
+              color: hasPlate
+                  ? const Color(0xFF003399)
+                  : Colors.white.withValues(alpha: 0.12),
+              borderRadius:
+                  const BorderRadius.horizontal(left: Radius.circular(3)),
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            hasPlate ? 'AT ••–•••••' : 'AT  –  –  –',
+            style: TextStyle(
+              color: hasPlate ? Colors.white54 : Colors.white24,
+              fontSize: 11,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(width: 5),
+        ],
+      ),
     );
   }
 }

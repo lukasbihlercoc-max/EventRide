@@ -1,6 +1,5 @@
 // profile_page.dart
 import 'dart:io';
-import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -403,7 +402,10 @@ class _LoggedInViewState extends State<_LoggedInView> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => _CarInfoSheet(current: widget.user.car),
+      builder: (ctx) => _CarInfoSheet(
+        current: widget.user.car,
+        currentLicensePlate: widget.user.licensePlate,
+      ),
     );
   }
 
@@ -690,7 +692,9 @@ class _LoggedInViewState extends State<_LoggedInView> {
                     icon: Icons.directions_car_outlined,
                     label: "Auto-Infos",
                     cta: user.car != null ? "Bearbeiten" : "Hinzufügen",
-                    state: user.car != null ? VerifState.done : VerifState.open,
+                    state: (user.car != null && user.car!.hasLicensePlate)
+                        ? VerifState.done
+                        : VerifState.open,
                     doneLabel: "Erledigt",
                     onTap: _showCarSheet,
                   ),
@@ -752,15 +756,6 @@ class _HeroSection extends StatelessWidget {
             child: Stack(
               alignment: Alignment.center,
               children: [
-                SizedBox(
-                  width: 122,
-                  height: 122,
-                  child: CustomPaint(
-                    painter: _ProgressArcPainter(
-                      progress: hasPhoto ? 0.5 : 0.25,
-                    ),
-                  ),
-                ),
                 Container(
                   width: 100,
                   height: 100,
@@ -1734,7 +1729,8 @@ class _HomeTownSheetState extends State<_HomeTownSheet> {
 
 class _CarInfoSheet extends StatefulWidget {
   final CarInfo? current;
-  const _CarInfoSheet({this.current});
+  final String? currentLicensePlate;
+  const _CarInfoSheet({this.current, this.currentLicensePlate});
 
   @override
   State<_CarInfoSheet> createState() => _CarInfoSheetState();
@@ -1745,6 +1741,7 @@ class _CarInfoSheetState extends State<_CarInfoSheet> {
   late final TextEditingController _modelCtrl;
   late final TextEditingController _colorCtrl;
   late final TextEditingController _seatsCtrl;
+  late final TextEditingController _plateCtrl;
   bool _loading = false;
   String? _error;
 
@@ -1757,6 +1754,7 @@ class _CarInfoSheetState extends State<_CarInfoSheet> {
     _colorCtrl = TextEditingController(text: c?.color ?? '');
     _seatsCtrl =
         TextEditingController(text: c?.seats != null ? '${c!.seats}' : '');
+    _plateCtrl = TextEditingController(text: widget.currentLicensePlate ?? '');
   }
 
   @override
@@ -1765,7 +1763,36 @@ class _CarInfoSheetState extends State<_CarInfoSheet> {
     _modelCtrl.dispose();
     _colorCtrl.dispose();
     _seatsCtrl.dispose();
+    _plateCtrl.dispose();
     super.dispose();
+  }
+
+  void _showPlateInfo() {
+    showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1F2E),
+        title: const Text(
+          'Warum Kennzeichen hinterlegen?',
+          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+        ),
+        content: const Text(
+          'Dein Kennzeichen wird ausschließlich bestätigten Mitfahrern '
+          '24 Stunden vor der Fahrt angezeigt. Dadurch können Mitfahrer '
+          'das Fahrzeug vor dem Einsteigen überprüfen. Dies erhöht die '
+          'Sicherheit für beide Seiten.\n\n'
+          'Falls du mit unterschiedlichen Fahrzeugen fährst, aktualisiere '
+          'das Kennzeichen rechtzeitig vor der Fahrt.',
+          style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK', style: TextStyle(color: Color(0xFFF5A04A))),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _save() async {
@@ -1776,17 +1803,28 @@ class _CarInfoSheetState extends State<_CarInfoSheet> {
       return;
     }
     final seats = int.tryParse(_seatsCtrl.text.trim());
+    final plate = _plateCtrl.text.trim().isEmpty ? null : _plateCtrl.text.trim().toUpperCase();
+    if (plate != null) {
+      final hasLetter = plate.contains(RegExp(r'[A-ZÄÖÜ]'));
+      final hasDigit = plate.contains(RegExp(r'\d'));
+      if (!hasLetter || !hasDigit) {
+        setState(() => _error = 'Ungültiges Kennzeichen (z. B. KL-123AB)');
+        return;
+      }
+    }
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      await context.read<IAuthRepository>().updateCarInfo(
-            make,
-            model,
-            _colorCtrl.text.trim().isEmpty ? null : _colorCtrl.text.trim(),
-            seats,
-          );
+      final repo = context.read<IAuthRepository>();
+      await repo.updateCarInfo(
+        make,
+        model,
+        _colorCtrl.text.trim().isEmpty ? null : _colorCtrl.text.trim(),
+        seats,
+      );
+      await repo.updateLicensePlate(plate);
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
@@ -1797,7 +1835,7 @@ class _CarInfoSheetState extends State<_CarInfoSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
           24, 20, 24, MediaQuery.of(context).viewInsets.bottom + 24),
       child: Column(
@@ -1835,6 +1873,18 @@ class _CarInfoSheetState extends State<_CarInfoSheet> {
               FilteringTextInputFormatter.digitsOnly,
               LengthLimitingTextInputFormatter(1),
             ],
+          ),
+          const SizedBox(height: 10),
+          _SheetTextField(
+            controller: _plateCtrl,
+            label: "Kennzeichen (optional)",
+            textCapitalization: TextCapitalization.characters,
+            inputFormatters: [LengthLimitingTextInputFormatter(10)],
+            suffixIcon: GestureDetector(
+              onTap: _showPlateInfo,
+              child: const Icon(Icons.info_outline,
+                  color: Colors.white38, size: 18),
+            ),
           ),
           if (_error != null) ...[
             const SizedBox(height: 8),
@@ -1963,6 +2013,8 @@ class _SheetTextField extends StatelessWidget {
   final TextInputType? keyboardType;
   final List<TextInputFormatter>? inputFormatters;
   final List<String>? autofillHints;
+  final TextCapitalization textCapitalization;
+  final Widget? suffixIcon;
 
   const _SheetTextField({
     required this.controller,
@@ -1970,6 +2022,8 @@ class _SheetTextField extends StatelessWidget {
     this.keyboardType,
     this.inputFormatters,
     this.autofillHints,
+    this.textCapitalization = TextCapitalization.none,
+    this.suffixIcon,
   });
 
   @override
@@ -1979,10 +2033,12 @@ class _SheetTextField extends StatelessWidget {
       keyboardType: keyboardType,
       inputFormatters: inputFormatters,
       autofillHints: autofillHints,
+      textCapitalization: textCapitalization,
       style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(color: Colors.white54),
+        suffixIcon: suffixIcon,
         filled: true,
         fillColor: Colors.white.withValues(alpha: 0.06),
         border: OutlineInputBorder(
@@ -2003,64 +2059,6 @@ class _SheetTextField extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PROGRESS ARC PAINTER
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _ProgressArcPainter extends CustomPainter {
-  final double progress;
-  const _ProgressArcPainter({required this.progress});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.width - 8) / 2;
-    final rect = Rect.fromCircle(center: center, radius: radius);
-
-    final trackPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.1)
-      ..strokeWidth = 3
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-    canvas.drawCircle(center, radius, trackPaint);
-
-    final progressPaint = Paint()
-      ..shader = SweepGradient(
-        startAngle: -math.pi / 2,
-        endAngle: -math.pi / 2 + 2 * math.pi,
-        colors: const [Color(0xFF4A80F0), Color(0xFF7B5EA7), Color(0xFF4A80F0)],
-        stops: const [0.0, 0.5, 1.0],
-      ).createShader(rect)
-      ..strokeWidth = 3
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawArc(
-      rect,
-      -math.pi / 2,
-      2 * math.pi * progress,
-      false,
-      progressPaint,
-    );
-
-    final endAngle = -math.pi / 2 + 2 * math.pi * progress;
-    final dotX = center.dx + radius * math.cos(endAngle);
-    final dotY = center.dy + radius * math.sin(endAngle);
-    final dotPaint = Paint()
-      ..color = const Color(0xFF7B5EA7)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
-    canvas.drawCircle(Offset(dotX, dotY), 5, dotPaint);
-    canvas.drawCircle(
-      Offset(dotX, dotY),
-      3,
-      Paint()..color = Colors.white,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _ProgressArcPainter old) =>
-      old.progress != progress;
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // OWN REVIEWS SECTION
