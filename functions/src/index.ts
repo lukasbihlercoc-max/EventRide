@@ -2,6 +2,7 @@ import * as admin from "firebase-admin";
 import {onDocumentCreated, onDocumentUpdated, onDocumentDeleted, onDocumentWritten} from "firebase-functions/v2/firestore";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {onSchedule} from "firebase-functions/v2/scheduler";
+import {auth} from "firebase-functions/v1";
 import * as nodemailer from "nodemailer";
 
 admin.initializeApp();
@@ -1000,3 +1001,25 @@ export const sendVerificationEmail = onCall(async (request) => {
     return {success: true};
   }
 );
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Account-Deletion Cleanup: Chat-Conversations + Messages löschen
+// Wird serverseitig ausgelöst, damit die Firestore-Rules kein client-seitiges
+// delete auf chat_conversations erlauben müssen.
+// ──────────────────────────────────────────────────────────────────────────────
+export const cleanupDeletedUser = auth.user().onDelete(async (user) => {
+  const uid = user.uid;
+
+  const chatsSnap = await db
+    .collection("chat_conversations")
+    .where("participants", "array-contains", uid)
+    .get();
+
+  for (const chatDoc of chatsSnap.docs) {
+    const msgsSnap = await chatDoc.ref.collection("messages").get();
+    const batch = db.batch();
+    for (const msg of msgsSnap.docs) batch.delete(msg.ref);
+    batch.delete(chatDoc.ref);
+    await batch.commit();
+  }
+});

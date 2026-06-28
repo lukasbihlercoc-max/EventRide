@@ -341,23 +341,6 @@ class FirebaseAuthRepository implements IAuthRepository {
       await batch.commit();
     }
 
-    // Chat-Conversations und deren Messages löschen
-    final chatsSnap = await _firestore
-        .collection('chat_conversations')
-        .where('participants', arrayContains: uid)
-        .get();
-
-    for (final chatDoc in chatsSnap.docs) {
-      final messagesSnap =
-          await chatDoc.reference.collection('messages').get();
-      final batch = _firestore.batch();
-      for (final msg in messagesSnap.docs) {
-        batch.delete(msg.reference);
-      }
-      batch.delete(chatDoc.reference);
-      await batch.commit();
-    }
-
     // Storage-Dateien löschen
     try {
       await _storage.ref('users/$uid/profile.jpg').delete();
@@ -749,7 +732,10 @@ class FirebaseAuthRepository implements IAuthRepository {
     final userInfo = await _firestoreUserInfo(fbUser.uid);
     await _storage
         .ref(path)
-        .putFile(flyer, SettableMetadata(contentType: 'image/jpeg'));
+        .putFile(flyer, SettableMetadata(
+          contentType: 'image/jpeg',
+          customMetadata: {'uploaderUid': fbUser.uid},
+        ));
 
     await docRef.set({
       'uid': fbUser.uid,
