@@ -3307,13 +3307,47 @@ class _KennzeichenSectionState extends State<_KennzeichenSection> {
   Widget build(BuildContext context) {
     if (!_loaded) return const SizedBox.shrink();
 
-    // Noch nicht im 24h-Fenster
+    // Noch nicht im 24h-Fenster — zweizeilig damit kein Overflow entsteht
     if (_releasedAt != null) {
       return Padding(
         padding: const EdgeInsets.only(top: 5),
-        child: _TimeBadge(
-          icon: Icons.lock_clock_outlined,
-          text: 'Kennzeichen ab ${_formatDate(_releasedAt!)} sichtbar',
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.lock_clock_outlined,
+                      size: 11, color: Colors.white60),
+                  const SizedBox(width: 4),
+                  const Text(
+                    'Kennzeichen gesperrt',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'ab ${_formatDate(_releasedAt!)}',
+                style: const TextStyle(
+                  color: Colors.white54,
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
