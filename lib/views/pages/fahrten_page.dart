@@ -2206,7 +2206,11 @@ class _RequestedRideCardState extends State<_RequestedRideCard> {
                       ],
                     ),
                     const Divider(color: Colors.white12, thickness: 1, height: 16),
-                    _FahrerProfilRow(userId: fahrt.ownerId, name: fahrt.ownerName),
+                    _FahrerProfilRow(
+                      userId: fahrt.ownerId,
+                      name: fahrt.ownerName,
+                      fahrtId: fahrt.id,
+                    ),
                     const SizedBox(height: 6),
                     Container(height: 1, color: Colors.white.withValues(alpha: 0.08)),
                     const SizedBox(height: 6),
@@ -3401,6 +3405,7 @@ class _FahrerProfilRow extends StatefulWidget {
   final Color chevronFarbe;
   final Color avatarBg;
   final double avatarRadius;
+  final String? fahrtId;
 
   const _FahrerProfilRow({
     required this.userId,
@@ -3409,6 +3414,7 @@ class _FahrerProfilRow extends StatefulWidget {
     this.chevronFarbe = Colors.white38,
     this.avatarBg = const Color(0x26FFFFFF),
     this.avatarRadius = 19.0,
+    this.fahrtId,
   });
 
   @override
@@ -3426,6 +3432,7 @@ class _FahrerProfilRowState extends State<_FahrerProfilRow> {
           userId: widget.userId,
           name: widget.name,
           photoUrl: _photoUrl,
+          fahrtId: widget.fahrtId,
         ),
       ),
     );

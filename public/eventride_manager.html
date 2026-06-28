@@ -109,6 +109,7 @@ select option{background:var(--surface);color:var(--text)}
 .badge-krampus{background:rgba(99,102,241,.09);color:#4338CA;border-color:rgba(99,102,241,.18)}
 .badge-disco{background:rgba(14,165,233,.09);color:#0369A1;border-color:rgba(14,165,233,.18)}
 .badge-festival{background:rgba(249,115,22,.09);color:#C2410C;border-color:rgba(249,115,22,.18)}
+.badge-strand{background:rgba(6,182,212,.10);color:#0E7490;border-color:rgba(6,182,212,.25)}
 .badge-confirmed{background:rgba(34,197,94,.09);color:#15803D;border-color:rgba(34,197,94,.18)}
 .badge-check{background:rgba(245,158,11,.10);color:#B45309;border-color:rgba(245,158,11,.20)}
 .badge-inapp{background:rgba(14,165,233,.09);color:#0369A1;border-color:rgba(14,165,233,.18)}
@@ -119,6 +120,7 @@ select option{background:var(--surface);color:var(--text)}
 [data-theme=dark] .badge-krampus{background:rgba(129,140,248,.10);color:#818CF8;border-color:rgba(129,140,248,.18)}
 [data-theme=dark] .badge-disco{background:rgba(56,189,248,.10);color:#38BDF8;border-color:rgba(56,189,248,.18)}
 [data-theme=dark] .badge-festival{background:rgba(251,146,60,.10);color:#FB923C;border-color:rgba(251,146,60,.18)}
+[data-theme=dark] .badge-strand{background:rgba(6,182,212,.15);color:#22D3EE;border-color:rgba(6,182,212,.30)}
 [data-theme=dark] .badge-confirmed{background:rgba(52,211,153,.10);color:#34D399;border-color:rgba(52,211,153,.18)}
 [data-theme=dark] .badge-check{background:rgba(251,191,36,.10);color:#FCD34D;border-color:rgba(251,191,36,.18)}
 [data-theme=dark] .badge-inapp{background:rgba(56,189,248,.10);color:#38BDF8;border-color:rgba(56,189,248,.18)}
@@ -480,10 +482,10 @@ const GEMEINDEN = {
   "Völkermarkt":["Bleiburg","Diex","Eberndorf","Eisenkappel-Vellach","Feistritz ob Bleiburg","Gallizien","Globasnitz","Griffen","Neuhaus","Ruden","St. Kanzian am Klopeiner See","Sittersdorf","Völkermarkt"],
   "Wolfsberg":["Bad St. Leonhard im Lavanttal","Frantschach-St. Gertraud","Lavamünd","Preitenegg","Reichenfels","St. Andrä","St. Georgen im Lavanttal","St. Paul im Lavanttal","Wolfsberg"]
 };
-const TYP_CODE = {"Kirchtage/Feste":"e1","Kirchtag":"e1","Feuerwehr":"e2","Feuerwehrfest":"e2","Disco/Party":"e3","Disco":"e3","Ball":"e4","Krampus":"e5","Krampuslauf":"e5","Festival/Open-Air":"e6","Festival":"e6"};
-const TYP_FROM_CODE = {"e1":"Kirchtage/Feste","e2":"Feuerwehr","e3":"Disco/Party","e4":"Ball","e5":"Krampus","e6":"Festival/Open-Air"};
-const TYPEN = ["Kirchtage/Feste","Feuerwehr","Ball","Krampus","Disco/Party","Festival/Open-Air"];
-const VALID_TYP_CODES = new Set(['e0','e1','e2','e3','e4','e5','e6']);
+const TYP_CODE = {"Kirchtage/Feste":"e1","Kirchtag":"e1","Feuerwehr":"e2","Feuerwehrfest":"e2","Disco/Party":"e3","Disco":"e3","Ball":"e4","Krampus":"e5","Krampuslauf":"e5","Festival/Open-Air":"e6","Festival":"e6","Strand & Sommer":"e7","Strand":"e7","Beach":"e7","Beachparty":"e7"};
+const TYP_FROM_CODE = {"e1":"Kirchtage/Feste","e2":"Feuerwehr","e3":"Disco/Party","e4":"Ball","e5":"Krampus","e6":"Festival/Open-Air","e7":"Strand & Sommer"};
+const TYPEN = ["Kirchtage/Feste","Feuerwehr","Ball","Krampus","Disco/Party","Festival/Open-Air","Strand & Sommer"];
+const VALID_TYP_CODES = new Set(['e0','e1','e2','e3','e4','e5','e6','e7']);
 function normalizeTyp(v) { return VALID_TYP_CODES.has(v) ? v : (TYP_CODE[v] || 'e1'); }
 
 let appEvents = [];
@@ -690,8 +692,8 @@ function buildAdminUrl(ev) {
 }
 
 function typBadge(typ) {
-  const toHuman = {"e1":"Kirchtage/Feste","e2":"Feuerwehr","e3":"Disco/Party","e4":"Ball","e5":"Krampus","e6":"Festival/Open-Air"};
-  const toClass = {"Kirchtage/Feste":"kirchtag","Feuerwehr":"feuerwehr","Ball":"ball","Krampus":"krampus","Disco/Party":"disco","Festival/Open-Air":"festival"};
+  const toHuman = {"e1":"Kirchtage/Feste","e2":"Feuerwehr","e3":"Disco/Party","e4":"Ball","e5":"Krampus","e6":"Festival/Open-Air","e7":"Strand & Sommer"};
+  const toClass = {"Kirchtage/Feste":"kirchtag","Feuerwehr":"feuerwehr","Ball":"ball","Krampus":"krampus","Disco/Party":"disco","Festival/Open-Air":"festival","Strand & Sommer":"strand"};
   const label = toHuman[typ] || typ || "?";
   return `<span class="badge badge-${toClass[label]||"kirchtag"}">${label}</span>`;
 }
@@ -1128,7 +1130,7 @@ function detailPanel(ev) {
 // ---- EDIT ----
 function editFormHTML(d) {
   const bezSelect = BEZIRKE.map(b=>`<option ${d.bezirk===b?"selected":""}>${b}</option>`).join("");
-  const typSelect = [['e1','Kirchtage/Feste'],['e2','Feuerwehr'],['e3','Disco/Party'],['e4','Ball'],['e5','Krampus'],['e6','Festival/Open-Air']]
+  const typSelect = [['e1','Kirchtage/Feste'],['e2','Feuerwehr'],['e3','Disco/Party'],['e4','Ball'],['e5','Krampus'],['e6','Festival/Open-Air'],['e7','Strand & Sommer']]
     .map(([v,l])=>`<option value="${v}" ${d.typ===v?"selected":""}>${l}</option>`).join("");
   const hasCoords = d.lat != null && d.lng != null;
   return `<div class="edit-grid">
@@ -1417,7 +1419,7 @@ async function submitQuickIgAdd() {
 function openAdd(prefill) {
   addFormData = Object.assign({name:"",datum:"",uhrzeit:"20:00",gemeinde:"",bezirk:"Spittal",veranstalter:"örtlich",eintritt:"",beschreibung:"",typ:"e1",quelle:"",quelleTyp:"",quelleLink:"",srcZitat:"",sicherheit:"mittel",adresse:"",latitude:null,longitude:null,notiz:"",infoAusstehend:false}, prefill||{});
   const bezSelect = BEZIRKE.map(b=>`<option value="${b}" ${b===addFormData.bezirk?"selected":""}>${b}</option>`).join("");
-  const typSelect = [['e1','Kirchtage/Feste'],['e2','Feuerwehr'],['e3','Disco/Party'],['e4','Ball'],['e5','Krampus'],['e6','Festival/Open-Air']]
+  const typSelect = [['e1','Kirchtage/Feste'],['e2','Feuerwehr'],['e3','Disco/Party'],['e4','Ball'],['e5','Krampus'],['e6','Festival/Open-Air'],['e7','Strand & Sommer']]
     .map(([v,l])=>`<option value="${v}" ${v==="e1"?"selected":""}>${l}</option>`).join("");
   document.getElementById("add-form").innerHTML = `<div class="edit-grid">
     <span class="edit-label">Name *</span><input placeholder="Eventname" oninput="addFormData.name=this.value">
@@ -1527,7 +1529,7 @@ function appEventDetail(ev) {
   if (appEditMode) {
     const d = appEditData;
     const bezOpts = BEZIRKE.map(b=>`<option value="${b}" ${d.bezirk===b?'selected':''}>${b}</option>`).join('');
-    const typOpts = [['e1','Kirchtage/Feste'],['e2','Feuerwehr'],['e3','Disco/Party'],['e4','Ball'],['e5','Krampus'],['e6','Festival/Open-Air']]
+    const typOpts = [['e1','Kirchtage/Feste'],['e2','Feuerwehr'],['e3','Disco/Party'],['e4','Ball'],['e5','Krampus'],['e6','Festival/Open-Air'],['e7','Strand & Sommer']]
       .map(([v,l])=>`<option value="${v}" ${d.typ===v?'selected':''}>  ${l}</option>`).join('');
     const hasCoords = d.lat && d.lng;
     return `<div class="detail-panel">
@@ -2410,7 +2412,7 @@ function closeUpload() {
 
 function uploadFormHTML() {
   const bezOpts = BEZIRKE.map(b => `<option value="${b}" ${uploadData.bezirk===b?'selected':''}>${b}</option>`).join('');
-  const typOpts = [['e1','Kirchtage/Feste'],['e2','Feuerwehr'],['e3','Disco/Party'],['e4','Ball'],['e5','Krampus'],['e6','Festival/Open-Air']]
+  const typOpts = [['e1','Kirchtage/Feste'],['e2','Feuerwehr'],['e3','Disco/Party'],['e4','Ball'],['e5','Krampus'],['e6','Festival/Open-Air'],['e7','Strand & Sommer']]
     .map(([v,l]) => `<option value="${v}" ${uploadData.typ===v?'selected':''}>${l}</option>`).join('');
   const similar = similarInApp(uploadData.name, uploadData.bezirk);
   const n = uploadData.name.trim().toLowerCase();
@@ -3472,7 +3474,7 @@ function renderEventAnfragen() {
         longitude: sel.longitude || null,
       };
     }
-    const typOpts = [['e0','Standard'],['e1','Kirchtage/Feste'],['e2','Feuerwehrfest'],['e3','Disco'],['e4','Ball'],['e5','Krampuslauf'],['e6','Festival/Open-Air']]
+    const typOpts = [['e0','Standard'],['e1','Kirchtage/Feste'],['e2','Feuerwehrfest'],['e3','Disco'],['e4','Ball'],['e5','Krampuslauf'],['e6','Festival/Open-Air'],['e7','Strand & Sommer']]
       .map(([v,l]) => `<option value="${v}"${erEditData.typ===v?' selected':''}>${l}</option>`).join('');
     const initials = (sel.userName||'?')[0].toUpperCase();
     const avatar = sel.userPhotoUrl

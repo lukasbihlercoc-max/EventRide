@@ -66,12 +66,14 @@ class PublicProfilePage extends StatefulWidget {
   final String userId;
   final String name;
   final String? photoUrl;
+  final String? fahrtId;
 
   const PublicProfilePage({
     super.key,
     required this.userId,
     required this.name,
     this.photoUrl,
+    this.fahrtId,
   });
 
   @override
@@ -514,6 +516,7 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
                         _CarCard(
                           car: _car!,
                           hasLicensePlate: _car!.hasLicensePlate,
+                          fahrtId: widget.fahrtId,
                         ),
                       ],
                       const SizedBox(height: 20),
@@ -757,54 +760,192 @@ class _StatCell extends StatelessWidget {
 // CAR CARD  (horizontal layout)
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _CarCard extends StatelessWidget {
+class _PlateResult {
+  final String? plate;
+  final DateTime? releasedAt;
+  final bool expired;
+  const _PlateResult({this.plate, this.releasedAt, this.expired = false});
+}
+
+class _CarCard extends StatefulWidget {
   final CarInfo car;
   final bool hasLicensePlate;
-  const _CarCard({required this.car, required this.hasLicensePlate});
+  final String? fahrtId;
 
-  void _showInfo(BuildContext context) {
-    showDialog<void>(
+  const _CarCard({
+    required this.car,
+    required this.hasLicensePlate,
+    this.fahrtId,
+  });
+
+  @override
+  State<_CarCard> createState() => _CarCardState();
+}
+
+class _CarCardState extends State<_CarCard> {
+  _PlateResult? _plateResult;
+  bool _plateLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.fahrtId != null) {
+      _plateLoading = true;
+      _loadPlate();
+    }
+  }
+
+  Future<void> _loadPlate() async {
+    try {
+      final result = await FirebaseFunctions.instance
+          .httpsCallable('getLicensePlate')
+          .call({'fahrtId': widget.fahrtId});
+      final data = result.data as Map<String, dynamic>;
+      if (!mounted) return;
+      setState(() {
+        _plateResult = _PlateResult(
+          plate: data['plate'] as String?,
+          releasedAt: data['releasedAt'] != null
+              ? DateTime.tryParse(data['releasedAt'] as String)
+              : null,
+          expired: data['expired'] as bool? ?? false,
+        );
+        _plateLoading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _plateLoading = false);
+    }
+  }
+
+  String _formatDate(DateTime dt) {
+    final local = dt.toLocal();
+    return '${local.day.toString().padLeft(2, '0')}.${local.month.toString().padLeft(2, '0')}. '
+        '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')} Uhr';
+  }
+
+  void _showInfoSheet(BuildContext context) {
+    final hasPlate = widget.car.hasLicensePlate;
+    final result = _plateResult;
+    final revealedPlate =
+        (result?.plate != null && result!.plate!.isNotEmpty) ? result.plate : null;
+    final locked = result?.releasedAt != null;
+
+    late final IconData icon;
+    late final Color iconColor;
+    late final String title;
+    late final String body;
+
+    if (revealedPlate != null) {
+      icon = Icons.check_circle_rounded;
+      iconColor = const Color(0xFF4CAF50);
+      title = 'Kennzeichen';
+      body = 'Das Kennzeichen des Fahrers wurde freigegeben. '
+          'Prüfe das Fahrzeug vor dem Einsteigen.';
+    } else if (locked) {
+      icon = Icons.lock_clock_outlined;
+      iconColor = const Color(0xFFF5A04A);
+      title = 'Noch gesperrt';
+      body = 'Wird am ${_formatDate(result!.releasedAt!)} freigegeben — '
+          '24 Stunden vor der Abfahrt.';
+    } else if (hasPlate) {
+      icon = Icons.check_circle_rounded;
+      iconColor = const Color(0xFF4CAF50);
+      title = 'Kennzeichen hinterlegt';
+      body = 'Der Fahrer hat sein Kennzeichen hinterlegt. '
+          'Du kannst es 24 Stunden vor der Fahrt auf deiner Mitfahrt-Seite einsehen '
+          'und das Fahrzeug vor dem Einsteigen prüfen.';
+    } else {
+      icon = Icons.credit_card_off_outlined;
+      iconColor = Colors.white38;
+      title = 'Kein Kennzeichen';
+      body = 'Dieser Fahrer hat noch kein Kennzeichen hinterlegt.';
+    }
+
+    showModalBottomSheet<void>(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1F2E),
-        title: Row(
+      backgroundColor: const Color(0xFF0E1B2E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.credit_card_outlined,
-                color: Color(0xFFF5A04A), size: 20),
-            const SizedBox(width: 8),
-            const Text(
-              'Kennzeichen',
-              style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: iconColor, size: 26),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (revealedPlate != null) ...[
+              const SizedBox(height: 4),
+              _LicensePlateIndicator(hasPlate: true, revealedPlate: revealedPlate),
+              const SizedBox(height: 8),
+            ],
+            Text(
+              body,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white60,
+                fontSize: 13,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => Navigator.pop(context),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white70,
+                  side: const BorderSide(color: Colors.white24),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: const Text('Schließen'),
+              ),
             ),
           ],
         ),
-        content: Text(
-          hasLicensePlate
-              ? 'Der Fahrer hat sein Kennzeichen hinterlegt. Du kannst es '
-                '24 Stunden vor der Fahrt auf deiner Mitfahrt-Seite einsehen '
-                'und das Fahrzeug vor dem Einsteigen prüfen.'
-              : 'Dieser Fahrer hat noch kein Kennzeichen hinterlegt.',
-          style: const TextStyle(
-              color: Colors.white70, fontSize: 13, height: 1.5),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK',
-                style: TextStyle(color: Color(0xFFF5A04A))),
-          ),
-        ],
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final color = _parseCarColor(car.color);
-    final carName = [car.make, car.model].where((s) => s.isNotEmpty).join(' ');
+    final color = _parseCarColor(widget.car.color);
+    final carName =
+        [widget.car.make, widget.car.model].where((s) => s.isNotEmpty).join(' ');
+
+    final result = _plateResult;
+    final revealedPlate =
+        (result?.plate != null && result!.plate!.isNotEmpty) ? result.plate : null;
+    final locked = result?.releasedAt != null;
+    final showGreen = widget.hasLicensePlate && revealedPlate == null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -822,7 +963,7 @@ class _CarCard extends StatelessWidget {
           ),
         ),
         GestureDetector(
-          onTap: () => _showInfo(context),
+          onTap: () => _showInfoSheet(context),
           child: AppCard(
             padding: const EdgeInsets.all(16),
             child: Row(
@@ -837,7 +978,7 @@ class _CarCard extends StatelessWidget {
                   ),
                   child: Center(
                     child: Icon(
-                      Icons.directions_car_rounded,
+                      Icons.time_to_leave_rounded,
                       size: 40,
                       color: color,
                     ),
@@ -862,7 +1003,7 @@ class _CarCard extends StatelessWidget {
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          if (car.color != null) ...[
+                          if (widget.car.color != null) ...[
                             Container(
                               width: 10,
                               height: 10,
@@ -875,34 +1016,55 @@ class _CarCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 5),
                             Text(
-                              car.color!,
+                              widget.car.color!,
                               style: const TextStyle(
                                   color: Colors.white60, fontSize: 13),
                             ),
                           ],
-                          if (car.color != null && car.seats != null)
+                          if (widget.car.color != null && widget.car.seats != null)
                             const Text(
                               ' · ',
                               style: TextStyle(
                                   color: Colors.white38, fontSize: 13),
                             ),
-                          if (car.seats != null)
+                          if (widget.car.seats != null)
                             Text(
-                              '${car.seats} Plätze',
+                              '${widget.car.seats} Plätze',
                               style: const TextStyle(
                                   color: Colors.white60, fontSize: 13),
                             ),
                         ],
                       ),
                       const SizedBox(height: 8),
-                      _LicensePlateIndicator(hasPlate: hasLicensePlate),
+                      if (_plateLoading)
+                        const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 1.5, color: Colors.white38),
+                        )
+                      else ...[
+                        _LicensePlateIndicator(
+                          hasPlate: widget.hasLicensePlate,
+                          revealedPlate: revealedPlate,
+                          highlighted: showGreen,
+                        ),
+                        if (locked) ...[
+                          const SizedBox(height: 5),
+                          _PlaceLockBadge(
+                              label:
+                                  'Ab ${_formatDate(result!.releasedAt!)}'),
+                        ],
+                      ],
                     ],
                   ),
                 ),
                 const SizedBox(width: 8),
                 Icon(
                   Icons.info_outline,
-                  color: Colors.white24,
+                  color: showGreen
+                      ? const Color(0xFF4CAF50).withValues(alpha: 0.6)
+                      : Colors.white24,
                   size: 16,
                 ),
               ],
@@ -914,22 +1076,71 @@ class _CarCard extends StatelessWidget {
   }
 }
 
-// Stilisierte Kennzeichen-Plakette — aktiv wenn hasPlate, grayed-out wenn nicht
-class _LicensePlateIndicator extends StatelessWidget {
-  final bool hasPlate;
-  const _LicensePlateIndicator({required this.hasPlate});
+// Kleine Badge "ab ..." wenn Kennzeichen noch gesperrt ist
+class _PlaceLockBadge extends StatelessWidget {
+  final String label;
+  const _PlaceLockBadge({required this.label});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 22,
-      constraints: const BoxConstraints(maxWidth: 120),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: hasPlate ? 0.06 : 0.02),
+        color: Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.lock_clock_outlined, size: 10, color: Colors.white38),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(
+                color: Colors.white38, fontSize: 10, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Stilisierte Kennzeichen-Plakette
+class _LicensePlateIndicator extends StatelessWidget {
+  final bool hasPlate;
+  final String? revealedPlate;
+  final bool highlighted;
+
+  const _LicensePlateIndicator({
+    required this.hasPlate,
+    this.revealedPlate,
+    this.highlighted = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bool revealed = revealedPlate != null && revealedPlate!.isNotEmpty;
+    final Color borderColor = revealed
+        ? const Color(0xFF4CAF50).withValues(alpha: 0.7)
+        : highlighted
+            ? const Color(0xFF4CAF50).withValues(alpha: 0.45)
+            : hasPlate
+                ? Colors.white24
+                : Colors.white12;
+    final Color bgColor = revealed
+        ? Colors.green.withValues(alpha: 0.10)
+        : highlighted
+            ? Colors.green.withValues(alpha: 0.07)
+            : Colors.white.withValues(alpha: hasPlate ? 0.06 : 0.02);
+
+    return Container(
+      height: 22,
+      constraints: const BoxConstraints(maxWidth: 140),
+      decoration: BoxDecoration(
+        color: bgColor,
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(
-          color: hasPlate ? Colors.white24 : Colors.white12,
-        ),
+        border: Border.all(color: borderColor),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -937,7 +1148,7 @@ class _LicensePlateIndicator extends StatelessWidget {
           Container(
             width: 7,
             decoration: BoxDecoration(
-              color: hasPlate
+              color: (hasPlate || revealed)
                   ? const Color(0xFF003399)
                   : Colors.white.withValues(alpha: 0.12),
               borderRadius:
@@ -946,10 +1157,15 @@ class _LicensePlateIndicator extends StatelessWidget {
           ),
           const SizedBox(width: 5),
           Text(
-            hasPlate ? 'AT ••–•••••' : 'AT  –  –  –',
+            revealed ? revealedPlate! : (hasPlate ? 'AT ••–•••••' : 'AT  –  –  –'),
             style: TextStyle(
-              color: hasPlate ? Colors.white54 : Colors.white24,
+              color: revealed
+                  ? Colors.white
+                  : hasPlate
+                      ? Colors.white60
+                      : Colors.white24,
               fontSize: 11,
+              fontWeight: revealed ? FontWeight.w700 : FontWeight.normal,
               letterSpacing: 0.5,
             ),
           ),

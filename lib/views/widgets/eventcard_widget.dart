@@ -23,6 +23,8 @@ String? getBackgroundImage(String typ) {
       return "assets/image/krampus.jpg";
     case "e6":
       return "assets/image/festival4.png";
+    case "e7":
+      return "assets/image/beach.png";
     default:
       return "assets/image/default.jpg";
   }
