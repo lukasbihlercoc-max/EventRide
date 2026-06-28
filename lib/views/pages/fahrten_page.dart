@@ -3318,13 +3318,51 @@ class _KennzeichenSectionState extends State<_KennzeichenSection> {
       );
     }
 
-    // Im Fenster, echtes Kennzeichen
+    // Im Fenster, echtes Kennzeichen — AT-Badge-Stil
     if (_plate != null && _plate!.isNotEmpty) {
       return Padding(
-        padding: const EdgeInsets.only(top: 5),
-        child: _TimeBadge(
-          icon: Icons.credit_card_outlined,
-          text: 'Kennzeichen: $_plate',
+        padding: const EdgeInsets.only(top: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Kennzeichen ',
+              style: const TextStyle(color: Colors.white54, fontSize: 11),
+            ),
+            Container(
+              height: 20,
+              decoration: BoxDecoration(
+                color: Colors.green.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(
+                    color: const Color(0xFF4CAF50).withValues(alpha: 0.7)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 7,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF003399),
+                      borderRadius:
+                          BorderRadius.horizontal(left: Radius.circular(3)),
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    _plate!,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                ],
+              ),
+            ),
+          ],
         ),
       );
     }
