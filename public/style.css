@@ -21,7 +21,7 @@
   --border-2:  rgba(255,255,255,.14);
 
   --glow:      rgba(140,165,200,.14);
-  --topo-op:   .22;
+  --topo-op:   .3;
 
   --maxw: 1120px;
 
@@ -83,8 +83,8 @@
   content: '';
   position: absolute; inset: 0;
   background-image: url('assets/brand/topo.png');
-  background-size: cover; background-position: center;
-  opacity: var(--topo-op); filter: blur(1px);
+  background-size: 1100px auto; background-repeat: repeat; background-position: center;
+  opacity: var(--topo-op);
   pointer-events: none;
 }
 .topo > * { position: relative; z-index: 1; }
@@ -539,26 +539,27 @@
   .faq-grid .sec-head { position: static; }
 }
 @media (max-width: 720px) {
-  .site { zoom: .9; }
+  .topo::before { background-size: 640px auto; }
   .nav { padding: 0 18px; }
   .nav-links, .nav-ig, .nav-cta { display: none; }
   .burger { display: flex; }
-  .block { padding: 76px 22px; }
-  .sec-head { margin-bottom: 38px; }
-  .hero { padding: 104px 22px 60px; min-height: auto; }
-  .hero-inner { flex-direction: column; gap: 48px; text-align: center; }
+  .block { padding: 64px 20px; }
+  .sec-head { margin-bottom: 34px; }
+  .hero { padding: 96px 22px 52px; min-height: auto; }
+  .hero-inner { flex-direction: column; gap: 44px; text-align: center; }
   .hero-text { max-width: 100%; }
   .hero-kicker { justify-content: center; }
-  .hero-sub { margin-left: auto; margin-right: auto; }
+  .hero h1 { font-size: clamp(2.3rem, 8.6vw, 3.4rem); }
+  .hero-sub { margin-left: auto; margin-right: auto; font-size: 1rem; }
   .hero-btns { justify-content: center; }
   .hero-trust { justify-content: center; gap: 12px 18px; }
   .hero-btns .btn-p, .hero-btns .btn-s { flex: 1; min-width: 0; }
-  .phone-c { width: 244px; }
-  .phone-c img { height: 528px; }
+  .phone-c { width: 208px; }
+  .phone-c img { height: 450px; }
   .ev-scroll { grid-template-columns: 1fr; gap: 12px; }
   .ev-scroll > *:nth-child(3) { display: flex; }
   .shots-scroll { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; margin-inline: -22px; padding: 4px 22px 16px; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }
-  .shot { scroll-snap-align: center; width: 200px; }
+  .shot { scroll-snap-align: center; width: 176px; }
   .steps { grid-template-columns: 1fr; gap: 12px; }
   .steps::before { display: none; }
   .step { padding: 22px; }

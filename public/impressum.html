@@ -23,6 +23,7 @@
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       background: var(--bg-deep); color: var(--text); line-height: 1.7;
       -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
     }
     a { color: var(--blue); text-decoration: none; }
     a:hover { text-decoration: underline; }
@@ -50,6 +51,7 @@
     header h1 {
       font-family: 'Poppins', sans-serif; font-weight: 800;
       font-size: clamp(1.9rem, 5vw, 2.6rem); letter-spacing: -.03em;
+      overflow-wrap: break-word; word-break: break-word; hyphens: auto;
     }
     header p { color: var(--muted); font-size: .95rem; margin-top: 8px; }
 
