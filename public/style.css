@@ -614,9 +614,6 @@
   -webkit-text-fill-color: transparent; color: #F5A04A;
 }
 
-/* floating center phone */
-@keyframes bob { from { translate: 0 0; } to { translate: 0 -12px; } }
-.phone-c { animation: bob 6s ease-in-out infinite alternate; }
 .hero-phones { transition: transform .1s linear; will-change: transform; }
 
 /* ticker */

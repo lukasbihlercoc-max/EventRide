@@ -314,18 +314,20 @@
     }, { passive: true });
   }
 
-  // hero phone 3D tilt (desktop pointers only)
-  if (!reduced && window.matchMedia('(pointer: fine)').matches && phones) {
-    window.addEventListener('mousemove', function (e) {
+  // hero phone 3D tilt (desktop pointers only) - follows the mouse across the whole hero section
+  var hero = document.querySelector('.hero');
+  if (!reduced && window.matchMedia('(pointer: fine)').matches && phones && hero) {
+    hero.addEventListener('mousemove', function (e) {
       var c = phones.querySelector('.phone-c');
       if (!c) return;
-      var r = phones.getBoundingClientRect();
-      if (e.clientX < r.left - 80 || e.clientX > r.right + 80 || e.clientY < r.top - 80 || e.clientY > r.bottom + 80) {
-        c.style.transform = ''; return;
-      }
-      var dx = (e.clientX - (r.left + r.width / 2)) / r.width;
-      var dy = (e.clientY - (r.top + r.height / 2)) / r.height;
+      var r = hero.getBoundingClientRect();
+      var dx = (e.clientX - (r.left + r.width / 2)) / (r.width / 2);
+      var dy = (e.clientY - (r.top + r.height / 2)) / (r.height / 2);
       c.style.transform = 'rotateY(' + (dx * 9) + 'deg) rotateX(' + (-dy * 7) + 'deg)';
+    }, { passive: true });
+    hero.addEventListener('mouseleave', function () {
+      var c = phones.querySelector('.phone-c');
+      if (c) c.style.transform = '';
     }, { passive: true });
   }
 
