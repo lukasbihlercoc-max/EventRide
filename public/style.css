@@ -21,7 +21,7 @@
   --border-2:  rgba(255,255,255,.14);
 
   --glow:      rgba(140,165,200,.14);
-  --topo-op:   .09;
+  --topo-op:   .22;
 
   --maxw: 1120px;
 
@@ -589,7 +589,7 @@
   opacity: .05; mix-blend-mode: overlay;
 }
 .hero, .block, .footer, .ticker, .brand-word { position: relative; z-index: 1; }
-.site section[id] { scroll-margin-top: 78px; }
+.site [id] { scroll-margin-top: 78px; }
 
 /* hero entrance */
 @keyframes rise { from { opacity: 0; transform: translateY(26px); filter: blur(8px); } to { opacity: 1; transform: none; filter: none; } }
