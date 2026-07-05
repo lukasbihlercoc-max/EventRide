@@ -260,8 +260,23 @@
   document.getElementById('burger').addEventListener('click', function () {
     site.classList.toggle('menu-open');
   });
-  document.querySelectorAll('.mobile-menu a').forEach(function (a) {
-    a.addEventListener('click', function () { site.classList.remove('menu-open'); });
+
+  // precise in-page anchor scrolling (measures the real, rendered nav height
+  // instead of relying on a fixed scroll-margin-top, so mobile lands exactly
+  // on the target section instead of a bit too far down)
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('a[href^="#"]');
+    if (!a) return;
+    var id = a.getAttribute('href').slice(1);
+    var target = id && document.getElementById(id);
+    if (!target) return;
+    e.preventDefault();
+    site.classList.remove('menu-open');
+    requestAnimationFrame(function () {
+      var navH = nav.getBoundingClientRect().height;
+      var y = target.getBoundingClientRect().top + window.pageYOffset - navH - 14;
+      window.scrollTo({ top: Math.max(y, 0), behavior: reduced ? 'auto' : 'smooth' });
+    });
   });
 
   // scroll: nav shadow, progress, phone parallax
