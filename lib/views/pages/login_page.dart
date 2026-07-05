@@ -222,13 +222,16 @@ class _LoginPageState extends State<LoginPage> {
 
       if (mounted) Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
+      debugPrint('[Login] FirebaseAuthException code=${e.code} message=${e.message}');
       if (!mounted) return;
       AppSnackbar.show(
         context,
         message: _authError(e.code),
         accentColor: Colors.redAccent,
       );
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('[Login] Unerwarteter Fehler: ${e.runtimeType}: $e');
+      debugPrint('[Login] Stacktrace: $st');
       if (!mounted) return;
       AppSnackbar.show(
         context,
