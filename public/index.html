@@ -1,1259 +1,361 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>EventRide – Gemeinsam zum Event in Kärnten</title>
-  <meta name="description" content="EventRide verbindet Menschen in Kärnten: Finde Mitfahrgelegenheiten zu Kirchtagen, Bällen und lokalen Festen – einfach, sicher und kostenlos." />
-  <meta name="theme-color" content="#0C0A08" />
-  <meta name="google-site-verification" content="mLKBs35_DZY-mc9IvuQjKdmX__VyPKoCqTwH-leAMGI" />
-  <link rel="icon" type="image/png" href="favicon.png" />
-  <link rel="apple-touch-icon" href="favicon.png" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --black:    #0C0A08;
-      --dark:     #111009;
-      --warm:     #161310;
-      --surface:  #1E1B17;
-      --border:   rgba(255,255,255,.07);
-      --border-w: rgba(255,255,255,.13);
-      --orange:   #F5A04A;
-      --orange-d: #E08832;
-      --gold:     #C4A46B;
-      --blue:     #406CFB;
-      --green:    #2FC69E;
-      --text:     #EDE8E0;
-      --muted:    rgba(237,232,224,.55);
-      --faint:    rgba(237,232,224,.32);
-      --maxw:     1160px;
-    }
-
-    html { scroll-behavior: smooth; }
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: var(--dark);
-      color: var(--text);
-      line-height: 1.65;
-      -webkit-font-smoothing: antialiased;
-      overflow-x: hidden;
-    }
-    h1, h2, h3, h4 { font-family: 'Poppins', sans-serif; line-height: 1.1; }
-
-    /* ── NAV ── */
-    nav {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-      height: 68px;
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 0 40px;
-      transition: background .35s, border-color .35s, backdrop-filter .35s;
-    }
-    nav.scrolled {
-      background: rgba(12,10,8,.88);
-      backdrop-filter: blur(22px) saturate(1.4);
-      -webkit-backdrop-filter: blur(22px) saturate(1.4);
-      border-bottom: 1px solid var(--border);
-    }
-    .nav-logo {
-      display: flex; align-items: center; gap: 10px;
-      text-decoration: none; color: var(--text);
-      font-family: 'Poppins', sans-serif;
-      font-weight: 700; font-size: 1.14rem; letter-spacing: -.02em;
-    }
-    .nav-logo img { width: 32px; height: 32px; border-radius: 8px; }
-    .nav-logo .r { color: var(--orange); }
-    .nav-links { display: flex; gap: 32px; list-style: none; }
-    .nav-links a {
-      color: rgba(255,255,255,.72); text-decoration: none;
-      font-size: .88rem; font-weight: 500; transition: color .2s;
-    }
-    .nav-links a:hover { color: white; }
-    .nav-cta {
-      display: inline-flex; align-items: center;
-      background: var(--orange); color: var(--black);
-      padding: 9px 22px; border-radius: 100px;
-      font-size: .85rem; font-weight: 700; text-decoration: none;
-      transition: background .2s, transform .15s;
-    }
-    .nav-cta:hover { background: #f0954a; transform: translateY(-1px); }
-
-    /* ── HERO ── */
-    .hero {
-      position: relative; min-height: 100svh;
-      display: flex; align-items: flex-end; overflow: hidden;
-    }
-    .hero-bg { position: absolute; inset: 0; z-index: 0; }
-    .hero-bg img {
-      width: 100%; height: 100%; object-fit: cover; object-position: center 25%;
-      display: block;
-    }
-    .hero-overlay {
-      position: absolute; inset: 0;
-      background: linear-gradient(
-        to bottom,
-        rgba(12,10,8,.2) 0%,
-        rgba(12,10,8,.0) 30%,
-        rgba(12,10,8,.6) 72%,
-        rgba(12,10,8,.97) 100%
-      );
-    }
-    .hero-content {
-      position: relative; z-index: 2;
-      width: 100%; max-width: var(--maxw); margin: 0 auto;
-      padding: 0 40px 96px;
-    }
-    .hero-eyebrow {
-      font-size: .72rem; font-weight: 700; letter-spacing: .2em;
-      text-transform: uppercase; color: var(--orange);
-      margin-bottom: 22px; display: block;
-    }
-    .hero h1 {
-      font-size: clamp(3.2rem, 8.5vw, 7rem);
-      font-weight: 900; line-height: .94; letter-spacing: -.04em;
-      color: white; margin-bottom: 28px; max-width: 14ch;
-    }
-    .hero-sub {
-      font-size: clamp(.98rem, 1.8vw, 1.15rem);
-      color: rgba(255,255,255,.72);
-      max-width: 46ch; margin-bottom: 42px;
-      line-height: 1.7; font-weight: 400;
-    }
-    .hero-btns { display: flex; gap: 14px; flex-wrap: wrap; }
-    .btn-primary {
-      display: inline-flex; align-items: center; gap: 8px;
-      background: var(--orange); color: var(--black);
-      padding: 15px 32px; border-radius: 100px;
-      font-weight: 700; font-size: .95rem; text-decoration: none;
-      transition: background .2s, transform .15s;
-    }
-    .btn-primary:hover { background: #f0954a; transform: translateY(-2px); }
-    .btn-ghost {
-      display: inline-flex; align-items: center; gap: 8px;
-      background: rgba(255,255,255,.08);
-      border: 1px solid rgba(255,255,255,.22);
-      color: white; backdrop-filter: blur(10px);
-      padding: 15px 28px; border-radius: 100px;
-      font-weight: 600; font-size: .95rem; text-decoration: none;
-      transition: background .2s, border-color .2s;
-    }
-    .btn-ghost:hover { background: rgba(255,255,255,.16); border-color: rgba(255,255,255,.38); }
-    .hero-scroll-hint {
-      position: absolute; bottom: 36px; left: 50%;
-      transform: translateX(-50%); z-index: 2;
-      color: rgba(255,255,255,.4); font-size: .7rem;
-      letter-spacing: .15em; text-transform: uppercase; text-align: center;
-      display: flex; flex-direction: column; align-items: center; gap: 6px;
-    }
-    .scroll-arrow {
-      width: 1px; height: 40px;
-      background: linear-gradient(to bottom, rgba(255,255,255,.4), transparent);
-      animation: scrollPulse 2s ease-in-out infinite;
-    }
-    @keyframes scrollPulse {
-      0%, 100% { opacity: .4; transform: scaleY(1); }
-      50% { opacity: .9; transform: scaleY(1.1); }
-    }
-
-    /* ── SHARED ── */
-    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 40px; }
-    .eyebrow {
-      font-size: .7rem; font-weight: 700; letter-spacing: .2em;
-      text-transform: uppercase; color: var(--orange);
-      margin-bottom: 16px; display: block;
-    }
-    .section-title {
-      font-size: clamp(2rem, 4vw, 3rem);
-      font-weight: 800; letter-spacing: -.03em; color: var(--text);
-      margin-bottom: 18px;
-    }
-    .section-sub {
-      color: var(--muted); font-size: 1.02rem; line-height: 1.75;
-      max-width: 50ch;
-    }
-    .divider {
-      height: 1px; background: var(--border);
-      max-width: var(--maxw); margin: 0 auto;
-    }
-
-    /* ── STORY ── */
-    .story { background: var(--dark); padding: 120px 0; }
-    .story-inner { max-width: var(--maxw); margin: 0 auto; padding: 0 40px; }
-    .story-lede {
-      max-width: 52ch; margin-bottom: 88px;
-    }
-    .story-lede .section-title { margin-bottom: 16px; }
-    .story-items { display: flex; flex-direction: column; gap: 0; }
-    .story-item {
-      display: grid; grid-template-columns: 1fr 1fr;
-      gap: 80px; align-items: center;
-      padding: 80px 0; border-top: 1px solid var(--border);
-    }
-    .story-item:last-child { border-bottom: 1px solid var(--border); }
-    .story-item.flip { }
-    .story-item.flip .story-visual { order: 2; }
-    .story-item.flip .story-text  { order: 1; }
-    .story-visual {
-      border-radius: 18px; overflow: hidden;
-      aspect-ratio: 4/3; position: relative;
-      background: var(--surface);
-    }
-    .story-visual img {
-      width: 100%; height: 100%;
-      object-fit: cover; object-position: center;
-      display: block; transition: transform .6s ease;
-    }
-    .story-item:hover .story-visual img { transform: scale(1.04); }
-    .story-num {
-      font-family: 'Poppins', sans-serif;
-      font-size: 4.5rem; font-weight: 900;
-      color: rgba(245,160,74,.1); line-height: 1;
-      letter-spacing: -.06em; display: block; margin-bottom: 8px;
-    }
-    .story-text h3 {
-      font-size: clamp(1.5rem, 2.5vw, 2.1rem);
-      font-weight: 700; letter-spacing: -.03em;
-      margin-bottom: 18px; color: var(--text);
-    }
-    .story-text p {
-      color: var(--muted); font-size: 1rem;
-      line-height: 1.78; max-width: 42ch;
-    }
-    .story-tag {
-      display: inline-flex; align-items: center; gap: 8px;
-      background: rgba(245,160,74,.08);
-      border: 1px solid rgba(245,160,74,.18);
-      color: var(--orange); border-radius: 100px;
-      padding: 6px 16px; font-size: .78rem; font-weight: 600;
-      margin-top: 28px; letter-spacing: .02em;
-    }
-
-    /* ── REGIONAL STRIP ── */
-    .regional { background: var(--warm); padding: 100px 0; overflow: hidden; }
-    .regional-head { padding: 0 40px; max-width: var(--maxw); margin: 0 auto 48px; }
-    .regional-head .section-title { margin-bottom: 12px; }
-    .event-strip {
-      display: flex; gap: 14px;
-      overflow-x: auto; padding: 8px 40px 16px;
-      -webkit-overflow-scrolling: touch; scrollbar-width: none;
-    }
-    .event-strip::-webkit-scrollbar { display: none; }
-    .ev-tile {
-      flex-shrink: 0; width: 210px; border-radius: 16px;
-      overflow: hidden; position: relative; aspect-ratio: 2/3;
-      background: var(--surface); transition: transform .28s;
-    }
-    .ev-tile:hover { transform: translateY(-6px); }
-    .ev-tile img {
-      width: 100%; height: 100%; object-fit: cover; display: block;
-      transition: transform .5s ease;
-    }
-    .ev-tile:hover img { transform: scale(1.06); }
-    .ev-tile-overlay {
-      position: absolute; inset: 0;
-      background: linear-gradient(to bottom, transparent 40%, rgba(0,0,0,.85) 100%);
-    }
-    .ev-tile-info {
-      position: absolute; bottom: 0; left: 0; right: 0; padding: 16px 14px;
-    }
-    .ev-tile-name {
-      font-family: 'Poppins', sans-serif; font-size: .88rem; font-weight: 700;
-      color: white; line-height: 1.3;
-    }
-    .ev-tile-loc { font-size: .73rem; color: rgba(255,255,255,.6); margin-top: 3px; }
-
-    /* ── TRUST ── */
-    .trust { background: var(--dark); padding: 110px 0; }
-    .trust-grid {
-      display: grid; grid-template-columns: repeat(3,1fr);
-      margin-top: 64px; border: 1px solid var(--border);
-      border-radius: 20px; overflow: hidden; gap: 1px;
-      background: var(--border);
-    }
-    .trust-item {
-      background: var(--dark); padding: 48px 40px;
-      transition: background .2s;
-    }
-    .trust-item:hover { background: var(--warm); }
-    .trust-icon {
-      font-size: 28px; margin-bottom: 22px; display: block; line-height: 1;
-    }
-    .trust-item h3 {
-      font-size: 1.08rem; font-weight: 700;
-      margin-bottom: 10px; letter-spacing: -.015em;
-    }
-    .trust-item p { color: var(--muted); font-size: .9rem; line-height: 1.7; }
-    .trust-badge {
-      display: inline-flex; align-items: center; gap: 6px;
-      background: rgba(47,198,158,.08); border: 1px solid rgba(47,198,158,.2);
-      color: var(--green); border-radius: 100px;
-      padding: 4px 12px; font-size: .75rem; font-weight: 600;
-      margin-top: 16px;
-    }
-
-    /* ── DEMO (Interactive mockup) ── */
-    .demo-section { background: var(--warm); padding: 110px 0; }
-    .demo-layout {
-      max-width: var(--maxw); margin: 0 auto; padding: 0 40px;
-      display: grid; grid-template-columns: 1fr auto;
-      gap: 80px; align-items: center;
-    }
-    .demo-text .section-title { margin-bottom: 14px; }
-    .demo-text .section-sub { margin-bottom: 0; }
-    .ptab-list { display: flex; flex-direction: column; gap: 4px; margin-top: 40px; }
-    .ptab {
-      padding: 18px 20px; border-radius: 12px;
-      cursor: pointer; transition: background .2s;
-      border-left: 3px solid transparent;
-    }
-    .ptab.pt-active {
-      background: rgba(245,160,74,.08);
-      border-left-color: var(--orange);
-    }
-    .ptab:hover:not(.pt-active) { background: rgba(255,255,255,.03); }
-    .ptab h4 { font-size: .93rem; font-weight: 600; margin-bottom: 4px; color: var(--text); }
-    .ptab p  { font-size: .84rem; color: var(--muted); line-height: 1.55; }
-
-    /* iPhone frame */
-    .iphone-wrap { flex-shrink: 0; }
-    .iphone-frame {
-      width: 300px; height: 620px;
-      background: #05080f; border-radius: 46px; padding: 8px;
-      border: 1px solid rgba(255,255,255,.10);
-      box-shadow: 0 40px 90px rgba(0,0,0,.65), 0 10px 30px rgba(0,0,0,.35),
-                  inset 0 1px 0 rgba(255,255,255,.07);
-      position: relative;
-    }
-    .iphone-frame::before {
-      content: ''; position: absolute; left: -4px; top: 118px;
-      width: 4px; height: 34px; background: rgba(255,255,255,.13);
-      border-radius: 2px 0 0 2px;
-      box-shadow: 0 50px 0 rgba(255,255,255,.13), 0 88px 0 rgba(255,255,255,.13);
-    }
-    .iphone-frame::after {
-      content: ''; position: absolute; right: -4px; top: 148px;
-      width: 4px; height: 64px; background: rgba(255,255,255,.13);
-      border-radius: 0 2px 2px 0;
-    }
-    .iphone-island {
-      position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
-      width: 120px; height: 32px; background: #05080f;
-      border-radius: 20px; z-index: 20;
-    }
-    .iphone-screen {
-      width: 100%; height: 100%; border-radius: 36px; overflow: hidden;
-      background: linear-gradient(160deg,#b79b78 0%,#52a1ef 52%,#406cfb 100%);
-      display: flex; flex-direction: column;
-    }
-    .iphone-sb {
-      height: 50px; flex-shrink: 0;
-      display: flex; align-items: flex-end; justify-content: space-between;
-      padding: 0 22px 8px; position: relative; z-index: 5;
-    }
-    .sb-time { font-size: 14px; font-weight: 700; color: white; font-family: 'Poppins',sans-serif; }
-    .sb-icons { display: flex; gap: 5px; align-items: center; }
-    .iphone-screens { flex: 1; position: relative; overflow: hidden; }
-    .iscreen {
-      position: absolute; inset: 0;
-      background: linear-gradient(160deg,#b79b78 0%,#52a1ef 52%,#406cfb 100%);
-      transition: transform .35s cubic-bezier(.4,0,.2,1);
-      overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;
-    }
-    .iscreen::-webkit-scrollbar { display: none; }
-    .iscreen.is-active { transform: translateX(0); }
-    .iscreen.is-left   { transform: translateX(-100%); }
-    .iscreen.is-right  { transform: translateX(100%); }
-    .iphone-nav {
-      height: 74px; flex-shrink: 0;
-      background: rgba(12,20,50,.68); backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border-top: 1px solid rgba(255,255,255,.12);
-      display: flex; align-items: flex-start; justify-content: space-around;
-      padding: 10px 0 0; position: relative; z-index: 5;
-    }
-    .in-item {
-      display: flex; flex-direction: column; align-items: center; gap: 2px;
-      font-size: 10px; font-weight: 500; color: rgba(255,255,255,.5);
-      cursor: pointer; padding: 2px 18px; user-select: none;
-      -webkit-tap-highlight-color: transparent; transition: color .15s;
-    }
-    .in-item.in-active { color: #F5A04A; }
-    .in-icon { font-size: 22px; line-height: 1.1; }
-
-    /* Screen 1 */
-    .is1-hd {
-      backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px);
-      background: rgba(255,255,255,.14); border-bottom: 1px solid rgba(255,255,255,.2);
-      padding: 6px 16px 12px; position: sticky; top: 0; z-index: 2;
-    }
-    .is1-title { font-family:'Poppins',sans-serif; font-size:24px; font-weight:800; color:white; margin-bottom:2px; }
-    .is1-date  { font-size:12px; color:rgba(255,255,255,.7); margin-bottom:10px; }
-    .is1-search {
-      background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.28);
-      border-radius: 12px; padding: 8px 12px;
-      display: flex; align-items: center; gap: 7px;
-      color: rgba(255,255,255,.65); font-size: 13px;
-    }
-    .is1-list { padding: 12px 0 20px; display: flex; flex-direction: column; gap: 10px; }
-    .ev-card {
-      margin: 0 16px; border-radius: 16px; overflow: hidden;
-      box-shadow: 0 4px 20px rgba(0,0,0,.28);
-      cursor: pointer; user-select: none; transition: transform .12s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .ev-card:active { transform: scale(.97); }
-    .ev-cover {
-      background-size: cover; background-position: center 25%;
-      min-height: 130px; display: flex; align-items: stretch; position: relative;
-    }
-    .ev-overlay { position: absolute; inset: 0; background: rgba(0,0,0,.52); }
-    .ev-info { position: relative; z-index: 1; padding: 14px 8px 14px 16px; flex: 1; }
-    .ev-title {
-      color: white; font-size: 18px; font-weight: 900; margin-bottom: 7px; line-height: 1.2;
-      font-family: 'Poppins',sans-serif;
-      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-    }
-    .ev-row { display: flex; align-items: center; gap: 6px; margin-top: 5px; }
-    .ev-icon-cal { color: #FFD740; font-size: 14px; }
-    .ev-icon-loc { color: #FF5252; font-size: 14px; }
-    .ev-meta-txt { color: rgba(255,255,255,.92); font-size: 14px; font-weight: 300; }
-    .ev-trailing {
-      position: relative; z-index: 1;
-      display: flex; flex-direction: column;
-      align-items: flex-end; justify-content: space-between;
-      padding: 12px 12px 12px 0;
-    }
-    .ev-star  { color: rgba(255,255,255,.7); font-size: 20px; line-height: 1; }
-    .ev-arrow { color: rgba(255,255,255,.7); font-size: 16px; }
-    .ps-skel-card {
-      margin: 0 16px; border-radius: 16px; height: 130px;
-      position: relative; overflow: hidden; background: rgba(0,0,0,.22);
-    }
-    .ps-skel-shine {
-      position: absolute; inset: 0;
-      background: linear-gradient(90deg,rgba(255,255,255,.04) 25%,rgba(255,255,255,.13) 50%,rgba(255,255,255,.04) 75%);
-      background-size: 300% 100%; animation: skel-sh 1.5s infinite;
-    }
-    @keyframes skel-sh { from{background-position:200% 0} to{background-position:-200% 0} }
-
-    /* Screen 2 */
-    .is2-back {
-      display: flex; align-items: center; gap: 2px; font-size: 16px; color: white;
-      cursor: pointer; padding: 10px 16px 6px; font-weight: 500; user-select: none;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .is2-cover {
-      height: 155px; margin: 0 16px; border-radius: 16px;
-      position: relative; overflow: hidden;
-      background-size: cover; background-position: center 25%;
-      box-shadow: 0 6px 24px rgba(0,0,0,.35);
-    }
-    .is2-cover-overlay { position: absolute; inset: 0; background: rgba(0,0,0,.42); }
-    .is2-cover-content { position: absolute; inset: 0; display: flex; align-items: flex-end; padding: 14px; }
-    .is2-evname {
-      font-family: 'Poppins',sans-serif; font-size: 18px; font-weight: 800;
-      color: white; line-height: 1.2; text-shadow: 0 2px 8px rgba(0,0,0,.6);
-    }
-    .is2-glass {
-      background: rgba(255,255,255,.14); backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,.22);
-      border-radius: 16px; margin: 12px 16px 0; padding: 14px;
-    }
-    .is2-meta {
-      display: flex; align-items: center; gap: 8px;
-      font-size: 13px; color: rgba(255,255,255,.9); margin-bottom: 8px;
-    }
-    .is2-meta:last-child { margin-bottom: 0; }
-    .is2-map {
-      height: 88px; background: rgba(0,0,0,.2); border-radius: 12px;
-      margin: 12px 16px 0; position: relative; overflow: hidden;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .is2-map-grid {
-      position: absolute; inset: 0;
-      background-image: linear-gradient(rgba(255,255,255,.08) 1px,transparent 1px),
-                        linear-gradient(90deg,rgba(255,255,255,.08) 1px,transparent 1px);
-      background-size: 18px 18px;
-    }
-    .is2-map-rh { position:absolute;width:100%;height:6px;background:rgba(255,255,255,.2);top:44%;left:0; }
-    .is2-map-rv { position:absolute;width:6px;height:100%;background:rgba(255,255,255,.2);left:38%;top:0; }
-    .is2-map-pin { position:relative;z-index:2;font-size:26px;filter:drop-shadow(0 3px 4px rgba(0,0,0,.5)); }
-    .is2-actions { display: flex; flex-direction: column; gap: 8px; margin: 12px 16px 20px; }
-    .ibtn {
-      display: block; padding: 12px; border-radius: 13px; text-align: center;
-      font-weight: 700; font-size: 14px; font-family: 'Poppins',sans-serif;
-      text-decoration: none; cursor: pointer;
-      transition: transform .12s, opacity .12s; user-select: none;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .ibtn:active { transform: scale(.97); opacity: .85; }
-    .ibtn-primary { background: #F5A04A; color: white; }
-    .ibtn-outline  { background: rgba(245,160,74,.15); color: #F5A04A; border: 1.5px solid rgba(245,160,74,.45); }
-    .ibtn-ghost    { background: rgba(255,255,255,.13); color: white; border: 1px solid rgba(255,255,255,.22); font-size: 13px; padding: 10px 12px; }
-
-    /* Screen 3 */
-    .is3-back {
-      display: flex; align-items: center; gap: 2px; font-size: 16px; color: white;
-      cursor: pointer; padding: 10px 16px 4px; font-weight: 500; user-select: none;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .is3-hd { padding: 4px 16px 12px; }
-    .is3-title { font-family:'Poppins',sans-serif; font-size:20px; font-weight:800; color:white; margin-bottom:3px; }
-    .is3-sub  { font-size:12px; color:rgba(255,255,255,.65); }
-    .fahr-card {
-      background: rgba(255,255,255,.14); backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.25);
-      border-radius: 14px; padding: 13px 14px; margin: 0 16px 10px;
-    }
-    .fahr-route {
-      font-weight: 700; font-size: 14px; color: white; margin-bottom: 4px;
-      display: flex; align-items: center; gap: 5px; overflow: hidden;
-      font-family: 'Poppins',sans-serif;
-    }
-    .fahr-arrow { color: #F5A04A; flex-shrink: 0; }
-    .fahr-dest  { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-    .fahr-meta  { font-size: 11px; color: rgba(255,255,255,.62); margin-bottom: 10px; }
-    .fahr-btn {
-      display: block; background: #F5A04A; color: white; border-radius: 10px;
-      padding: 9px; text-align: center; font-weight: 700; font-size: 13px;
-      text-decoration: none; cursor: pointer;
-      -webkit-tap-highlight-color: transparent; font-family: 'Poppins',sans-serif;
-    }
-    .fahr-btn:active { opacity: .85; }
-
-    /* ── SCREENSHOTS ── */
-    .screenshots { background: var(--dark); padding: 110px 0; overflow: hidden; }
-    .screenshots-head { padding: 0 40px; max-width: var(--maxw); margin: 0 auto 64px; }
-    .shots-row {
-      display: flex; gap: 20px;
-      padding: 20px 40px 24px; overflow-x: auto;
-      -webkit-overflow-scrolling: touch; scrollbar-width: none;
-      align-items: flex-end;
-    }
-    .shots-row::-webkit-scrollbar { display: none; }
-    .shot-phone { flex-shrink: 0; }
-    .shot-phone:hover .shot-frame { transform: scale(1.03); }
-    .shot-frame {
-      width: 228px; height: 494px; border-radius: 40px; overflow: hidden;
-      background: #000; border: 7px solid rgba(255,255,255,.12);
-      box-shadow: 0 32px 72px rgba(0,0,0,.6), inset 0 0 0 1px rgba(255,255,255,.06);
-      position: relative; transition: transform .3s ease;
-    }
-    .shot-frame img {
-      width: 100%; height: 100%; object-fit: cover; object-position: top; display: block;
-    }
-    .shot-frame::before {
-      content: ''; position: absolute; top: 9px; left: 50%; transform: translateX(-50%);
-      width: 86px; height: 25px; background: #000; border-radius: 13px; z-index: 10;
-    }
-    .shot-tilt-1 { transform: rotate(-3.5deg) translateY(18px); }
-    .shot-tilt-2 { transform: rotate(-1deg)   translateY(5px); }
-    .shot-tilt-3 { transform: rotate(1deg)    translateY(5px); }
-    .shot-tilt-4 { transform: rotate(3.5deg)  translateY(18px); }
-    .shot-label {
-      margin-top: 14px; font-size: .77rem; color: var(--faint);
-      font-weight: 500; text-align: center;
-    }
-
-    /* ── COMMUNITY ── */
-    .community { background: var(--warm); padding: 120px 0; }
-    .community-inner {
-      max-width: var(--maxw); margin: 0 auto; padding: 0 40px;
-      display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center;
-    }
-    .community-text .section-title { font-size: clamp(2rem, 4vw, 2.8rem); }
-    .community-text .section-sub { margin-top: 18px; }
-    .community-list {
-      list-style: none; margin-top: 40px;
-      display: flex; flex-direction: column; gap: 18px;
-    }
-    .community-list li {
-      display: flex; align-items: flex-start; gap: 14px;
-      color: var(--muted); font-size: .95rem; line-height: 1.65;
-    }
-    .community-list li::before {
-      content: ''; flex-shrink: 0; margin-top: 7px;
-      width: 6px; height: 6px; border-radius: 50%;
-      background: var(--orange);
-    }
-    .community-visual {
-      border-radius: 20px; overflow: hidden;
-      aspect-ratio: 3/4; background: var(--surface);
-      position: relative;
-    }
-    .community-visual img {
-      width: 100%; height: 100%; object-fit: cover;
-      object-position: top; display: block;
-    }
-    .community-visual-overlay {
-      position: absolute; inset: 0;
-      background: linear-gradient(to bottom, transparent 50%, rgba(12,10,8,.7) 100%);
-    }
-    .community-visual-quote {
-      position: absolute; bottom: 28px; left: 24px; right: 24px;
-      font-family: 'Poppins', sans-serif;
-      font-size: 1.05rem; font-weight: 600; color: white;
-      line-height: 1.4;
-    }
-    .community-visual-quote cite {
-      display: block; font-size: .8rem; font-weight: 400;
-      color: rgba(255,255,255,.6); margin-top: 6px; font-style: normal;
-    }
-
-    /* ── DOWNLOAD ── */
-    .download { background: var(--black); padding: 120px 40px; text-align: center; }
-    .download-inner { max-width: 640px; margin: 0 auto; }
-    .download-inner img {
-      width: 80px; height: 80px; border-radius: 20px;
-      margin: 0 auto 28px; display: block;
-      box-shadow: 0 16px 40px rgba(64,108,251,.3), 0 0 0 1px rgba(255,255,255,.07);
-    }
-    .download-inner h2 {
-      font-size: clamp(2rem, 4.5vw, 3.2rem); font-weight: 800;
-      letter-spacing: -.035em; margin-bottom: 16px;
-    }
-    .download-inner p {
-      color: var(--muted); font-size: 1.02rem; max-width: 42ch;
-      margin: 0 auto 48px; line-height: 1.7;
-    }
-    .store-row {
-      display: flex; justify-content: center;
-      gap: 14px; flex-wrap: wrap; margin-bottom: 28px;
-    }
-    .store-btn {
-      display: flex; align-items: center; gap: 13px;
-      background: var(--surface); border: 1px solid var(--border-w);
-      border-radius: 14px; padding: 14px 26px;
-      text-decoration: none; color: var(--text);
-      transition: background .2s, transform .15s;
-    }
-    .store-btn:hover { background: #252219; transform: translateY(-2px); }
-    .store-btn svg { width: 26px; height: 26px; flex-shrink: 0; }
-    .store-btn-txt { text-align: left; line-height: 1.2; }
-    .store-btn-txt small { display: block; color: var(--muted); font-size: .7rem; }
-    .store-btn-txt strong { font-size: 1rem; font-weight: 600; font-family: 'Poppins',sans-serif; }
-    .coming-soon {
-      display: inline-flex; align-items: center; gap: 8px;
-      background: rgba(245,160,74,.1); border: 1px solid rgba(245,160,74,.25);
-      color: var(--orange); border-radius: 100px;
-      padding: 8px 18px; font-size: .8rem; font-weight: 600;
-    }
-    .coming-soon .dot {
-      width: 7px; height: 7px; border-radius: 50%;
-      background: var(--orange); box-shadow: 0 0 8px var(--orange);
-    }
-
-    /* ── FOOTER ── */
-    footer {
-      background: var(--black);
-      border-top: 1px solid var(--border);
-      padding: 36px 40px;
-    }
-    .footer-inner {
-      max-width: var(--maxw); margin: 0 auto;
-      display: flex; justify-content: space-between;
-      align-items: center; flex-wrap: wrap; gap: 20px;
-    }
-    .footer-brand {
-      display: flex; align-items: center; gap: 10px;
-      font-family: 'Poppins',sans-serif; font-weight: 700; font-size: .94rem;
-      color: var(--text); text-decoration: none;
-    }
-    .footer-brand img { width: 26px; height: 26px; border-radius: 7px; }
-    .footer-brand .r { color: var(--orange); }
-    .footer-brand small { color: var(--faint); font-size: .78rem; margin-left: 6px; font-weight: 400; }
-    .footer-links { display: flex; gap: 24px; flex-wrap: wrap; }
-    .footer-links a {
-      color: var(--muted); text-decoration: none; font-size: .84rem; transition: color .2s;
-    }
-    .footer-links a:hover { color: var(--text); }
-
-    /* ── FADE-IN ON SCROLL ── */
-    .reveal { opacity: 0; transform: translateY(28px); transition: opacity .7s ease, transform .7s ease; }
-    .reveal.visible { opacity: 1; transform: none; }
-
-    /* ── RESPONSIVE ── */
-    @media (max-width: 960px) {
-      .story-item, .story-item.flip { grid-template-columns: 1fr; gap: 36px; }
-      .story-item.flip .story-visual { order: 0; }
-      .story-item.flip .story-text  { order: 0; }
-      .trust-grid { grid-template-columns: 1fr; }
-      .demo-layout { grid-template-columns: 1fr; }
-      .iphone-wrap { display: flex; justify-content: center; }
-      .community-inner { grid-template-columns: 1fr; }
-      .community-visual { max-height: 360px; }
-    }
-    @media (max-width: 720px) {
-      nav { padding: 0 22px; }
-      .nav-links { display: none; }
-      .hero-content { padding: 0 24px 80px; }
-      .wrap { padding: 0 24px; }
-      .story-inner { padding: 0 24px; }
-      .story { padding: 80px 0; }
-      .story-lede { margin-bottom: 56px; }
-      .story-item { padding: 60px 0; }
-      .trust { padding: 80px 0; }
-      .trust .wrap { padding: 0 24px; }
-      .demo-section { padding: 80px 0; }
-      .demo-layout { padding: 0 24px; }
-      .screenshots { padding: 80px 0; }
-      .screenshots-head { padding: 0 24px; }
-      .shots-row { padding: 20px 24px 24px; }
-      .regional-head { padding: 0 24px; }
-      .event-strip { padding: 8px 24px 16px; }
-      .community { padding: 80px 0; }
-      .community-inner { padding: 0 24px; }
-      .download { padding: 80px 24px; }
-      footer { padding: 32px 24px; }
-      .footer-inner { flex-direction: column; align-items: flex-start; }
-    }
-    @media (max-width: 480px) {
-      .hero h1 { font-size: 2.8rem; }
-      .hero-btns { flex-direction: column; }
-      .btn-primary, .btn-ghost { justify-content: center; }
-      .shot-frame { width: 170px; height: 368px; border-radius: 30px; }
-      .ev-tile { width: 165px; }
-    }
-  </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EventRide – Mitfahrgelegenheiten zu Events in Kärnten</title>
+  <meta name="description" content="EventRide bringt dich zu Kirchtagen, Bällen, Festen und Partys in ganz Kärnten. Finde eine Mitfahrgelegenheit oder nimm selbst wen mit – kostenlos für iOS und Android.">
+  <meta name="theme-color" content="#081221">
+  <meta name="google-site-verification" content="mLKBs35_DZY-mc9IvuQjKdmX__VyPKoCqTwH-leAMGI">
+  <meta property="og:title" content="EventRide – Kein Auto? Kein Problem.">
+  <meta property="og:description" content="Mitfahrgelegenheiten zu Events in ganz Kärnten. Kostenlos für iOS und Android.">
+  <meta property="og:image" content="og-image.png">
+  <meta property="og:url" content="https://eventride.at">
+  <meta property="og:type" content="website">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="apple-touch-icon" href="favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body style="margin:0;background:#081221">
 
-<!-- NAVBAR -->
-<nav id="main-nav">
-  <a class="nav-logo" href="#top">
-    <img src="favicon.png" alt="EventRide" />
-    Event<span class="r">Ride</span>
-  </a>
-  <ul class="nav-links">
-    <li><a href="#story">Wie es funktioniert</a></li>
-    <li><a href="#demo">App</a></li>
-    <li><a href="#download">Download</a></li>
-  </ul>
-  <a class="nav-cta" href="#download">App holen</a>
-</nav>
+<div class="site" id="site" data-theme="navy">
 
-<!-- HERO -->
-<section class="hero" id="top">
-  <div class="hero-bg">
-    <img src="assets/image/kirchtag6.jpg" alt="Villacher Kirchtag – gemeinsam feiern" />
-    <div class="hero-overlay"></div>
-  </div>
-  <div class="hero-content">
-    <span class="hero-eyebrow">Kärnten · Gemeinschaft · Erlebnis</span>
-    <h1>Gemeinsam<br>zum Event.</h1>
-    <p class="hero-sub">
-      EventRide bringt Menschen zusammen, die zum gleichen Fest wollen.
-      Mitfahren, kennenlernen, gemeinsam feiern.
-    </p>
-    <div class="hero-btns">
-      <a href="#download" class="btn-primary">App herunterladen</a>
-      <a href="#story" class="btn-ghost">So funktioniert's</a>
+  <div class="progress" id="progress"></div>
+
+  <!-- NAVBAR -->
+  <nav class="nav" id="nav">
+    <a class="nav-logo" href="#top"><img src="assets/logo-256.png" alt="EventRide Logo"><span>Event<span class="r">Ride</span></span></a>
+    <ul class="nav-links">
+      <li><a href="#events">Events</a></li>
+      <li><a href="#features">Die App</a></li>
+      <li><a href="#veranstalter">Veranstalter</a></li>
+      <li><a href="#faq">FAQ</a></li>
+    </ul>
+    <div class="nav-right">
+      <a class="nav-ig" href="https://instagram.com/event.ride" target="_blank" rel="noopener" aria-label="EventRide auf Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="2.5" width="19" height="19" rx="5.5"></rect><circle cx="12" cy="12" r="4.4"></circle><circle cx="17.6" cy="6.4" r="1.1" fill="currentColor" stroke="none"></circle></svg></a>
+      <a class="nav-cta" href="#download">App holen</a>
+      <button class="burger" id="burger" aria-label="Menü öffnen"><svg class="bars" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16"></path><path d="M4 12h16"></path><path d="M4 17h16"></path></svg><svg class="x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 6 12 12"></path><path d="M18 6 6 18"></path></svg></button>
     </div>
+  </nav>
+  <div class="mobile-menu">
+    <a href="#events">Events</a>
+    <a href="#features">Die App</a>
+    <a href="#veranstalter">Für Veranstalter</a>
+    <a href="#faq">FAQ</a>
+    <a href="https://instagram.com/event.ride" target="_blank" rel="noopener">Instagram @event.ride</a>
+    <a class="mm-cta" href="#download">App holen</a>
   </div>
-  <div class="hero-scroll-hint">
-    <div class="scroll-arrow"></div>
-  </div>
-</section>
 
-<!-- STORY -->
-<section class="story" id="story">
-  <div class="story-inner">
-    <div class="story-lede reveal">
-      <span class="eyebrow">Wie es funktioniert</span>
-      <h2 class="section-title">Von zuhause<br>direkt aufs Fest.</h2>
-      <p class="section-sub">Kein Stress mit Parken, kein teures Taxi. EventRide macht's einfach.</p>
+  <!-- HERO -->
+  <section class="hero topo" id="top">
+    <div class="hero-inner">
+      <div class="hero-text">
+        <div class="hero-kicker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-5.3-7-11a7 7 0 0 1 14 0c0 5.7-7 11-7 11Z"></path><circle cx="12" cy="10" r="2.6"></circle></svg>Aus Kärnten. Für Kärnten.</div>
+        <h1>Kein Auto?<br><span class="r">Kein Problem.</span></h1>
+        <p class="hero-sub">EventRide bringt dich zu <strong>Kirchtagen, Bällen, Festen und Partys</strong> in ganz Kärnten – finde eine Mitfahrgelegenheit oder nimm selbst wen mit.</p>
+        <div class="hero-btns">
+          <a class="btn-p" href="#download"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"></path><path d="m7 12 5 5 5-5"></path><path d="M5 21h14"></path></svg>App holen</a>
+          <a class="btn-s" href="#veranstalter">Ich veranstalte ein Event</a>
+        </div>
+        <div class="hero-trust">
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>App 100% kostenlos</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>Verifizierte Fahrer</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>Alle 10 Bezirke</span>
+        </div>
+      </div>
+      <div class="hero-phones" id="phones">
+        <div class="glow"></div>
+        <div class="phone phone-l"><img src="assets/screenshots/real-fahrten-web.jpg" alt="Fahrten finden in der EventRide App"></div>
+        <div class="phone phone-r"><img src="assets/screenshots/real-chat-web.jpg" alt="Chat in der EventRide App"></div>
+        <div class="phone phone-c"><img src="assets/screenshots/real-events-web.jpg" alt="Events entdecken in der EventRide App"></div>
+      </div>
     </div>
-    <div class="story-items">
+  </section>
 
-      <div class="story-item reveal">
-        <div class="story-visual">
-          <img src="assets/image/feuerwehr.png" alt="Feuerwehrfest Kärnten" />
-        </div>
-        <div class="story-text">
-          <span class="story-num">01</span>
-          <h3>Du willst hin —<br>aber wie?</h3>
-          <p>Der Villacher Kirchtag, das Feuerwehrfest, der Maturaball — die schönsten Events liegen oft dort, wo der Bus nicht mehr fährt. Und das Auto abzustellen wäre doch so praktisch.</p>
-          <span class="story-tag">Das Bedürfnis</span>
-        </div>
-      </div>
-
-      <div class="story-item flip reveal">
-        <div class="story-visual">
-          <img src="assets/image/Ball.png" alt="Ball in Kärnten" />
-        </div>
-        <div class="story-text">
-          <span class="story-num">02</span>
-          <h3>EventRide findet<br>die Fahrt für dich.</h3>
-          <p>Öffne die App, wähle dein Event — und sieh sofort, wer von deiner Stadt aus fährt. Ein Tap, und du fragst an. Der Fahrer bestätigt, ihr chattet kurz, und alles ist geregelt.</p>
-          <span class="story-tag">Die Lösung</span>
-        </div>
-      </div>
-
-      <div class="story-item reveal">
-        <div class="story-visual">
-          <img src="assets/image/disco.png" alt="Festival in Kärnten" />
-        </div>
-        <div class="story-text">
-          <span class="story-num">03</span>
-          <h3>Neue Leute.<br>Unvergessliche Abende.</h3>
-          <p>Aus einer Mitfahrgelegenheit werden echte Gespräche, neue Bekanntschaften und manchmal sogar Freundschaften. So wie Kärnten schon immer funktioniert hat.</p>
-          <span class="story-tag">Das Erlebnis</span>
-        </div>
-      </div>
-
+  <!-- TICKER -->
+  <div class="ticker" aria-hidden="true">
+    <div class="ticker-track">
+      <span class="tk t1">Kirchtage</span><span class="tk t2">Maturabälle</span><span class="tk t3">Feuerwehrfeste</span><span class="tk t4">Krampusläufe</span><span class="tk t5">Open-Airs</span><span class="tk t6">Partys</span><span class="tk t1">Kirchtage</span><span class="tk t2">Maturabälle</span><span class="tk t3">Feuerwehrfeste</span><span class="tk t4">Krampusläufe</span><span class="tk t5">Open-Airs</span><span class="tk t6">Partys</span>
     </div>
   </div>
-</section>
 
-<!-- REGIONAL -->
-<section class="regional" id="regional">
-  <div class="regional-head reveal">
-    <span class="eyebrow">Gebaut für Kärnten</span>
-    <h2 class="section-title">Für die Events,<br>die zählen.</h2>
-    <p class="section-sub">Von Kirchtagszügen bis Maturabällen — EventRide kennt Kärnten.</p>
-  </div>
-  <div class="event-strip">
-    <div class="ev-tile">
-      <img src="assets/image/kirchtag6.jpg" alt="Kirchtag" />
-      <div class="ev-tile-overlay"></div>
-      <div class="ev-tile-info">
-        <div class="ev-tile-name">Villacher Kirchtag</div>
-        <div class="ev-tile-loc">Villach</div>
-      </div>
-    </div>
-    <div class="ev-tile">
-      <img src="assets/image/feuerwehr.png" alt="Feuerwehrfest" />
-      <div class="ev-tile-overlay"></div>
-      <div class="ev-tile-info">
-        <div class="ev-tile-name">Feuerwehrfeste</div>
-        <div class="ev-tile-loc">Ganz Kärnten</div>
-      </div>
-    </div>
-    <div class="ev-tile">
-      <img src="assets/image/Ball.png" alt="Ball" />
-      <div class="ev-tile-overlay"></div>
-      <div class="ev-tile-info">
-        <div class="ev-tile-name">Matura&shy;bälle</div>
-        <div class="ev-tile-loc">Klagenfurt · Villach</div>
-      </div>
-    </div>
-    <div class="ev-tile">
-      <img src="assets/image/krampus.jpg" alt="Krampuslauf" />
-      <div class="ev-tile-overlay"></div>
-      <div class="ev-tile-info">
-        <div class="ev-tile-name">Krampus&shy;läufe</div>
-        <div class="ev-tile-loc">Dezember</div>
-      </div>
-    </div>
-    <div class="ev-tile">
-      <img src="assets/image/disco.png" alt="Open-Air Festival" />
-      <div class="ev-tile-overlay"></div>
-      <div class="ev-tile-info">
-        <div class="ev-tile-name">Open‑Air Festivals</div>
-        <div class="ev-tile-loc">Sommer</div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- TRUST -->
-<section class="trust" id="trust">
-  <div class="wrap">
-    <div class="reveal">
-      <span class="eyebrow">Sicherheit &amp; Vertrauen</span>
-      <h2 class="section-title">Weil du weißt,<br>mit wem du fährst.</h2>
-      <p class="section-sub">Echte Menschen. Verifizierte Profile. Bewertungen nach jeder Fahrt.</p>
-    </div>
-    <div class="trust-grid reveal">
-      <div class="trust-item">
-        <span class="trust-icon">✉️</span>
-        <h3>E-Mail Verifizierung</h3>
-        <p>Jedes Konto wird mit einer verifizierten E-Mail-Adresse verknüpft. Keine anonymen Profile.</p>
-        <span class="trust-badge">✓ Pflicht beim Registrieren</span>
-      </div>
-      <div class="trust-item">
-        <span class="trust-icon">📱</span>
-        <h3>Telefon­verifizierung</h3>
-        <p>Eine verifizierte Telefonnummer erhöht das Vertrauen — für Fahrer und Mitfahrer gleichermaßen.</p>
-        <span class="trust-badge">✓ Freiwillig · Level 2</span>
-      </div>
-      <div class="trust-item">
-        <span class="trust-icon">🪪</span>
-        <h3>Führerschein­prüfung</h3>
-        <p>Fahrer können ihren Führerschein einreichen und von unserem Team manuell verifizieren lassen.</p>
-        <span class="trust-badge">✓ Manuell geprüft · Level 3</span>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- APP DEMO -->
-<section class="demo-section" id="demo">
-  <div class="demo-layout">
-    <div class="demo-text reveal">
-      <span class="eyebrow">Die App</span>
-      <h2 class="section-title">Probier's direkt<br>hier aus.</h2>
-      <p class="section-sub">Tippe auf ein Event und erlebe EventRide — kein Download nötig. Echte Daten aus Kärnten.</p>
-      <div class="ptab-list">
-        <div class="ptab pt-active" id="ptab-1" onclick="isNavigate(1)">
-          <h4>🎪 Events entdecken</h4>
-          <p>Aktuelle Veranstaltungen aus Kärnten — direkt aus der EventRide-Datenbank geladen.</p>
+  <!-- LIVE EVENTS -->
+  <section class="block" id="events">
+    <div class="wrap rv">
+      <div class="sec-head row">
+        <div>
+          <p class="eyebrow">Live aus der App</p>
+          <h2 class="sec-title">Was geht in Kärnten?</h2>
+          <p class="sec-sub">Die nächsten Events, zu denen du mitfahren kannst – live aus der App.</p>
         </div>
-        <div class="ptab" id="ptab-2" onclick="isOpenDetail(0)">
-          <h4>🗓️ Event öffnen</h4>
-          <p>Datum, Ort, Karte und verfügbare Mitfahrten — alles auf einen Blick.</p>
+        <a class="sec-aside" href="#download">Alle Events in der App<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m13 6 6 6-6 6"></path></svg></a>
+      </div>
+      <div class="ev-scroll" id="ev-scroll">
+        <div class="ev-skel"></div><div class="ev-skel"></div><div class="ev-skel"></div>
+      </div>
+      <p class="ev-foot" id="ev-note">Kirchtage · Feuerwehrfeste · Bälle · Krampusläufe · Partys – alle Termine und Fahrten findest du in der App.</p>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="block" id="features">
+    <div class="wrap rv">
+      <div class="sec-head">
+        <p class="eyebrow">Die App</p>
+        <h2 class="sec-title">Hinkommen. Feiern.<br>Sicher heimkommen.</h2>
+      </div>
+      <div class="bento">
+        <div class="bento-cell spot bento-a">
+          <span class="bento-tag">Fahrten</span>
+          <h3>Mitfahren oder mitnehmen</h3>
+          <p>Zu jedem Event siehst du, wer hinfährt – freie Plätze, Abfahrtsort, Entfernung. Ein Tap auf „Mitfahren", fertig. Oder du bietest selbst Plätze an.</p>
+          <div class="bento-shot"><img src="assets/screenshots/real-fahrten-web.jpg" alt="Fahrtenliste zum Villacher Kirchtag" loading="lazy"></div>
         </div>
-        <div class="ptab" id="ptab-3" onclick="isNavigate(3)">
-          <h4>🚗 Fahrt anfragen</h4>
-          <p>Mit einem Tap anfragen — der Fahrer bestätigt direkt in der App.</p>
+        <div class="bento-cell spot bento-b">
+          <span class="bento-tag">Chat</span>
+          <h3>Alles direkt ausmachen</h3>
+          <p>Treffpunkt, Abfahrtszeit, „bin 5 min später" – direkt in der App, ohne Nummern auszutauschen.</p>
+          <div class="bento-shot"><img src="assets/screenshots/real-chat-web.jpg" alt="Chat mit Fahrtdetails" loading="lazy"></div>
+        </div>
+        <div class="bento-cell spot bento-c">
+          <div class="bento-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v5c0 4 3 7.5 7 9 4-1.5 7-5 7-9V6l-7-3Z"></path><path d="m9.5 12 1.8 1.8L15 10"></path></svg></div>
+          <h3>Verifizierte Fahrer</h3>
+          <p>E-Mail, Telefon und Führerschein verifiziert, dazu Bewertungen – du siehst, bei wem du einsteigst.</p>
+        </div>
+        <div class="bento-cell spot bento-d">
+          <div class="bento-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6Z"></path><path d="M10.5 19a1.8 1.8 0 0 0 3 0"></path></svg></div>
+          <h3>Sofort Bescheid wissen</h3>
+          <p>Push, sobald deine Anfrage bestätigt wird oder eine Nachricht reinkommt.</p>
+        </div>
+        <div class="bento-cell spot bento-e">
+          <div class="bento-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11h18"></path><path d="M5 11V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v4"></path><path d="M4 11v6"></path><path d="M20 11v6"></path><path d="M7 21v-2"></path><path d="M17 21v-2"></path><path d="M4 19h16"></path></svg></div>
+          <h3>Sicher heimkommen</h3>
+          <p>Rückfahrten findest du genauso wie Hinfahrten – niemand muss fahren, der gefeiert hat.</p>
         </div>
       </div>
     </div>
+  </section>
 
-    <div class="iphone-wrap">
-      <div class="iphone-frame">
-        <div class="iphone-island"></div>
-        <div class="iphone-screen">
-          <div class="iphone-sb">
-            <span class="sb-time">9:41</span>
-            <div class="sb-icons">
-              <svg width="17" height="12" viewBox="0 0 17 12" fill="white">
-                <rect x="0" y="7" width="3" height="5" rx="1"/>
-                <rect x="4.5" y="4.5" width="3" height="7.5" rx="1"/>
-                <rect x="9" y="2" width="3" height="10" rx="1"/>
-                <rect x="13.5" y="0" width="3" height="12" rx="1"/>
-              </svg>
-              <svg width="16" height="12" viewBox="0 0 16 12" fill="white">
-                <path d="M8 9.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3z"/>
-                <path d="M8 6C5.8 6 3.8 6.9 2.3 8.4l1.4 1.4C4.9 8.6 6.4 8 8 8s3.1.6 4.3 1.8l1.4-1.4C12.2 6.9 10.2 6 8 6z" opacity=".6"/>
-                <path d="M8 2C4.7 2 1.7 3.3-.3 5.4l1.4 1.4C3 5.1 5.4 4 8 4s5 1.1 6.9 2.8l1.4-1.4C14.3 3.3 11.3 2 8 2z" opacity=".3"/>
-              </svg>
-              <svg width="25" height="12" viewBox="0 0 25 12" fill="none">
-                <rect x=".5" y=".5" width="21" height="11" rx="3.5" stroke="white" stroke-opacity=".55"/>
-                <rect x="2" y="2" width="16" height="8" rx="2" fill="white"/>
-                <path d="M23 4v4a2 2 0 000-4z" fill="white" fill-opacity=".4"/>
-              </svg>
-            </div>
-          </div>
-          <div class="iphone-screens">
-            <div class="iscreen is-active" id="is-1">
-              <div class="is1-hd">
-                <div class="is1-title">Veranstaltungen</div>
-                <div class="is1-date" id="is-today-date">Di, 3. Juni 2026</div>
-                <div class="is1-search">
-                  <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="#8e8e93" stroke-width="1.5"/><path d="M10 10l2.5 2.5" stroke="#8e8e93" stroke-width="1.5" stroke-linecap="round"/></svg>
-                  <span style="color:#8e8e93">Suchen…</span>
-                </div>
-              </div>
-              <div class="is1-list" id="is-events-list">
-                <div class="ps-skel-card"><div class="ps-skel-shine"></div></div>
-                <div class="ps-skel-card"><div class="ps-skel-shine"></div></div>
-              </div>
-            </div>
-            <div class="iscreen is-right" id="is-2">
-              <div class="is2-back" onclick="isNavigate(1)">‹ Zurück</div>
-              <div class="is2-cover" id="is-detail-cover" style="background-image:url(assets/image/kirchtag6.jpg)">
-                <div class="is2-cover-overlay"></div>
-                <div class="is2-cover-content">
-                  <div class="is2-evname" id="is-detail-name">Event Name</div>
-                </div>
-              </div>
-              <div class="is2-glass">
-                <div class="is2-meta"><span>📅</span><span id="is-detail-date" style="font-weight:500">Datum</span></div>
-                <div class="is2-meta"><span>📍</span><span id="is-detail-loc">Ort</span></div>
-              </div>
-              <div class="is2-map">
-                <div class="is2-map-grid"></div>
-                <div class="is2-map-rh"></div>
-                <div class="is2-map-rv"></div>
-                <span class="is2-map-pin">📍</span>
-              </div>
-              <div class="is2-actions">
-                <a href="#download" class="ibtn ibtn-primary" onclick="isDownload(event)">🚗 Fahrten finden</a>
-                <a href="#download" class="ibtn ibtn-outline" onclick="isDownload(event)">+ Fahrt anbieten</a>
-                <a href="#download" class="ibtn ibtn-ghost"   onclick="isDownload(event)">⭐ Ich will hin</a>
-              </div>
-            </div>
-            <div class="iscreen is-right" id="is-3">
-              <div class="is3-back" onclick="isNavigate(2)">‹ Event</div>
-              <div class="is3-hd">
-                <div class="is3-title">Verfügbare Fahrten</div>
-                <div class="is3-sub" id="is-fahrten-sub">für dieses Event</div>
-              </div>
-              <div class="fahr-card">
-                <div class="fahr-route">🏠 Klagenfurt <span class="fahr-arrow">→</span> <span class="fahr-dest" id="is-ziel-1">Ziel</span></div>
-                <div class="fahr-meta">Sa 19:30 · 3 Plätze frei · Max M.</div>
-                <a href="#download" class="fahr-btn" onclick="isDownload(event)">Mitfahren →</a>
-              </div>
-              <div class="fahr-card">
-                <div class="fahr-route">🏠 Villach <span class="fahr-arrow">→</span> <span class="fahr-dest" id="is-ziel-2">Ziel</span></div>
-                <div class="fahr-meta">Sa 20:00 · 2 Plätze frei · Lisa K.</div>
-                <a href="#download" class="fahr-btn" onclick="isDownload(event)">Mitfahren →</a>
-              </div>
-              <div class="fahr-card">
-                <div class="fahr-route">🏠 Spittal <span class="fahr-arrow">→</span> <span class="fahr-dest" id="is-ziel-3">Ziel</span></div>
-                <div class="fahr-meta">Sa 18:45 · 1 Platz frei · Tom B.</div>
-                <a href="#download" class="fahr-btn" onclick="isDownload(event)">Mitfahren →</a>
-              </div>
-            </div>
-          </div>
-          <div class="iphone-nav">
-            <div class="in-item in-active" id="in-0" onclick="isNavigate(1)">
-              <span class="in-icon">🎪</span><span>Events</span>
-            </div>
-            <div class="in-item" id="in-1" onclick="isDownload()">
-              <span class="in-icon">🚗</span><span>Fahrten</span>
-            </div>
-            <div class="in-item" id="in-2" onclick="isDownload()">
-              <span class="in-icon">👤</span><span>Profil</span>
-            </div>
-          </div>
+  <!-- SCREENSHOTS -->
+  <section class="block" id="screenshots">
+    <div class="wrap rv">
+      <div class="sec-head">
+        <p class="eyebrow">Echte Screenshots</p>
+        <h2 class="sec-title">Schau selbst rein.</h2>
+      </div>
+      <div class="shots-scroll">
+        <div class="shot"><img src="assets/screenshots/real-events-web.jpg" alt="Event-Übersicht" loading="lazy"><div class="shot-cap">Events<small>Alle Feste auf einen Blick</small></div></div>
+        <div class="shot"><img src="assets/screenshots/real-fahrten-web.jpg" alt="Fahrten finden" loading="lazy"><div class="shot-cap">Fahrten finden<small>Mitfahren mit einem Tap</small></div></div>
+        <div class="shot"><img src="assets/screenshots/real-chat-web.jpg" alt="Chat" loading="lazy"><div class="shot-cap">Chat<small>Alles direkt ausmachen</small></div></div>
+        <div class="shot"><img src="assets/screenshots/real-profil-web.jpg" alt="Profil mit Verifizierung" loading="lazy"><div class="shot-cap">Profil<small>Verifizierung &amp; Bewertungen</small></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- VERANSTALTER -->
+  <section class="block topo" id="veranstalter">
+    <div class="va-grid rv">
+      <div class="va-text">
+        <p class="eyebrow">Für Veranstalter</p>
+        <h2 class="sec-title">Dein Event in der App. Kostenlos.</h2>
+        <p class="va-lead">Kirchtag, Fest, Ball oder Party? Wir listen dein Event kostenlos – und lösen das Anreise-Problem deiner Besucher gleich mit.</p>
+        <ul class="va-list">
+          <li><span class="va-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span><div><strong>Mehr junge Besucher</strong><span>Die Zielgruppe, die sonst daheim bleibt, kommt jetzt zu dir.</span></div></li>
+          <li><span class="va-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span><div><strong>Weniger Parkchaos</strong><span>Volle Autos statt voller Wiesen – Fahrgemeinschaften entlasten deine Parkflächen.</span></div></li>
+          <li><span class="va-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span><div><strong>Sichere Heimfahrt</strong><span>Deine Gäste kommen sicher heim – Verantwortung, die auf dein Event zurückstrahlt.</span></div></li>
+          <li><span class="va-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span><div><strong>In 24 Stunden online</strong><span>Eventname, Datum, Ort an uns – wir kümmern uns um den Rest. Ohne Vertrag, ohne Kosten.</span></div></li>
+        </ul>
+        <div class="va-ctas">
+          <a class="btn-p" href="mailto:kontakt@eventride.at?subject=Mein%20Event%20in%20EventRide"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m3 7 9 6 9-6"></path></svg>Event melden</a>
+          <a class="btn-s" href="https://instagram.com/event.ride" target="_blank" rel="noopener">Per Instagram-DM</a>
         </div>
+        <p class="va-note">kontakt@eventride.at – wir antworten meistens noch am selben Tag.</p>
+      </div>
+      <div class="va-visual">
+        <div class="phone"><img src="assets/screenshots/real-infos-web.jpg" alt="Event-Detailseite in der EventRide App" loading="lazy"></div>
+        <div class="va-float f1"><div class="t"><span class="hl">Kostenlos</span> gelistet</div><div class="s">Kein Vertrag, keine Gebühren</div></div>
+        <div class="va-float f2"><div class="t">Mit Karte &amp; Navigation</div><div class="s">Deine Gäste finden direkt hin</div></div>
       </div>
     </div>
+  </section>
 
-  </div>
-</section>
+  <!-- IDEE -->
+  <section class="block">
+    <div class="idee rv">
+      <div class="sec-head center" style="margin-bottom:0"><p class="eyebrow">Warum es EventRide gibt</p></div>
+      <blockquote>„Am Land ist jedes Fest nur so gut wie deine Mitfahrgelegenheit. <span class="hl">Das wollten wir ändern.</span>"</blockquote>
+      <p>Entstanden in Kärnten: Der Kirchtag ist drei Dörfer weiter, der letzte Bus fährt um 20 Uhr – und irgendwer muss nüchtern bleiben. Statt Eltern-Taxi und Daheimbleiben gibt's jetzt eine App dafür.</p>
+    </div>
+  </section>
 
-<!-- SCREENSHOTS -->
-<section class="screenshots" id="app-screenshots">
-  <div class="screenshots-head reveal">
-    <span class="eyebrow">Echte Screenshots</span>
-    <h2 class="section-title">So sieht EventRide aus.</h2>
-    <p class="section-sub">Kein Mock, kein Konzept — das ist die echte App auf einem iPhone.</p>
-  </div>
-  <div class="shots-row">
-    <div class="shot-phone shot-tilt-1">
-      <div class="shot-frame">
-        <img src="assets/screenshots/IMG_0170.PNG" alt="Events entdecken" loading="lazy" />
+  <!-- FAQ -->
+  <section class="block" id="faq">
+    <div class="faq-grid rv">
+      <div class="sec-head">
+        <p class="eyebrow">Gut zu wissen</p>
+        <h2 class="sec-title">Häufige Fragen</h2>
+        <p class="faq-side-note">Deine Frage ist nicht dabei? Schreib uns an <a href="mailto:kontakt@eventride.at">kontakt@eventride.at</a> oder per DM an <a href="https://instagram.com/event.ride" target="_blank" rel="noopener">@event.ride</a>.</p>
       </div>
-      <p class="shot-label">Events entdecken</p>
-    </div>
-    <div class="shot-phone shot-tilt-2">
-      <div class="shot-frame">
-        <img src="assets/screenshots/IMG_0158.PNG" alt="Fahrten finden" loading="lazy" />
-      </div>
-      <p class="shot-label">Fahrten finden</p>
-    </div>
-    <div class="shot-phone shot-tilt-3">
-      <div class="shot-frame">
-        <img src="assets/screenshots/IMG_0161.PNG" alt="Chat" loading="lazy" />
-      </div>
-      <p class="shot-label">Direkt chatten</p>
-    </div>
-    <div class="shot-phone shot-tilt-4">
-      <div class="shot-frame">
-        <img src="assets/screenshots/IMG_0162.PNG" alt="Anfragen verwalten" loading="lazy" />
-      </div>
-      <p class="shot-label">Anfragen verwalten</p>
-    </div>
-  </div>
-</section>
-
-<!-- COMMUNITY -->
-<section class="community" id="community">
-  <div class="community-inner">
-    <div class="community-text reveal">
-      <span class="eyebrow">Mehr als eine App</span>
-      <h2 class="section-title">Nicht nur<br>eine Mitfahrt.</h2>
-      <p class="section-sub">EventRide bringt Menschen zusammen, die zum gleichen Event wollen. Was als Mitfahrgelegenheit beginnt, wird oft mehr.</p>
-      <ul class="community-list">
-        <li>Mitfahrten entstehen — unkompliziert und verlässlich</li>
-        <li>Gespräche entstehen — auf der Fahrt hin und zurück</li>
-        <li>Neue Kontakte entstehen — weil Kärnten klein ist</li>
-        <li>Erinnerungen entstehen — die länger bleiben als der Abend</li>
-      </ul>
-    </div>
-    <div class="community-visual reveal">
-      <img src="assets/screenshots/IMG_0158.PNG" alt="Fahrten in EventRide" />
-      <div class="community-visual-overlay"></div>
-      <div class="community-visual-quote">
-        "Einfach die App aufgemacht — und zwei Minuten später hatte ich eine Mitfahrt zum Kirchtag."
-        <cite>Lukas, Klagenfurt</cite>
+      <div class="faq-list">
+        <details><summary>Was kostet EventRide?<span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span></summary><div class="faq-a">Die App ist komplett kostenlos – keine Gebühren, keine Abos, keine versteckten Kosten. Für die Fahrt selbst ist es üblich, sich mit dem Fahrer eine faire <strong>Spritpreisbeteiligung</strong> auszumachen – das regelt ihr direkt untereinander, EventRide verdient nichts mit.</div></details>
+        <details><summary>Wie finde ich eine Mitfahrgelegenheit?<span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span></summary><div class="faq-a">Event auswählen, verfügbare Fahrten ansehen, mit einem Tap anfragen. Sobald der Fahrer bestätigt, könnt ihr direkt in der App chatten und Treffpunkt &amp; Zeit ausmachen.</div></details>
+        <details><summary>Wie sicher ist das?<span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span></summary><div class="faq-a">Fahrer können E-Mail, Telefonnummer und Führerschein verifizieren – das siehst du direkt im Profil. Zusätzlich können Fahrer ihr Kennzeichen hinterlegen, das <strong>nur ihre Mitfahrer</strong> sehen – so erkennst du das richtige Auto sofort. Nach jeder Fahrt wird bewertet, so vertraust du auf echte Erfahrungen anderer.</div></details>
+        <details><summary>Wie biete ich selbst eine Fahrt an?<span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span></summary><div class="faq-a">Event auswählen, freie Plätze und Abfahrtsort angeben – fertig. Anfragen von Mitfahrern bestätigst du mit einem Tap und klärst den Rest im Chat.</div></details>
+        <details><summary>Mein Event fehlt in der App – was tun?<span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span></summary><div class="faq-a">Als Veranstalter kannst du dein Event direkt in der App hochladen. Oder schreib uns an <a href="mailto:kontakt@eventride.at">kontakt@eventride.at</a> bzw. per DM an <a href="https://instagram.com/event.ride" target="_blank" rel="noopener">@event.ride</a> – wir nehmen es kostenlos auf.</div></details>
       </div>
     </div>
-  </div>
-</section>
+  </section>
 
-<!-- DOWNLOAD -->
-<section class="download" id="download">
-  <div class="download-inner reveal">
-    <img src="favicon.png" alt="EventRide App Icon" />
-    <span class="eyebrow" style="text-align:center;">Download</span>
-    <h2>EventRide ist<br>bald verfügbar.</h2>
-    <p>Wir arbeiten am Release für iOS und Android. Bald kannst du EventRide direkt aus dem App Store oder Google Play herunterladen.</p>
-    <div class="store-row">
-      <a class="store-btn" href="#">
-        <svg viewBox="0 0 24 24" fill="currentColor" width="26" height="26"><path d="M17.05 12.54c-.02-2.2 1.8-3.25 1.88-3.3-1.02-1.5-2.62-1.7-3.18-1.72-1.35-.14-2.64.79-3.32.79-.69 0-1.74-.77-2.86-.75-1.47.02-2.83.85-3.58 2.17-1.53 2.65-.39 6.57 1.1 8.72.73 1.05 1.6 2.23 2.73 2.19 1.1-.04 1.52-.71 2.85-.71 1.32 0 1.7.71 2.86.69 1.18-.02 1.93-1.07 2.65-2.13.84-1.22 1.18-2.4 1.2-2.46-.03-.01-2.3-.88-2.32-3.49zM14.88 5.96c.6-.74 1.01-1.76.9-2.78-.87.04-1.93.58-2.56 1.31-.56.65-1.05 1.69-.92 2.68.97.08 1.97-.49 2.58-1.21z"/></svg>
-        <div class="store-btn-txt"><small>Demnächst im</small><strong>App Store</strong></div>
-      </a>
-      <a class="store-btn" href="#">
-        <svg viewBox="0 0 24 24" width="26" height="26"><path fill="#5DA9FF" d="M3.6 2.3c-.2.2-.32.53-.32.95v17.5c0 .42.12.75.33.95l.06.05L13.4 12v-.1L3.66 2.25l-.06.05z"/><path fill="#2FC69E" d="M16.7 15.3 13.4 12v-.1l3.3-3.3.08.05 3.9 2.22c1.12.63 1.12 1.67 0 2.31l-3.9 2.21-.08.05z"/><path fill="#FF9A3C" d="M16.78 15.25 13.4 11.9 3.6 21.7c.37.39.98.44 1.67.05l11.5-6.5z"/><path fill="#F5873A" d="M16.78 8.6 5.27 2.1c-.69-.39-1.3-.34-1.67.05l9.8 9.75 3.38-3.3z"/></svg>
-        <div class="store-btn-txt"><small>Demnächst bei</small><strong>Google Play</strong></div>
-      </a>
+  <!-- DOWNLOAD -->
+  <section class="block" id="download">
+    <div class="dl-card rv">
+      <img class="dl-icon" src="assets/logo-256.png" alt="EventRide App Icon">
+      <div class="sec-head center" style="margin-bottom:0">
+        <p class="eyebrow">Download</p>
+        <h2 class="sec-title">Hol dir EventRide.</h2>
+        <p class="sec-sub">Kostenlos für iOS und Android – hol dir die App und sichere dir deine Mitfahrgelegenheit zum nächsten Fest.</p>
+      </div>
+      <div class="store-row">
+        <a class="store-btn" href="#"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 12.54c-.02-2.2 1.8-3.25 1.88-3.3-1.02-1.5-2.62-1.7-3.18-1.72-1.35-.14-2.64.79-3.32.79-.69 0-1.74-.77-2.86-.75-1.47.02-2.83.85-3.58 2.17-1.53 2.65-.39 6.57 1.1 8.72.73 1.05 1.6 2.23 2.73 2.19 1.1-.04 1.52-.71 2.85-.71 1.32 0 1.7.71 2.86.69 1.18-.02 1.93-1.07 2.65-2.13.84-1.22 1.18-2.4 1.2-2.46-.03-.01-2.3-.88-2.32-3.49zM14.88 5.96c.6-.74 1.01-1.76.9-2.78-.87.04-1.93.58-2.56 1.31-.56.65-1.05 1.69-.92 2.68.97.08 1.97-.49 2.58-1.21z"></path></svg><div class="store-btn-txt"><small>Laden im</small><strong>App Store</strong></div></a>
+        <a class="store-btn" href="#"><svg viewBox="0 0 24 24"><path fill="#5DA9FF" d="M3.6 2.3c-.2.2-.32.53-.32.95v17.5c0 .42.12.75.33.95l.06.05L13.4 12v-.1L3.66 2.25l-.06.05z"></path><path fill="#2FC69E" d="M16.7 15.3 13.4 12v-.1l3.3-3.3.08.05 3.9 2.22c1.12.63 1.12 1.67 0 2.31l-3.9 2.21-.08.05z"></path><path fill="#FF9A3C" d="M16.78 15.25 13.4 11.9 3.6 21.7c.37.39.98.44 1.67.05l11.5-6.5z"></path><path fill="#F5873A" d="M16.78 8.6 5.27 2.1c-.69-.39-1.3-.34-1.67.05l9.8 9.75 3.38-3.3z"></path></svg><div class="store-btn-txt"><small>Jetzt bei</small><strong>Google Play</strong></div></a>
+      </div>
+      <a class="ig-cta" href="https://instagram.com/event.ride" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="2.5" width="19" height="19" rx="5.5"></rect><circle cx="12" cy="12" r="4.4"></circle><circle cx="17.6" cy="6.4" r="1.1" fill="currentColor" stroke="none"></circle></svg>@event.ride auf Instagram folgen</a>
     </div>
-    <div><span class="coming-soon"><span class="dot"></span>Release in Kürze</span></div>
-  </div>
-</section>
+  </section>
 
-<!-- FOOTER -->
-<footer>
-  <div class="footer-inner">
-    <a class="footer-brand" href="#top">
-      <img src="favicon.png" alt="EventRide" />
-      Event<span class="r">Ride</span>
-      <small>© 2026</small>
-    </a>
-    <div class="footer-links">
-      <a href="datenschutz.html">Datenschutz</a>
-      <a href="agb.html">AGB</a>
-      <a href="impressum.html">Impressum</a>
-      <a href="mailto:kontakt@eventride.at">kontakt@eventride.at</a>
+  <!-- FOOTER -->
+  <div class="brand-word" aria-hidden="true">EventRide</div>
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-l"><img src="assets/logo-256.png" alt="EventRide"><span class="fw">Event<span class="r">Ride</span></span><small>© 2026 – Made in Kärnten</small></div>
+      <div class="footer-links">
+        <a href="https://instagram.com/event.ride" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="2.5" width="19" height="19" rx="5.5"></rect><circle cx="12" cy="12" r="4.4"></circle><circle cx="17.6" cy="6.4" r="1.1" fill="currentColor" stroke="none"></circle></svg>@event.ride</a>
+        <a href="mailto:kontakt@eventride.at">kontakt@eventride.at</a>
+        <a href="datenschutz.html">Datenschutz</a>
+        <a href="impressum.html">Impressum</a>
+      </div>
     </div>
+  </footer>
+
+  <!-- MOBILE STICKY CTA -->
+  <div class="mobile-cta">
+    <a class="mc-ig" href="https://instagram.com/event.ride" target="_blank" rel="noopener" aria-label="Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="2.5" width="19" height="19" rx="5.5"></rect><circle cx="12" cy="12" r="4.4"></circle><circle cx="17.6" cy="6.4" r="1.1" fill="currentColor" stroke="none"></circle></svg></a>
+    <a class="btn-p mc-p" href="#download">App holen</a>
   </div>
-</footer>
 
-<!-- Firebase -->
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, getDocs, query, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
-  const app = initializeApp({
-    apiKey: "AIzaSyBAq6FHDB3s_mWcE7ZSNifhSiOxUWrxQac",
-    authDomain: "eventride-cd0e9.firebaseapp.com",
-    projectId: "eventride-cd0e9",
-    storageBucket: "eventride-cd0e9.firebasestorage.app",
-    messagingSenderId: "686951435694",
-    appId: "1:686951435694:web:b7ebb9bded06f1fa7e4c3f"
-  });
-  const db = getFirestore(app);
-
-  const FALLBACK = [
-    { name: 'Paternioner Kirchtag',      datum: '2026-08-15T20:00:00.000Z', standort: 'Paternion',   typ: 'e1', fahrten: 4 },
-    { name: 'Feuerwehrfest Feldkirchen', datum: '2026-07-12T18:00:00.000Z', standort: 'Feldkirchen', typ: 'e2', fahrten: 2 },
-    { name: 'Disco Night Villach',       datum: '2026-06-28T22:00:00.000Z', standort: 'Villach',     typ: 'e3', fahrten: 6 },
-  ];
-  const IMGS = {
-    e1: 'assets/image/kirchtag6.jpg',
-    e2: 'assets/image/feuerwehr.png',
-    e3: 'assets/image/disco.png',
-    e4: 'assets/image/Ball.png',
-    e5: 'assets/image/krampus.jpg',
-  };
-
-  function fmtDate(d) {
-    try { return new Date(d).toLocaleDateString('de-AT',{weekday:'short',day:'numeric',month:'short',year:'numeric'}); }
-    catch { return d || '–'; }
-  }
-
-  function renderEvents(events) {
-    window._isEvents = events;
-    window._isImgs   = IMGS;
-    window._fmtDate  = fmtDate;
-    const list = document.getElementById('is-events-list');
-    if (!list) return;
-    list.innerHTML = '';
-    events.forEach((ev, i) => {
-      const img = IMGS[ev.typ] || IMGS.e1;
-      const card = document.createElement('div');
-      card.className = 'ev-card';
-      card.innerHTML = `
-        <div class="ev-cover" style="background-image:url(${img})">
-          <div class="ev-overlay"></div>
-          <div class="ev-info">
-            <div class="ev-title">${ev.name}</div>
-            <div class="ev-row"><span class="ev-icon-cal">●</span><span class="ev-meta-txt">${fmtDate(ev.datum)}</span></div>
-            <div class="ev-row"><span class="ev-icon-loc">●</span><span class="ev-meta-txt">${ev.standort || ''}</span></div>
-          </div>
-          <div class="ev-trailing">
-            <span class="ev-star">☆</span>
-            <span class="ev-arrow">›</span>
-          </div>
-        </div>`;
-      card.addEventListener('click', () => window.isOpenDetail(i));
-      list.appendChild(card);
-    });
-  }
-
-  async function loadEvents() {
-    let events = [];
-    try {
-      const today = new Date().toISOString();
-      const snap  = await getDocs(query(collection(db, 'events'), limit(12)));
-      snap.forEach(d => events.push({ id: d.id, ...d.data() }));
-      events = events
-        .filter(e => e.datum && e.datum >= today)
-        .sort((a, b) => a.datum.localeCompare(b.datum))
-        .slice(0, 3);
-    } catch (e) {
-      console.warn('Preview load failed:', e.message);
-    }
-    renderEvents(events.length ? events : FALLBACK);
-  }
-
-  window._fmtDate = fmtDate;
-  const dateEl = document.getElementById('is-today-date');
-  if (dateEl) dateEl.textContent = new Date().toLocaleDateString('de-AT',{weekday:'short',day:'numeric',month:'long',year:'numeric'});
-  loadEvents();
-</script>
+</div>
 
 <script>
-  // Nav scroll effect
-  const nav = document.getElementById('main-nav');
-  window.addEventListener('scroll', () => {
-    nav.classList.toggle('scrolled', window.scrollY > 60);
-  }, { passive: true });
+(function () {
+  var site = document.getElementById('site');
+  var nav = document.getElementById('nav');
+  var progress = document.getElementById('progress');
+  var phones = document.getElementById('phones');
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // Reveal on scroll
-  const observer = new IntersectionObserver(entries => {
-    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); } });
-  }, { threshold: 0.12 });
-  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+  // burger menu
+  document.getElementById('burger').addEventListener('click', function () {
+    site.classList.toggle('menu-open');
+  });
+  document.querySelectorAll('.mobile-menu a').forEach(function (a) {
+    a.addEventListener('click', function () { site.classList.remove('menu-open'); });
+  });
 
-  // iPhone navigation
-  window.isNavigate = function(target) {
-    [1,2,3].forEach(n => {
-      const el = document.getElementById('is-' + n);
-      if (!el) return;
-      el.classList.remove('is-active','is-left','is-right');
-      if      (n < target) el.classList.add('is-left');
-      else if (n > target) el.classList.add('is-right');
-      else                  el.classList.add('is-active');
-    });
-    document.querySelectorAll('.in-item').forEach((el, i) => {
-      el.classList.toggle('in-active', i === 0 && target === 1);
-    });
-    [1,2,3].forEach(n => {
-      document.getElementById('ptab-' + n)?.classList.toggle('pt-active', n === target);
-    });
-  };
+  // scroll: nav shadow, progress, phone parallax
+  function onScroll() {
+    nav.classList.toggle('scrolled', window.scrollY > 12);
+    var max = document.documentElement.scrollHeight - window.innerHeight;
+    progress.style.transform = 'scaleX(' + (max > 0 ? window.scrollY / max : 0) + ')';
+    if (phones && !reduced) {
+      phones.style.transform = 'translateY(' + Math.min(window.scrollY * 0.07, 70) + 'px)';
+    }
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
 
-  window.isOpenDetail = function(idx) {
-    const ev  = (window._isEvents || [])[idx];
-    if (!ev) { isNavigate(2); return; }
-    const imgs = window._isImgs || {};
-    const img  = imgs[ev.typ] || imgs.e1 || 'assets/image/kirchtag6.jpg';
-    const fmt  = window._fmtDate || (d => d);
-    document.getElementById('is-detail-cover').style.backgroundImage = `url(${img})`;
-    document.getElementById('is-detail-name').textContent = ev.name;
-    document.getElementById('is-detail-date').textContent = fmt(ev.datum);
-    document.getElementById('is-detail-loc').textContent  = ev.standort || '';
-    document.getElementById('is-fahrten-sub').textContent = `für ${ev.name}`;
-    ['is-ziel-1','is-ziel-2','is-ziel-3'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.textContent = ev.standort || 'Ziel';
-    });
-    isNavigate(2);
-  };
+  // scroll reveal
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+      });
+    }, { rootMargin: '0px 0px -60px 0px', threshold: 0.06 });
+    document.querySelectorAll('.rv').forEach(function (el) { io.observe(el); });
+  } else {
+    document.querySelectorAll('.rv').forEach(function (el) { el.classList.add('in'); });
+  }
 
-  window.isDownload = function(e) {
-    if (e) e.preventDefault();
-    document.getElementById('download')?.scrollIntoView({ behavior: 'smooth' });
-    return false;
-  };
+  // cursor spotlight
+  if (!reduced) {
+    site.addEventListener('mousemove', function (e) {
+      var card = e.target.closest && e.target.closest('.spot');
+      if (!card) return;
+      var r = card.getBoundingClientRect();
+      card.style.setProperty('--mx', (e.clientX - r.left) + 'px');
+      card.style.setProperty('--my', (e.clientY - r.top) + 'px');
+    }, { passive: true });
+  }
+
+  // hero phone 3D tilt (desktop pointers only)
+  if (!reduced && window.matchMedia('(pointer: fine)').matches && phones) {
+    window.addEventListener('mousemove', function (e) {
+      var c = phones.querySelector('.phone-c');
+      if (!c) return;
+      var r = phones.getBoundingClientRect();
+      if (e.clientX < r.left - 80 || e.clientX > r.right + 80 || e.clientY < r.top - 80 || e.clientY > r.bottom + 80) {
+        c.style.transform = ''; return;
+      }
+      var dx = (e.clientX - (r.left + r.width / 2)) / r.width;
+      var dy = (e.clientY - (r.top + r.height / 2)) / r.height;
+      c.style.transform = 'rotateY(' + (dx * 9) + 'deg) rotateX(' + (-dy * 7) + 'deg)';
+    }, { passive: true });
+  }
+
+  // live events from Firestore
+  var TYP = { e1: ['Kirchtag', 'typ-e1'], e2: ['Feuerwehrfest', 'typ-e2'], e3: ['Party', 'typ-e3'], e4: ['Ball', 'typ-e4'], e5: ['Krampuslauf', 'typ-e5'] };
+  var MON = ['Jän', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+  var evScroll = document.getElementById('ev-scroll');
+  var evNote = document.getElementById('ev-note');
+  function parseDatum(s) {
+    if (!s) return null;
+    var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+    m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+    if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
+    return null;
+  }
+  function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function fail() { if (evScroll) evScroll.style.display = 'none'; }
+  var url = 'https://firestore.googleapis.com/v1/projects/eventride-cd0e9/databases/(default)/documents/events?pageSize=300&key=AIzaSyBAq6FHDB3s_mWcE7ZSNifhSiOxUWrxQac';
+  fetch(url).then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); }).then(function (data) {
+    var docs = (data.documents || []).map(function (d) {
+      var f = d.fields || {};
+      function get(k) { return (f[k] && (f[k].stringValue || f[k].integerValue)) || ''; }
+      return { name: get('name'), datum: get('datum'), ort: get('standort') || get('gemeinde'), bezirk: get('bezirk'), typ: get('typ') };
+    });
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    var upcoming = docs.map(function (e) { e._d = parseDatum(e.datum); return e; })
+      .filter(function (e) { return e._d && e._d >= today && e.name; })
+      .sort(function (a, b) { return a._d - b._d; }).slice(0, 3);
+    if (!upcoming.length) { fail(); return; }
+    var pin = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-5.3-7-11a7 7 0 0 1 14 0c0 5.7-7 11-7 11Z"></path><circle cx="12" cy="10" r="2.6"></circle></svg>';
+    var arrow = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m13 6 6 6-6 6"></path></svg>';
+    evScroll.innerHTML = upcoming.map(function (e) {
+      var t = TYP[e.typ] || TYP.e1;
+      var loc = e.ort + (e.bezirk ? ' · ' + e.bezirk : '');
+      return '<a class="ev-card spot" href="#download">' +
+        '<div class="ev-top"><div class="ev-cal"><strong>' + e._d.getDate() + '</strong><span>' + MON[e._d.getMonth()] + '</span></div>' +
+        '<span class="ev-typ ' + t[1] + '">' + t[0] + '</span></div>' +
+        '<div class="ev-name">' + esc(e.name) + '</div>' +
+        '<div class="ev-loc">' + pin + esc(loc) + '</div>' +
+        '<div class="ev-go"><span>Fahrt finden</span>' + arrow + '</div></a>';
+    }).join('');
+    if (evNote && docs.length > upcoming.length) evNote.textContent = 'Das war nur ein Ausschnitt – alle ' + docs.length + ' Events samt Fahrten findest du in der App.';
+  }).catch(fail);
+})();
 </script>
 
 </body>
