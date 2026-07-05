@@ -345,6 +345,21 @@ select option{background:var(--surface);color:var(--text)}
     <div class="login-logo">Event<span>Ride</span></div>
     <div class="login-sub">Manager — Intern</div>
     <div id="login-error" style="display:none;background:var(--red-bg);color:var(--red-t);border:1px solid var(--red-bg);border-radius:10px;padding:10px 12px;font-size:12px;margin-bottom:1rem;text-align:left"></div>
+    <form onsubmit="event.preventDefault();loginWithEmail();" style="text-align:left;margin-bottom:1rem">
+      <input id="login-email" type="email" autocomplete="username" placeholder="E-Mail" style="width:100%;box-sizing:border-box;margin-bottom:8px">
+      <input id="login-password" type="password" autocomplete="current-password" placeholder="Passwort" style="width:100%;box-sizing:border-box;margin-bottom:10px">
+      <button type="submit" class="primary" style="width:100%;padding:11px;font-size:14px;border-radius:10px;box-sizing:border-box">
+        Anmelden
+      </button>
+      <div style="text-align:right;margin-top:6px">
+        <a href="#" onclick="event.preventDefault();resetPassword();" style="font-size:11px;color:var(--text-3)">Passwort vergessen?</a>
+      </div>
+    </form>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem">
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+      <span style="font-size:11px;color:var(--text-3)">oder</span>
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+    </div>
     <button class="primary" style="width:100%;padding:11px;font-size:14px;border-radius:10px" onclick="login()">
       Mit Google anmelden
     </button>
@@ -585,6 +600,35 @@ function login() {
     }
   });
 }
+
+const LOGIN_ERROR_MESSAGES = {
+  'auth/invalid-email': 'Ungültige E-Mail-Adresse.',
+  'auth/user-not-found': 'Kein Konto mit dieser E-Mail gefunden.',
+  'auth/wrong-password': 'Falsches Passwort.',
+  'auth/invalid-credential': 'E-Mail oder Passwort falsch.',
+  'auth/too-many-requests': 'Zu viele Versuche. Bitte kurz warten.',
+  'auth/operation-not-allowed': 'E-Mail/Passwort-Anmeldung ist noch nicht aktiviert.',
+};
+
+function loginWithEmail() {
+  const email = (document.getElementById('login-email').value || '').trim();
+  const password = document.getElementById('login-password').value || '';
+  if(!email || !password) { showLoginError('Bitte E-Mail und Passwort eingeben.'); return; }
+  auth.signInWithEmailAndPassword(email, password).catch(e => {
+    showLoginError(LOGIN_ERROR_MESSAGES[e.code] || ('Fehler: ' + e.message));
+  });
+}
+
+function resetPassword() {
+  const email = (document.getElementById('login-email').value || '').trim();
+  if(!email) { showLoginError('Bitte zuerst die E-Mail-Adresse eingeben.'); return; }
+  auth.sendPasswordResetEmail(email).then(() => {
+    showLoginError('✓ E-Mail zum Zurücksetzen des Passworts wurde gesendet.');
+  }).catch(e => {
+    showLoginError(LOGIN_ERROR_MESSAGES[e.code] || ('Fehler: ' + e.message));
+  });
+}
+
 function logout() { auth.signOut(); }
 
 // ---- FIRESTORE ----
