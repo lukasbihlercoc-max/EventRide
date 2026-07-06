@@ -1,6 +1,7 @@
 // login_page.dart
 import 'package:flutter/material.dart';
 import 'dart:ui'; // Für ImageFilter.blur
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/utils/app_route.dart';
@@ -309,7 +310,7 @@ class _LoginPageState extends State<LoginPage> {
                         if (!mounted) return;
                         AppSnackbar.show(context,
                             message: 'E-Mail zum Zurücksetzen wurde gesendet');
-                      } on FirebaseAuthException catch (e) {
+                      } on FirebaseFunctionsException catch (e) {
                         setSheetState(() => loading = false);
                         if (!mounted) return;
                         AppSnackbar.show(context,
@@ -333,11 +334,12 @@ class _LoginPageState extends State<LoginPage> {
     emailController.dispose();
   }
 
+  // Bewusst ohne "Kein Konto gefunden"-Fall: die Cloud Function gibt aus
+  // Enumeration-Schutz-Gründen immer Erfolg zurück, egal ob die E-Mail
+  // existiert. Diese Fehler treten nur bei echten Netzwerk-/Server-Problemen auf.
   String _resetError(String code) {
     switch (code) {
-      case 'user-not-found':
-        return 'Kein Konto mit dieser E-Mail gefunden';
-      case 'invalid-email':
+      case 'invalid-argument':
         return 'Ungültige E-Mail-Adresse';
       default:
         return 'Fehler beim Senden der E-Mail';

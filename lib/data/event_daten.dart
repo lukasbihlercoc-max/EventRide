@@ -11,6 +11,11 @@ class Event {
   final double? latitude;
   final double? longitude;
 
+  /// Anzahl "Ich will hin"-Interessenten. Wird ausschließlich serverseitig
+  /// per Cloud Function gepflegt (onInteressentCreated/-Deleted) — deshalb
+  /// nicht in toMap(), damit Client-Updates den Zähler nie überschreiben.
+  final int interessentenCount;
+
   // optional: alias für alte Verwendung
   String get stabileId => id;
 
@@ -25,6 +30,7 @@ class Event {
     required this.adresse,
     this.latitude,
     this.longitude,
+    this.interessentenCount = 0,
   })  : id = id ?? DateTime.now().millisecondsSinceEpoch.toString(),
         // Normalisiere Datum auf UTC intern, damit Firestore-kompatibel
         datum = datum.toUtc();
@@ -53,6 +59,7 @@ class Event {
       adresse: adresse ?? this.adresse,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
+      interessentenCount: interessentenCount,
     );
   }
 
@@ -109,6 +116,7 @@ class Event {
       adresse: map['adresse'] as String? ?? '',
       latitude: (map['latitude'] as num?)?.toDouble(),
       longitude: (map['longitude'] as num?)?.toDouble(),
+      interessentenCount: (map['interessentenCount'] as num?)?.toInt() ?? 0,
     );
   }
 

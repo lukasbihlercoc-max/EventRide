@@ -448,18 +448,20 @@ class _InteressentenInlineState extends State<_InteressentenInline>
 
   @override
   Widget build(BuildContext context) {
-    final interessentenService = context.watch<InteressentenService>();
     final currentUser = context.read<IAuthRepository>().currentUser;
-    final interessenten = interessentenService.getForEvent(widget.event.id);
-    final count = interessenten.length;
 
     // ── Nicht eingeloggt ──
+    // Zähler kommt aus dem denormalisierten event.interessentenCount (öffentlich
+    // lesbar), nicht aus InteressentenService — die interessenten-Collection
+    // bleibt für ausgeloggte Clients unlesbar (Anti-Scraping), daher auch keine
+    // Avatare hier.
     if (currentUser == null) {
+      final count = widget.event.interessentenCount;
       return _shell(
         bgColor: Colors.white.withValues(alpha: 0.06),
         borderColor: Colors.white.withValues(alpha: 0.08),
         child: _inlineRow(
-          interessenten: interessenten,
+          interessenten: const [],
           mainText: count == 0
               ? 'Noch keiner eingetragen'
               : count == 1
@@ -488,6 +490,10 @@ class _InteressentenInlineState extends State<_InteressentenInline>
         ),
       );
     }
+
+    final interessentenService = context.watch<InteressentenService>();
+    final interessenten = interessentenService.getForEvent(widget.event.id);
+    final count = interessenten.length;
 
     final fahrtService = context.watch<FahrtService>();
     final anfrageService = context.watch<AnfrageService>();

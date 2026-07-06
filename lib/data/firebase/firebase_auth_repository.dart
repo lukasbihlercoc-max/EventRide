@@ -240,8 +240,13 @@ class FirebaseAuthRepository implements IAuthRepository {
   }
 
   @override
-  Future<void> resetPassword(String email) =>
-      _auth.sendPasswordResetEmail(email: email);
+  Future<void> resetPassword(String email) async {
+    // Eigener Versand (wie sendEmailVerification) statt Firebases Standard-Mail/
+    // Weiterleitung — gleiche Begründung: eigenes Branding, eigene SMTP-Zustellung.
+    final fn =
+        FirebaseFunctions.instance.httpsCallable('sendPasswordResetEmailCustom');
+    await fn.call({'email': email});
+  }
 
   @override
   Future<void> signOut() async {

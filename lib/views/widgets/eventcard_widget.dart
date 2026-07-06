@@ -1,9 +1,7 @@
 // eventcard_widget.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart';
 import 'package:my_app/data/event_daten.dart';
-import 'package:my_app/data/interessenten_service.dart';
 import 'package:my_app/utils/app_route.dart';
 import 'package:my_app/views/pages/detail_page.dart';
 import 'package:my_app/data/notifiers.dart';
@@ -52,8 +50,7 @@ class EventCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final backgroundImage =
         getBackgroundImage(event.typ) ?? "assets/image/default.jpg";
-    final count =
-        context.watch<InteressentenService>().countForEvent(event.id);
+    final count = event.interessentenCount;
 
     return Padding(
       padding: const EdgeInsets.symmetric(

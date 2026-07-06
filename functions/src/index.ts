@@ -272,6 +272,38 @@ export const onFahrtDeleted = onDocumentDeleted(
 );
 
 // ──────────────────────────────────────────────────────────────────────────────
+// Interessenten-Zähler: denormalisiertes Feld events/{eventId}.interessentenCount
+// pflegen, damit auch ausgeloggte Clients den Zähler sehen können, ohne die
+// (auth-geschützte) interessenten-Collection lesen zu müssen.
+// ──────────────────────────────────────────────────────────────────────────────
+
+export const onInteressentCreated = onDocumentCreated(
+  "interessenten/{docId}",
+  async (event) => {
+    const eventId = event.data?.data()?.["eventId"] as string | undefined;
+    if (!eventId) return;
+    await db.collection("events").doc(eventId).update({
+      interessentenCount: admin.firestore.FieldValue.increment(1),
+    }).catch(() => {
+      // Event evtl. bereits gelöscht (cleanupAbgelaufeneEvents) — nicht kritisch
+    });
+  }
+);
+
+export const onInteressentDeleted = onDocumentDeleted(
+  "interessenten/{docId}",
+  async (event) => {
+    const eventId = event.data?.data()?.["eventId"] as string | undefined;
+    if (!eventId) return;
+    await db.collection("events").doc(eventId).update({
+      interessentenCount: admin.firestore.FieldValue.increment(-1),
+    }).catch(() => {
+      // Event evtl. bereits gelöscht (cleanupAbgelaufeneEvents) — nicht kritisch
+    });
+  }
+);
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Trigger 4: Führerschein hochgeladen → alle Admins benachrichtigen
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -1001,6 +1033,103 @@ export const sendVerificationEmail = onCall(async (request) => {
     return {success: true};
   }
 );
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Passwort-Reset (eigener Versand, umgeht Firebase Console)
+//
+// Anders als sendVerificationEmail MUSS diese Function ohne Login aufrufbar
+// sein (der Nutzer ist ja gerade ausgesperrt). Deshalb zwei zusätzliche
+// Schutzmaßnahmen, die es bei sendVerificationEmail nicht braucht:
+// - Keine Nutzer-Enumeration: immer {success:true}, unabhängig davon ob die
+//   E-Mail existiert (Fehler wird nur serverseitig geloggt).
+// - Rate-Limit (60s pro E-Mail) gegen Mail-Bombing, da kein Auth-Check greift.
+// ──────────────────────────────────────────────────────────────────────────────
+
+export const sendPasswordResetEmailCustom = onCall(async (request) => {
+  const email = (request.data?.email as string | undefined)?.trim().toLowerCase();
+  if (!email) throw new HttpsError("invalid-argument", "E-Mail fehlt");
+
+  const rateLimitRef = db.collection("password_reset_attempts").doc(email);
+  const rateDoc = await rateLimitRef.get();
+  const now = Date.now();
+  if (rateDoc.exists && now - ((rateDoc.data()?.lastRequest as number | undefined) ?? 0) < 60_000) {
+    // Stiller Erfolg — kein Hinweis nach außen, dass ein Rate-Limit gegriffen hat
+    return {success: true};
+  }
+  await rateLimitRef.set({lastRequest: now});
+
+  try {
+    const firebaseLink = await admin.auth().generatePasswordResetLink(email, {
+      url: "https://eventride.at/auth/password-reset.html",
+    });
+
+    const linkUrl = new URL(firebaseLink);
+    const oobCode = linkUrl.searchParams.get("oobCode") ?? "";
+    const apiKey = linkUrl.searchParams.get("apiKey") ?? "";
+
+    const resetUrl =
+      `https://eventride.at/auth/password-reset.html` +
+      `?mode=resetPassword&oobCode=${encodeURIComponent(oobCode)}&apiKey=${encodeURIComponent(apiKey)}`;
+
+    const transporter = nodemailer.createTransport({
+      host: "smtp.world4you.com",
+      port: 587,
+      secure: false,
+      auth: {
+        user: "kontakt@eventride.at",
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    const htmlBody = `
+<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#0d1b3e;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0d1b3e;padding:40px 16px">
+    <tr><td align="center">
+      <table width="100%" style="max-width:480px;background:rgba(255,255,255,0.07);border-radius:20px;border:1px solid rgba(255,255,255,0.12);padding:40px 32px">
+        <tr><td align="center" style="padding-bottom:24px">
+          <span style="font-size:26px;font-weight:700;color:#52A1EF;letter-spacing:-0.5px">EventRide</span>
+        </td></tr>
+        <tr><td align="center" style="padding-bottom:12px">
+          <p style="font-size:22px;font-weight:600;color:#ffffff;margin:0">Passwort zurücksetzen</p>
+        </td></tr>
+        <tr><td align="center" style="padding-bottom:28px">
+          <p style="font-size:15px;color:rgba(255,255,255,0.65);line-height:1.6;margin:0">
+            Klicke auf den Button um ein neues Passwort für dein EventRide-Konto festzulegen.
+          </p>
+        </td></tr>
+        <tr><td align="center" style="padding-bottom:28px">
+          <a href="${resetUrl}" style="display:inline-block;padding:16px 40px;background:linear-gradient(135deg,#52A1EF,#406CFB);color:#ffffff;border-radius:12px;font-size:16px;font-weight:600;text-decoration:none">
+            Passwort zurücksetzen
+          </a>
+        </td></tr>
+        <tr><td align="center">
+          <p style="font-size:12px;color:rgba(255,255,255,0.35);line-height:1.5;margin:0">
+            Falls du das nicht angefordert hast, kannst du diese E-Mail ignorieren — dein Passwort bleibt unverändert.<br>
+            Der Link ist 1 Stunde gültig.
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+    await transporter.sendMail({
+      from: '"EventRide" <kontakt@eventride.at>',
+      to: email,
+      subject: "EventRide – Passwort zurücksetzen",
+      html: htmlBody,
+    });
+  } catch (err) {
+    // z.B. auth/user-not-found — bewusst NICHT nach außen geben (Enumeration-Schutz)
+    console.error("[sendPasswordResetEmailCustom]", err);
+  }
+
+  return {success: true};
+});
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Account-Deletion Cleanup: Chat-Conversations + Messages löschen

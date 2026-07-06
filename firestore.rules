@@ -163,6 +163,16 @@ service cloud.firestore {
     }
 
     // ----------------------------------------------------------------
+    // password_reset_attempts/{email}
+    //
+    // Rate-Limit-Tracking für sendPasswordResetEmailCustom — nur die Cloud
+    // Function (Admin SDK) darf lesen/schreiben, kein Client-Zugriff.
+    // ----------------------------------------------------------------
+    match /password_reset_attempts/{email} {
+      allow read, write: if false;
+    }
+
+    // ----------------------------------------------------------------
     // licenseRequests/{uid}
     //
     // Erstellen: Nur der eigene Nutzer (status muss 'pending' sein)
