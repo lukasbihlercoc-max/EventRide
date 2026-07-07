@@ -3427,41 +3427,66 @@ class _IchWillHinRow extends StatelessWidget {
   final InteressentenDaten person;
   const _IchWillHinRow({required this.person});
 
+  void _navigate(BuildContext context) {
+    Navigator.push(
+      context,
+      AppRoute(
+        builder: (_) => PublicProfilePage(
+          userId: person.userId,
+          name: person.userName,
+          photoUrl: person.userPhotoUrl,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          UserAvatarWidget(
-            name: person.userName,
-            photoUrl: person.userPhotoUrl,
-            radius: 14,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  person.userName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (person.bezirk != null && person.bezirk!.isNotEmpty)
-                  Text(
-                    person.bezirk!,
-                    style: const TextStyle(
-                        color: Colors.white54, fontSize: 11),
-                  ),
-              ],
+    return GestureDetector(
+      onTap: () => _navigate(context),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            UserAvatarWidget(
+              name: person.userName,
+              photoUrl: person.userPhotoUrl,
+              radius: 14,
             ),
-          ),
-        ],
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          person.userName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      TrustShieldsByUserId(userId: person.userId, size: 11),
+                    ],
+                  ),
+                  if (person.bezirk != null && person.bezirk!.isNotEmpty)
+                    Text(
+                      person.bezirk!,
+                      style: const TextStyle(
+                          color: Colors.white54, fontSize: 11),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

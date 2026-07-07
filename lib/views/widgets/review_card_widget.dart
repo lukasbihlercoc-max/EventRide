@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:my_app/data/review.dart';
 import 'package:my_app/views/widgets/app_card.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
+import 'package:my_app/views/widgets/trust_shields_widget.dart';
 import 'package:my_app/views/widgets/user_avatar_widget.dart';
 
 String reviewRelativeTime(DateTime dt) {
@@ -59,13 +60,22 @@ class ReviewCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        review.reviewerName,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              review.reviewerName,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          TrustShieldsByUserId(userId: review.reviewerId, size: 12),
+                        ],
                       ),
                       Text(
                         reviewRelativeTime(review.createdAt),

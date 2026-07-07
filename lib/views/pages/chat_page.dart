@@ -12,10 +12,13 @@ import 'package:my_app/data/chat_service.dart';
 import 'package:my_app/data/notification_service.dart';
 import 'package:my_app/data/chat_message.dart';
 import 'package:my_app/data/notifiers.dart';
+import 'package:my_app/utils/app_route.dart';
 import 'package:my_app/views/auth/verification_guard.dart';
+import 'package:my_app/views/pages/public_profile_page.dart';
 import 'package:my_app/views/widgets/app_card.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
+import 'package:my_app/views/widgets/trust_shields_widget.dart';
 import 'package:my_app/views/widgets/user_avatar_widget.dart';
 
 class ChatPage extends StatefulWidget {
@@ -44,6 +47,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   late final ChatService _chatService;
 
   bool _isSending = false;
+  String? _otherUserPhotoUrl;
   final _lastSeenNotifier = ValueNotifier<DateTime?>(null);
   final _tickNotifier = ValueNotifier<int>(0);
   StreamSubscription<DateTime?>? _lastSeenSub;
@@ -145,33 +149,58 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         250;
   }
 
+  void _navigateToProfile() {
+    Navigator.push(
+      context,
+      AppRoute(
+        builder: (_) => PublicProfilePage(
+          userId: widget.otherUserId,
+          name: widget.otherUserName,
+          photoUrl: _otherUserPhotoUrl,
+        ),
+      ),
+    );
+  }
+
   Widget _appBarTitle() {
     return ListenableBuilder(
       listenable: Listenable.merge([_lastSeenNotifier, _tickNotifier]),
       builder: (context, _) {
         final subtitle = _lastSeenText(_lastSeenNotifier.value);
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            UserAvatarById(
-              userId: widget.otherUserId,
-              name: widget.otherUserName,
-              radius: 18,
-            ),
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(widget.otherUserName,
-                    style: const TextStyle(fontSize: 16, height: 1.2)),
-                if (subtitle != null)
-                  Text(subtitle,
-                      style:
-                          const TextStyle(fontSize: 11, color: Colors.white60)),
-              ],
-            ),
-          ],
+        return GestureDetector(
+          onTap: _navigateToProfile,
+          behavior: HitTestBehavior.opaque,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              UserAvatarById(
+                userId: widget.otherUserId,
+                name: widget.otherUserName,
+                radius: 18,
+                onPhotoLoaded: (url) => _otherUserPhotoUrl = url,
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(widget.otherUserName,
+                          style: const TextStyle(fontSize: 16, height: 1.2)),
+                      const SizedBox(width: 6),
+                      TrustShieldsByUserId(userId: widget.otherUserId, size: 12),
+                    ],
+                  ),
+                  if (subtitle != null)
+                    Text(subtitle,
+                        style: const TextStyle(
+                            fontSize: 11, color: Colors.white60)),
+                ],
+              ),
+            ],
+          ),
         );
       },
     );
