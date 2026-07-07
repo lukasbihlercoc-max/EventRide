@@ -245,6 +245,7 @@ class _NavItemFahrtenState extends State<_NavItemFahrten> {
                 final uid = context.read<IAuthRepository>().currentUser?.userId;
                 bool hasAnfrageUnseen = false;
                 bool hasChatUnread = false;
+                bool hasOffeneEingehende = false;
                 if (uid != null) {
                   final blockedIds = blockService.blockedUserIds;
                   final visibleConvos = _conversations.where((c) {
@@ -278,8 +279,15 @@ class _NavItemFahrtenState extends State<_NavItemFahrten> {
                     }
                     return c.ownerId == uid;
                   });
+
+                  hasOffeneEingehende = anfrageService.alleAnfragen.any(
+                      (a) =>
+                          a.fahrtOwnerId == uid &&
+                          a.status == AnfrageStatus.offen &&
+                          !a.vonFahrer);
                 }
-                final hasUnseen = hasAnfrageUnseen || hasChatUnread;
+                final hasUnseen =
+                    hasAnfrageUnseen || hasOffeneEingehende || hasChatUnread;
 
                 return Stack(
                   clipBehavior: Clip.none,
