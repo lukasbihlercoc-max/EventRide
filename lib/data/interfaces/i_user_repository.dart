@@ -3,6 +3,10 @@ abstract class IUserRepository {
   /// kein Foto gesetzt ist.
   Future<String?> getPhotoUrl(String userId);
 
+  /// Gibt den Anzeigenamen (firstName + lastName) eines beliebigen Nutzers
+  /// zurück, oder null wenn nicht auflösbar.
+  Future<String?> getUserName(String userId);
+
   /// Gibt das Trust-Level (0–3) eines beliebigen Nutzers zurück.
   Future<int> getTrustLevel(String userId);
 

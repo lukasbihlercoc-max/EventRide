@@ -15,6 +15,17 @@ class FirestoreUserRepository implements IUserRepository {
   }
 
   @override
+  Future<String?> getUserName(String userId) async {
+    final doc = await _db.collection('users').doc(userId).get();
+    final data = doc.data();
+    if (data == null) return null;
+    final first = (data['firstName'] as String?) ?? '';
+    final last = (data['lastName'] as String?) ?? '';
+    final name = '$first $last'.trim();
+    return name.isEmpty ? null : name;
+  }
+
+  @override
   Future<int> getTrustLevel(String userId) async {
     if (userId.isEmpty) return 0;
     try {

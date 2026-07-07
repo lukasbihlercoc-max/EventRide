@@ -812,17 +812,19 @@ export const onMessageCreated = onDocumentCreated(
       if (msgTime <= lastSeen) return;
     }
 
+    const senderId = msg["senderId"] as string;
     const tokens = await getTokens(targetUserId);
     const text = msg["text"] as string;
     const preview = text.length > 80 ? text.substring(0, 80) + "…" : text;
+    const senderName = await getUserName(senderId, "Neue Nachricht");
 
     await sendNotification(tokens, targetUserId, {
-      title: "Neue Nachricht",
+      title: senderName,
       body: preview,
       data: {
         type: "chat",
         conversationId: event.params["convId"],
-        senderId: msg["senderId"] as string,
+        senderId: senderId,
       },
     });
   }

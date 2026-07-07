@@ -228,11 +228,33 @@ class NotificationService {
     }
   }
 
-  void _showChatLocalNotification(ChatConversation conv) {
+  static final Map<String, String> _senderNameCache = {};
+
+  Future<void> _showChatLocalNotification(ChatConversation conv) async {
     final preview = conv.lastMessage ?? 'Neue Nachricht';
+    final senderId = conv.lastSenderId;
+    String title = 'Neue Nachricht';
+    if (senderId != null && senderId.isNotEmpty && senderId != 'system') {
+      final cached = _senderNameCache[senderId];
+      if (cached != null) {
+        title = cached;
+      } else {
+        try {
+          final name = await _userRepo
+              .getUserName(senderId)
+              .timeout(const Duration(seconds: 5));
+          if (name != null) {
+            _senderNameCache[senderId] = name;
+            title = name;
+          }
+        } catch (_) {
+          // Bleibt bei generischem Titel – Notification darf nicht ausbleiben.
+        }
+      }
+    }
     _localNotifications.show(
       conv.id.hashCode,
-      'Neue Nachricht',
+      title,
       preview.length > 80 ? '${preview.substring(0, 80)}…' : preview,
       NotificationDetails(
         android: AndroidNotificationDetails(
@@ -243,7 +265,7 @@ class NotificationService {
         ),
         iOS: const DarwinNotificationDetails(),
       ),
-      payload: 'type=chat&conversationId=${conv.id}&senderId=${conv.lastSenderId ?? ""}',
+      payload: 'type=chat&conversationId=${conv.id}&senderId=${senderId ?? ""}',
     );
   }
 
