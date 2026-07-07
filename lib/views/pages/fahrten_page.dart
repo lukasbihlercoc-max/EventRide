@@ -2614,12 +2614,15 @@ class _EinladungButtonsState extends State<_EinladungButtons> {
       widget.onInteracted?.call();
       AppSnackbar.show(context, message: 'Einladung angenommen!');
     } on AsyncGuardTimeoutException {
-      // Cloud Function arbeitet auf fester Anfrage-ID - idempotent, wird bei
-      // Timeout als erledigt behandelt statt den Fehler zu zeigen.
+      // Cloud Function prüft serverseitig die Kapazität (Overbooking-Schutz) -
+      // anders als bei reinen Firestore-Writes gibt es hier keine Offline-
+      // Warteschlange, ein Timeout kann also auch eine echte Ablehnung (keine
+      // Plätze mehr) bedeuten. Deshalb NICHT als erfolgreich anzeigen.
       if (mounted) {
         widget.onInteracted?.call();
         AppSnackbar.show(context,
-            message: 'Verbindung langsam – wird im Hintergrund synchronisiert');
+            message:
+                'Verbindung langsam – bitte prüfen, ob die Einladung angenommen wurde.');
       }
     } on FirebaseFunctionsException catch (e) {
       if (!mounted) return;

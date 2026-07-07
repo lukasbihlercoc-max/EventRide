@@ -444,6 +444,13 @@ class _LoggedInViewState extends State<_LoggedInView> {
       await guarded(context
           .read<IAuthRepository>()
           .uploadProfilePhoto(File(cropped.path)));
+    } on AsyncGuardTimeoutException {
+      // Fester Storage-Pfad + Update auf feste userId - idempotent, wird bei
+      // Timeout als erledigt behandelt statt den Fehler zu zeigen.
+      if (mounted) {
+        AppSnackbar.show(context,
+            message: 'Verbindung langsam – wird im Hintergrund synchronisiert');
+      }
     } catch (e) {
       if (mounted) {
         AppSnackbar.show(

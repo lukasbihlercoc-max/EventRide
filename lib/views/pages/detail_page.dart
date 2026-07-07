@@ -946,10 +946,14 @@ class _EinladungsBottomSheetState extends State<_EinladungsBottomSheet> {
       if (!ok || !mounted) return;
       setState(() => _angenommen = true);
     } on AsyncGuardTimeoutException {
-      // Cloud Function arbeitet auf fester Anfrage-ID - idempotent, wird bei
-      // Timeout als erledigt behandelt statt den Fehler zu zeigen.
+      // Cloud Function prüft serverseitig die Kapazität (Overbooking-Schutz) -
+      // anders als bei reinen Firestore-Writes gibt es hier keine Offline-
+      // Warteschlange, ein Timeout kann also auch eine echte Ablehnung (keine
+      // Plätze mehr) bedeuten. Deshalb NICHT als erfolgreich anzeigen.
       if (mounted) {
-        setState(() => _angenommen = true);
+        AppSnackbar.show(context,
+            message:
+                'Verbindung langsam – bitte erneut versuchen oder später prüfen, ob die Einladung angenommen wurde.');
       }
     } on FirebaseFunctionsException catch (e) {
       if (!mounted) return;
@@ -1294,9 +1298,15 @@ class _EinladungCardState extends State<_EinladungCard> {
       if (!ok || !mounted) return;
       setState(() => _angenommen = true);
     } on AsyncGuardTimeoutException {
-      // Cloud Function arbeitet auf fester Anfrage-ID - idempotent, wird bei
-      // Timeout als erledigt behandelt statt den Fehler zu zeigen.
-      if (mounted) setState(() => _angenommen = true);
+      // Cloud Function prüft serverseitig die Kapazität (Overbooking-Schutz) -
+      // anders als bei reinen Firestore-Writes gibt es hier keine Offline-
+      // Warteschlange, ein Timeout kann also auch eine echte Ablehnung (keine
+      // Plätze mehr) bedeuten. Deshalb NICHT als erfolgreich anzeigen.
+      if (mounted) {
+        AppSnackbar.show(context,
+            message:
+                'Verbindung langsam – bitte erneut versuchen oder später prüfen, ob die Einladung angenommen wurde.');
+      }
     } on FirebaseFunctionsException catch (e) {
       if (!mounted) return;
       final msg = switch (e.code) {
