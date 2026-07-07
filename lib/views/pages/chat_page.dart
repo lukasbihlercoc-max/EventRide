@@ -13,6 +13,7 @@ import 'package:my_app/data/notification_service.dart';
 import 'package:my_app/data/chat_message.dart';
 import 'package:my_app/data/notifiers.dart';
 import 'package:my_app/utils/app_route.dart';
+import 'package:my_app/utils/async_guard.dart';
 import 'package:my_app/views/auth/verification_guard.dart';
 import 'package:my_app/views/pages/public_profile_page.dart';
 import 'package:my_app/views/widgets/app_card.dart';
@@ -598,11 +599,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 _controller.clear();
                 final ctx = context;
                 try {
-                  await chatService.sendMessage(
+                  await guarded(chatService.sendMessage(
                     conversationId: widget.conversationId,
                     senderId: _myUserId,
                     text: text,
-                  );
+                  ));
                 } catch (e) {
                   _controller.text = text;
                   _controller.selection = TextSelection.fromPosition(

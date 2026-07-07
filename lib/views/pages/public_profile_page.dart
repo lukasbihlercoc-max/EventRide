@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:my_app/data/app_user.dart';
 import 'package:my_app/utils/app_route.dart';
+import 'package:my_app/utils/async_guard.dart';
 import 'package:my_app/data/block_service.dart';
 import 'package:my_app/data/review.dart';
 import 'package:my_app/views/widgets/app_card.dart';
@@ -82,6 +83,7 @@ class PublicProfilePage extends StatefulWidget {
 
 class _PublicProfilePageState extends State<PublicProfilePage> {
   bool _loading = true;
+  bool _loadFailed = false;
 
   late String _name;
   String? _photoUrl;
@@ -112,143 +114,188 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
   }
 
   Future<void> _load() async {
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _loadFailed = false;
+      });
+    }
     final db = FirebaseFirestore.instance;
     final currentUid = FirebaseAuth.instance.currentUser?.uid;
 
-    // Schritt 1: User-Dokument laden (Schilde hängen nur davon ab)
-    DocumentSnapshot? userDoc;
     try {
-      userDoc = await db.collection('users').doc(widget.userId).get();
-    } catch (_) {}
+      // Schritt 1: User-Dokument laden (Schilde hängen nur davon ab)
+      DocumentSnapshot? userDoc;
+      try {
+        userDoc = await guarded(db.collection('users').doc(widget.userId).get());
+      } on AsyncGuardTimeoutException {
+        rethrow;
+      } catch (_) {}
 
-    // Schritt 2: Counts + Reviews parallel laden (eigener try-catch)
-    int fahrtCount = 0;
-    int mitfahrerCount = 0;
-    QuerySnapshot? reviewSnap;
-    try {
-      final results = await Future.wait([
-        db.collection('fahrten').where('ownerId', isEqualTo: widget.userId).count().get(),
-        db.collection('reviews').where('reviewedId', isEqualTo: widget.userId).limit(20).get(),
-        db.collection('anfragen')
-            .where('fahrtOwnerId', isEqualTo: widget.userId)
-            .where('status', isEqualTo: 1)
-            .count()
-            .get(),
-      ]);
-      fahrtCount = (results[0] as AggregateQuerySnapshot).count ?? 0;
-      reviewSnap = results[1] as QuerySnapshot;
-      mitfahrerCount = (results[2] as AggregateQuerySnapshot).count ?? 0;
-    } catch (_) {}
+      // Schritt 2: Counts + Reviews parallel laden (eigener try-catch)
+      int fahrtCount = 0;
+      int mitfahrerCount = 0;
+      QuerySnapshot? reviewSnap;
+      try {
+        final results = await guarded(Future.wait([
+          db.collection('fahrten').where('ownerId', isEqualTo: widget.userId).count().get(),
+          db.collection('reviews').where('reviewedId', isEqualTo: widget.userId).limit(20).get(),
+          db.collection('anfragen')
+              .where('fahrtOwnerId', isEqualTo: widget.userId)
+              .where('status', isEqualTo: 1)
+              .count()
+              .get(),
+        ]));
+        fahrtCount = (results[0] as AggregateQuerySnapshot).count ?? 0;
+        reviewSnap = results[1] as QuerySnapshot;
+        mitfahrerCount = (results[2] as AggregateQuerySnapshot).count ?? 0;
+      } on AsyncGuardTimeoutException {
+        rethrow;
+      } catch (_) {}
 
-    // Schritt 3: Bewertungs-Berechtigung prüfen (eigener try-catch)
-    bool canReview = false;
-    bool hasReviewed = false;
-    String? sharedFahrtId;
-    try {
-      if (currentUid != null && currentUid != widget.userId) {
-        final sharedSnap = await db
-            .collection('anfragen')
-            .where('fahrtOwnerId', isEqualTo: widget.userId)
-            .where('requesterId', isEqualTo: currentUid)
-            .where('status', isEqualTo: 1)
-            .get();
+      // Schritt 3: Bewertungs-Berechtigung prüfen (eigener try-catch)
+      bool canReview = false;
+      bool hasReviewed = false;
+      String? sharedFahrtId;
+      try {
+        if (currentUid != null && currentUid != widget.userId) {
+          final sharedSnap = await guarded(db
+              .collection('anfragen')
+              .where('fahrtOwnerId', isEqualTo: widget.userId)
+              .where('requesterId', isEqualTo: currentUid)
+              .where('status', isEqualTo: 1)
+              .get());
 
-        for (final anfrageDoc in sharedSnap.docs) {
-          final fahrtId = anfrageDoc.data()['fahrtId'] as String?;
-          if (fahrtId == null) continue;
-          final fahrtDoc = await db.collection('fahrten').doc(fahrtId).get();
-          if (!fahrtDoc.exists) continue;
-          final eventId =
-              (fahrtDoc.data() as Map<String, dynamic>)['eventId'] as String?;
-          if (eventId == null) continue;
-          final eventDoc = await db.collection('events').doc(eventId).get();
-          if (!eventDoc.exists) continue;
-          final rawDatum = (eventDoc.data() as Map<String, dynamic>)['datum'];
-          DateTime? eventDatum;
-          if (rawDatum is String) {
-            eventDatum = DateTime.tryParse(rawDatum);
-          } else if (rawDatum is Timestamp) {
-            eventDatum = rawDatum.toDate();
+          final fahrtIds = sharedSnap.docs
+              .map((d) => d.data()['fahrtId'] as String?)
+              .whereType<String>()
+              .toList();
+
+          if (fahrtIds.isNotEmpty) {
+            // Alle Fahrt-Dokumente parallel laden statt einzeln nacheinander
+            // (großer Latenz-Gewinn bei mehreren gemeinsamen Fahrten).
+            final fahrtDocs = await guarded(Future.wait(
+              fahrtIds.map((id) => db.collection('fahrten').doc(id).get()),
+            ));
+
+            final relevantFahrtIds = <String>[];
+            final eventIds = <String>[];
+            for (var i = 0; i < fahrtDocs.length; i++) {
+              if (!fahrtDocs[i].exists) continue;
+              final eventId =
+                  (fahrtDocs[i].data() as Map<String, dynamic>)['eventId'] as String?;
+              if (eventId == null) continue;
+              relevantFahrtIds.add(fahrtIds[i]);
+              eventIds.add(eventId);
+            }
+
+            if (eventIds.isNotEmpty) {
+              final eventDocs = await guarded(Future.wait(
+                eventIds.map((id) => db.collection('events').doc(id).get()),
+              ));
+
+              for (var i = 0; i < eventDocs.length; i++) {
+                if (!eventDocs[i].exists) continue;
+                final rawDatum =
+                    (eventDocs[i].data() as Map<String, dynamic>)['datum'];
+                DateTime? eventDatum;
+                if (rawDatum is String) {
+                  eventDatum = DateTime.tryParse(rawDatum);
+                } else if (rawDatum is Timestamp) {
+                  eventDatum = rawDatum.toDate();
+                }
+                if (eventDatum != null && _istVergangen(eventDatum)) {
+                  sharedFahrtId = relevantFahrtIds[i];
+                  break;
+                }
+              }
+            }
           }
-          if (eventDatum != null && _istVergangen(eventDatum)) {
-            sharedFahrtId = fahrtId;
-            break;
+
+          if (sharedFahrtId != null) {
+            final alreadyReviewedSnap = await guarded(db
+                .collection('reviews')
+                .where('reviewerId', isEqualTo: currentUid)
+                .where('reviewedId', isEqualTo: widget.userId)
+                .limit(1)
+                .get());
+            hasReviewed = alreadyReviewedSnap.docs.isNotEmpty;
+            canReview = true;
           }
         }
+      } on AsyncGuardTimeoutException {
+        rethrow;
+      } catch (_) {}
 
-        if (sharedFahrtId != null) {
-          final alreadyReviewedSnap = await db
-              .collection('reviews')
-              .where('reviewerId', isEqualTo: currentUid)
-              .where('reviewedId', isEqualTo: widget.userId)
-              .limit(1)
-              .get();
-          hasReviewed = alreadyReviewedSnap.docs.isNotEmpty;
-          canReview = true;
-        }
+      if (!mounted) return;
+
+      if (userDoc != null && userDoc.exists) {
+        final d = userDoc.data()! as Map<String, dynamic>;
+        final first = d['firstName'] as String? ?? '';
+        final last = d['lastName'] as String? ?? '';
+        final fullName = '$first $last'.trim();
+
+        final theirBlockedIds = (d['blockedUserIds'] as List<dynamic>?)
+                ?.whereType<String>()
+                .toList() ??
+            const [];
+        final blockedByThem =
+            currentUid != null && theirBlockedIds.contains(currentUid);
+
+        DateTime? memberSince;
+        final ts = d['createdAt'];
+        if (ts is Timestamp) memberSince = ts.toDate();
+
+        setState(() {
+          _isBlockedByThem = blockedByThem;
+          _name = fullName.isNotEmpty ? fullName : widget.name;
+          _photoUrl = (d['photoUrl'] as String?)?.isNotEmpty == true
+              ? d['photoUrl'] as String
+              : widget.photoUrl;
+          _homeTown = (d['homeTown'] as String?)?.isNotEmpty == true
+              ? d['homeTown'] as String
+              : null;
+          _hasPhone = d['phoneVerified'] as bool? ?? false;
+          _emailVerified = d['emailVerified'] as bool? ?? false;
+          _licenseVerified = (d['licenseStatus'] as String?) == 'verified';
+          _memberSince = memberSince;
+          _fahrtCount = fahrtCount;
+          _mitfahrerCount = mitfahrerCount;
+          _ratingAvg = (d['ratingAvg'] as num?)?.toDouble();
+          _ratingCount = (d['ratingCount'] as num?)?.toInt() ?? 0;
+          final allReviews =
+              (reviewSnap?.docs ?? []).map(Review.fromDoc).toList()
+                ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          _reviews = allReviews.take(5).toList();
+          _canReview = canReview;
+          _hasReviewed = hasReviewed;
+          _sharedFahrtId = sharedFahrtId;
+          final carMap = d['car'] as Map<String, dynamic>?;
+          if (carMap != null) {
+            final ci = CarInfo.fromMap(carMap);
+            _car = (ci.make.isNotEmpty || ci.model.isNotEmpty) ? ci : null;
+          }
+          _loading = false;
+        });
+      } else {
+        setState(() {
+          _fahrtCount = fahrtCount;
+          _mitfahrerCount = mitfahrerCount;
+          final allReviews2 =
+              (reviewSnap?.docs ?? []).map(Review.fromDoc).toList()
+                ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          _reviews = allReviews2.take(5).toList();
+          _canReview = canReview;
+          _hasReviewed = hasReviewed;
+          _sharedFahrtId = sharedFahrtId;
+          _loading = false;
+        });
       }
-    } catch (_) {}
-
-    if (!mounted) return;
-
-    if (userDoc != null && userDoc.exists) {
-      final d = userDoc.data()! as Map<String, dynamic>;
-      final first = d['firstName'] as String? ?? '';
-      final last = d['lastName'] as String? ?? '';
-      final fullName = '$first $last'.trim();
-
-      final theirBlockedIds = (d['blockedUserIds'] as List<dynamic>?)
-              ?.whereType<String>()
-              .toList() ??
-          const [];
-      final blockedByThem =
-          currentUid != null && theirBlockedIds.contains(currentUid);
-
-      DateTime? memberSince;
-      final ts = d['createdAt'];
-      if (ts is Timestamp) memberSince = ts.toDate();
-
+    } on AsyncGuardTimeoutException {
+      if (!mounted) return;
       setState(() {
-        _isBlockedByThem = blockedByThem;
-        _name = fullName.isNotEmpty ? fullName : widget.name;
-        _photoUrl = (d['photoUrl'] as String?)?.isNotEmpty == true
-            ? d['photoUrl'] as String
-            : widget.photoUrl;
-        _homeTown = (d['homeTown'] as String?)?.isNotEmpty == true
-            ? d['homeTown'] as String
-            : null;
-        _hasPhone = d['phoneVerified'] as bool? ?? false;
-        _emailVerified = d['emailVerified'] as bool? ?? false;
-        _licenseVerified = (d['licenseStatus'] as String?) == 'verified';
-        _memberSince = memberSince;
-        _fahrtCount = fahrtCount;
-        _mitfahrerCount = mitfahrerCount;
-        _ratingAvg = (d['ratingAvg'] as num?)?.toDouble();
-        _ratingCount = (d['ratingCount'] as num?)?.toInt() ?? 0;
-        final allReviews = (reviewSnap?.docs ?? []).map(Review.fromDoc).toList()
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        _reviews = allReviews.take(5).toList();
-        _canReview = canReview;
-        _hasReviewed = hasReviewed;
-        _sharedFahrtId = sharedFahrtId;
-        final carMap = d['car'] as Map<String, dynamic>?;
-        if (carMap != null) {
-          final ci = CarInfo.fromMap(carMap);
-          _car = (ci.make.isNotEmpty || ci.model.isNotEmpty) ? ci : null;
-        }
         _loading = false;
-      });
-    } else {
-      setState(() {
-        _fahrtCount = fahrtCount;
-        _mitfahrerCount = mitfahrerCount;
-        final allReviews2 = (reviewSnap?.docs ?? []).map(Review.fromDoc).toList()
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        _reviews = allReviews2.take(5).toList();
-        _canReview = canReview;
-        _hasReviewed = hasReviewed;
-        _sharedFahrtId = sharedFahrtId;
-        _loading = false;
+        _loadFailed = true;
       });
     }
   }
@@ -489,7 +536,25 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
         appBar: appBar,
         body: _loading
             ? const Center(child: CircularProgressIndicator(color: Colors.white))
-            : SafeArea(
+            : _loadFailed
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.wifi_off_rounded,
+                            color: Colors.white38, size: 40),
+                        const SizedBox(height: 12),
+                        const Text('Profil konnte nicht geladen werden',
+                            style: TextStyle(color: Colors.white70)),
+                        const SizedBox(height: 16),
+                        TextButton(
+                          onPressed: _load,
+                          child: const Text('Erneut versuchen'),
+                        ),
+                      ],
+                    ),
+                  )
+                : SafeArea(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
                   child: Column(

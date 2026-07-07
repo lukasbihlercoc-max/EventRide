@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:my_app/utils/async_guard.dart';
 import 'package:my_app/utils/platform_pickers.dart';
 import 'package:flutter/material.dart';
 import 'package:my_app/views/widgets/places_autocomplete_field.dart';
@@ -311,15 +312,28 @@ class _FahrtAnbietenPageState extends State<FahrtAnbietenPage>
                                 setState(() => _isSaving = true);
                                 try {
                                   if (widget.existingFahrt == null) {
-                                    await fahrtService.add(fahrt);
-                                    await interessentenService.removeForUser(widget.event.id, fahrt.ownerId);
-                                    await anfrageService.storniereOffeneAnfragenFuerEvent(
+                                    await guarded(fahrtService.add(fahrt));
+                                    await guarded(interessentenService.removeForUser(widget.event.id, fahrt.ownerId));
+                                    await guarded(anfrageService.storniereOffeneAnfragenFuerEvent(
                                       eventId: widget.event.id,
                                       requesterId: fahrt.ownerId,
-                                    );
+                                    ));
                                   } else {
-                                    await fahrtService.update(fahrt);
+                                    await guarded(fahrtService.update(fahrt));
                                   }
+                                } on AsyncGuardTimeoutException {
+                                  // fahrt.id wurde einmalig vor dem Speichern generiert (fixe ID,
+                                  // kein .add() mit Auto-ID) - ein erneuter Tap würde also nichts
+                                  // doppelt anlegen. Firestores Offline-Warteschlange reicht den
+                                  // Schreibvorgang im Hintergrund nach, auch wenn wir hier nicht
+                                  // mehr auf die Server-Bestätigung warten.
+                                  if (!context.mounted) return;
+                                  setState(() => _isSaving = false);
+                                  AppSnackbar.show(context,
+                                      message: "Verbindung langsam – wird im Hintergrund synchronisiert",
+                                      accentColor: Colors.orangeAccent);
+                                  nav.pop();
+                                  return;
                                 } catch (e, st) {
                                   if (kDebugMode) debugPrint('❌ [Speichern] Fehler: $e\n$st');
                                   if (!context.mounted) return;
