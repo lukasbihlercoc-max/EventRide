@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
+import 'package:my_app/utils/async_guard.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/widgets/sizehelper_widget.dart';
@@ -76,7 +77,7 @@ class _EmailVerificationPageState extends State<EmailVerificationPage>
       _resentSuccess = false;
     });
     try {
-      await context.read<IAuthRepository>().sendEmailVerification();
+      await guarded(context.read<IAuthRepository>().sendEmailVerification());
       if (mounted) setState(() => _resentSuccess = true);
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
@@ -85,6 +86,13 @@ class _EmailVerificationPageState extends State<EmailVerificationPage>
         message: e.code == 'too-many-requests'
             ? 'Zu viele Versuche – bitte später erneut versuchen'
             : 'Fehler beim Senden der E-Mail',
+        accentColor: Colors.redAccent,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      AppSnackbar.show(
+        context,
+        message: 'Fehler beim Senden der E-Mail',
         accentColor: Colors.redAccent,
       );
     } finally {
@@ -99,7 +107,8 @@ class _EmailVerificationPageState extends State<EmailVerificationPage>
 
   Future<void> _changeEmail(String newEmail, String password) async {
     try {
-      await context.read<IAuthRepository>().changeEmail(newEmail, password);
+      await guarded(
+          context.read<IAuthRepository>().changeEmail(newEmail, password));
       if (!mounted) return;
 
       Navigator.pop(context);
@@ -129,6 +138,13 @@ class _EmailVerificationPageState extends State<EmailVerificationPage>
       AppSnackbar.show(
         context,
         message: message,
+        accentColor: Colors.redAccent,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      AppSnackbar.show(
+        context,
+        message: 'Fehler beim Ändern der E-Mail',
         accentColor: Colors.redAccent,
       );
     }

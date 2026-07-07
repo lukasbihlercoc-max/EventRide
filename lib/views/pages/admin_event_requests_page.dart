@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:my_app/utils/async_guard.dart';
 import 'package:my_app/utils/platform_pickers.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -475,13 +476,19 @@ class _ReviewSheetState extends State<_ReviewSheet> {
         longitude: _longitude,
       );
 
-      await context
+      await guarded(context
           .read<IAuthRepository>()
-          .approveEventRequest(widget.request.id, event);
+          .approveEventRequest(widget.request.id, event));
 
       if (mounted) {
         Navigator.pop(context);
         AppSnackbar.show(context, message: 'Event veröffentlicht.');
+      }
+    } on AsyncGuardTimeoutException {
+      if (mounted) {
+        Navigator.pop(context);
+        AppSnackbar.show(context,
+            message: 'Verbindung langsam – wird im Hintergrund synchronisiert');
       }
     } catch (e) {
       if (mounted) AppSnackbar.show(context, message: 'Fehler: $e');
@@ -537,12 +544,18 @@ class _ReviewSheetState extends State<_ReviewSheet> {
 
     setState(() => _actioning = true);
     try {
-      await context
+      await guarded(context
           .read<IAuthRepository>()
-          .discardEventRequest(widget.request.id, reason: reason);
+          .discardEventRequest(widget.request.id, reason: reason));
       if (mounted) {
         Navigator.pop(context);
         AppSnackbar.show(context, message: 'Anfrage verworfen.');
+      }
+    } on AsyncGuardTimeoutException {
+      if (mounted) {
+        Navigator.pop(context);
+        AppSnackbar.show(context,
+            message: 'Verbindung langsam – wird im Hintergrund synchronisiert');
       }
     } catch (e) {
       if (mounted) AppSnackbar.show(context, message: 'Fehler: $e');

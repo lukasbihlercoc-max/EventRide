@@ -1,6 +1,7 @@
 // event_submit_page.dart
 import 'dart:io';
 import 'dart:async';
+import 'package:my_app/utils/async_guard.dart';
 import 'package:my_app/utils/platform_pickers.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -163,7 +164,7 @@ class _EventSubmitPageState extends State<EventSubmitPage> {
     }
     setState(() => _submitting = true);
     try {
-      await context.read<IAuthRepository>().submitEventRequestManual(
+      await guarded(context.read<IAuthRepository>().submitEventRequestManual(
             name: _nameCtrl.text.trim().isEmpty
                 ? 'Unbenanntes Event'
                 : _nameCtrl.text.trim(),
@@ -179,10 +180,19 @@ class _EventSubmitPageState extends State<EventSubmitPage> {
                 : _adresseCtrl.text.trim(),
             latitude: _latitude,
             longitude: _longitude,
-          );
+          ));
       if (!mounted) return;
       AppSnackbar.show(context, message: 'Anfrage eingereicht – danke!');
       Navigator.pop(context);
+    } on AsyncGuardTimeoutException {
+      // Jeder Versuch legt einen neuen eventRequests-Eintrag mit frischer
+      // ID an (.add()) - anders als bei Fahrt erstellen wäre ein erneuter
+      // Tap hier NICHT idempotent. Deshalb kein Auto-Zurück, sondern
+      // explizite Warnung und Verbleib auf der Seite.
+      if (!mounted) return;
+      AppSnackbar.show(context,
+          message:
+              'Verbindung sehr langsam. Bitte prüfe, ob die Anfrage schon angekommen ist, bevor du es erneut versuchst.');
     } catch (e) {
       if (!mounted) return;
       AppSnackbar.show(context, message: 'Fehler: $e');
@@ -241,13 +251,20 @@ class _EventSubmitPageState extends State<EventSubmitPage> {
     }
     setState(() => _submitting = true);
     try {
-      await context.read<IAuthRepository>().submitEventRequestFlyer(
+      await guarded(context.read<IAuthRepository>().submitEventRequestFlyer(
             _flyerFile!,
             note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
-          );
+          ));
       if (!mounted) return;
       AppSnackbar.show(context, message: 'Flyer eingereicht – danke!');
       Navigator.pop(context);
+    } on AsyncGuardTimeoutException {
+      // Jeder Versuch generiert eine neue Dokument-ID - ein erneuter Tap
+      // wäre nicht idempotent, deshalb kein Auto-Zurück.
+      if (!mounted) return;
+      AppSnackbar.show(context,
+          message:
+              'Verbindung sehr langsam. Bitte prüfe, ob der Flyer schon angekommen ist, bevor du es erneut versuchst.');
     } catch (e) {
       if (!mounted) return;
       AppSnackbar.show(context, message: 'Fehler: $e');

@@ -4,6 +4,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/data/license_request.dart';
+import 'package:my_app/utils/async_guard.dart';
 import 'package:my_app/views/widgets/app_bottom_sheet.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
@@ -241,12 +242,21 @@ class _ReviewSheetState extends State<_ReviewSheet> {
   Future<void> _approve() async {
     setState(() => _actioning = true);
     try {
-      await context
+      await guarded(context
           .read<IAuthRepository>()
-          .approveLicense(widget.request.uid);
+          .approveLicense(widget.request.uid));
       if (mounted) {
         Navigator.pop(context);
         AppSnackbar.show(context, message: 'Führerschein angenommen.');
+      }
+    } on AsyncGuardTimeoutException {
+      // Update auf feste userId, idempotent (Cloud-Funktion prüft Status
+      // ohnehin gegen doppelte Anwendung) - Timeout wird als erledigt
+      // behandelt.
+      if (mounted) {
+        Navigator.pop(context);
+        AppSnackbar.show(context,
+            message: 'Verbindung langsam – wird im Hintergrund synchronisiert');
       }
     } catch (e) {
       if (mounted) {
@@ -265,10 +275,17 @@ class _ReviewSheetState extends State<_ReviewSheet> {
           Navigator.pop(ctx);
           setState(() => _actioning = true);
           try {
-            await context
+            await guarded(context
                 .read<IAuthRepository>()
-                .rejectLicense(widget.request.uid, reason);
+                .rejectLicense(widget.request.uid, reason));
             if (mounted) Navigator.pop(context);
+          } on AsyncGuardTimeoutException {
+            if (mounted) {
+              Navigator.pop(context);
+              AppSnackbar.show(context,
+                  message:
+                      'Verbindung langsam – wird im Hintergrund synchronisiert');
+            }
           } catch (e) {
             if (mounted) AppSnackbar.show(context, message: 'Fehler: $e');
           } finally {

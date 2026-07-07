@@ -5,6 +5,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/utils/app_route.dart';
+import 'package:my_app/utils/async_guard.dart';
 import 'package:my_app/views/widgets/app_bottom_sheet.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
@@ -215,10 +216,10 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => _isLoading = true);
     try {
       final auth = context.read<IAuthRepository>();
-      await auth.signIn(
+      await guarded(auth.signIn(
         _emailController.text.trim(),
         _passwordController.text,
-      );
+      ));
       if (!mounted) return;
 
       if (mounted) Navigator.pop(context);

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:my_app/data/fahrt_daten.dart';
 import 'package:my_app/data/anfrage_daten.dart';
 import 'package:my_app/utils/app_route.dart';
+import 'package:my_app/utils/async_guard.dart';
 import 'package:my_app/data/anfrage_service.dart';
 import 'package:my_app/data/fahrt_service.dart';
 import 'package:my_app/views/widgets/trust_shields_widget.dart';
@@ -498,11 +499,16 @@ class _AnfragenButtonState extends State<_AnfragenButton> {
         eventDatum: widget.fahrt.eventDatum,
       );
 
-      await widget.anfrageService.addAnfrage(anfrage);
+      await guarded(widget.anfrageService.addAnfrage(anfrage));
 
       if (mounted) {
         AppSnackbar.show(context,
             message: 'Anfrage an ${widget.interessent.userName} gesendet!');
+      }
+    } on AsyncGuardTimeoutException {
+      if (mounted) {
+        AppSnackbar.show(context,
+            message: 'Verbindung langsam – wird im Hintergrund synchronisiert');
       }
     } catch (e) {
       if (mounted) {
@@ -678,7 +684,7 @@ class _AnfrageCardState extends State<_AnfrageCard> {
     try {
       final chatService = context.read<ChatService>();
       final a = widget.anfrage;
-      await context.read<AnfrageService>().ablehnenAnfrage(a);
+      await guarded(context.read<AnfrageService>().ablehnenAnfrage(a));
       if (!mounted) return;
       chatService.sendStatusNotification(
         fahrtId: widget.fahrt.id,
@@ -690,6 +696,17 @@ class _AnfrageCardState extends State<_AnfrageCard> {
         seatsRequested: a.seatsRequested,
         text: 'Deine Anfrage wurde leider abgelehnt.',
       );
+    } on AsyncGuardTimeoutException {
+      // Update auf feste Anfrage-ID - idempotent, wird bei Timeout als
+      // erledigt behandelt statt den Fehler zu zeigen.
+      if (mounted) {
+        AppSnackbar.show(context,
+            message: 'Verbindung langsam – wird im Hintergrund synchronisiert');
+      }
+    } catch (e) {
+      if (mounted) {
+        AppSnackbar.show(context, message: 'Fehler: $e');
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -710,16 +727,17 @@ class _AnfrageCardState extends State<_AnfrageCard> {
       final freie = aktuelleFahrt.freiePlaetze;
       if (_acceptedSeats > freie) return;
 
-      final ok = await anfrageService.akzeptiereAnfrage(
+      final ok = await guarded(anfrageService.akzeptiereAnfrage(
         anfrage: a,
         fahrt: aktuelleFahrt,
         seatsAccepted: _acceptedSeats,
-      );
+      ));
       if (!ok) return;
 
-      await interessentenService.removeForUser(widget.fahrt.eventId, a.requesterId);
+      await guarded(
+          interessentenService.removeForUser(widget.fahrt.eventId, a.requesterId));
 
-      final convo = await chatService.ensureConversation(
+      final convo = await guarded(chatService.ensureConversation(
         fahrtId: widget.fahrt.id,
         ownerId: widget.fahrt.ownerId,
         requesterId: a.requesterId,
@@ -727,7 +745,7 @@ class _AnfrageCardState extends State<_AnfrageCard> {
         startOrt: widget.fahrt.abfahrtsort,
         zielOrt: widget.fahrt.standort,
         seatsRequested: a.seatsRequested,
-      );
+      ));
 
       try {
         await chatService.updateSystemMessage(
@@ -760,7 +778,7 @@ class _AnfrageCardState extends State<_AnfrageCard> {
             .where((x) => x.id != a.id && x.status == AnfrageStatus.offen)
             .toList();
         for (final offeneAnfrage in offene) {
-          await anfrageService.ablehnenAnfrage(offeneAnfrage);
+          await guarded(anfrageService.ablehnenAnfrage(offeneAnfrage));
           if (!mounted) break;
           chatService.sendStatusNotification(
             fahrtId: widget.fahrt.id,
@@ -773,6 +791,17 @@ class _AnfrageCardState extends State<_AnfrageCard> {
             text: 'Fahrt ist leider voll.',
           );
         }
+      }
+    } on AsyncGuardTimeoutException {
+      // Updates laufen über feste IDs - idempotent, wird bei Timeout als
+      // erledigt behandelt statt den Fehler zu zeigen.
+      if (mounted) {
+        AppSnackbar.show(context,
+            message: 'Verbindung langsam – wird im Hintergrund synchronisiert');
+      }
+    } catch (e) {
+      if (mounted) {
+        AppSnackbar.show(context, message: 'Fehler: $e');
       }
     } finally {
       if (mounted) setState(() => _loading = false);

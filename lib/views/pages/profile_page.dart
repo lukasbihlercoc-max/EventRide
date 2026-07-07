@@ -11,6 +11,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:my_app/config/feature_flags.dart';
 import 'package:my_app/config/legal_texts.dart';
 import 'package:my_app/utils/app_route.dart';
+import 'package:my_app/utils/async_guard.dart';
 import 'package:my_app/data/app_user.dart';
 import 'package:my_app/views/pages/legal_page.dart';
 import 'package:my_app/views/pages/public_profile_page.dart';
@@ -440,9 +441,9 @@ class _LoggedInViewState extends State<_LoggedInView> {
 
     setState(() => _uploading = true);
     try {
-      await context
+      await guarded(context
           .read<IAuthRepository>()
-          .uploadProfilePhoto(File(cropped.path));
+          .uploadProfilePhoto(File(cropped.path)));
     } catch (e) {
       if (mounted) {
         AppSnackbar.show(
@@ -1446,11 +1447,19 @@ class _LicenseSheetState extends State<_LicenseSheet> {
       _error = null;
     });
     try {
-      await context.read<IAuthRepository>().uploadLicense(File(picked.path));
+      await guarded(context.read<IAuthRepository>().uploadLicense(File(picked.path)));
       if (mounted) {
         Navigator.pop(context);
         AppSnackbar.show(context,
             message: 'Führerschein hochgeladen. Wird in Kürze geprüft.');
+      }
+    } on AsyncGuardTimeoutException {
+      // Fester Storage-Pfad + Update auf feste userId - idempotent, wird bei
+      // Timeout als erledigt behandelt statt den Fehler zu zeigen.
+      if (mounted) {
+        Navigator.pop(context);
+        AppSnackbar.show(context,
+            message: 'Verbindung langsam – wird im Hintergrund synchronisiert');
       }
     } catch (e) {
       if (mounted) setState(() => _error = 'Führerschein konnte nicht hochgeladen werden. Bitte versuche es erneut.');
@@ -1641,12 +1650,20 @@ class _HomeTownSheetState extends State<_HomeTownSheet> {
       _error = null;
     });
     try {
-      await context.read<IAuthRepository>().setHomeTown(
+      await guarded(context.read<IAuthRepository>().setHomeTown(
             _selectedName!,
             lat: _selectedLat,
             lng: _selectedLng,
-          );
+          ));
       if (mounted) Navigator.pop(context);
+    } on AsyncGuardTimeoutException {
+      // Update auf feste userId - idempotent, wird bei Timeout als erledigt
+      // behandelt statt den Fehler zu zeigen.
+      if (mounted) {
+        Navigator.pop(context);
+        AppSnackbar.show(context,
+            message: 'Verbindung langsam – wird im Hintergrund synchronisiert');
+      }
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
     } finally {
@@ -1818,14 +1835,22 @@ class _CarInfoSheetState extends State<_CarInfoSheet> {
     });
     try {
       final repo = context.read<IAuthRepository>();
-      await repo.updateCarInfo(
+      await guarded(repo.updateCarInfo(
         make,
         model,
         _colorCtrl.text.trim().isEmpty ? null : _colorCtrl.text.trim(),
         seats,
-      );
-      await repo.updateLicensePlate(plate);
+      ));
+      await guarded(repo.updateLicensePlate(plate));
       if (mounted) Navigator.pop(context);
+    } on AsyncGuardTimeoutException {
+      // Updates auf feste userId - idempotent, wird bei Timeout als erledigt
+      // behandelt statt den Fehler zu zeigen.
+      if (mounted) {
+        Navigator.pop(context);
+        AppSnackbar.show(context,
+            message: 'Verbindung langsam – wird im Hintergrund synchronisiert');
+      }
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
     } finally {

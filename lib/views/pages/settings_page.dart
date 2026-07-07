@@ -9,6 +9,7 @@ import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/data/license_request.dart';
 import 'package:my_app/data/notification_service.dart';
 import 'package:my_app/utils/app_route.dart';
+import 'package:my_app/utils/async_guard.dart';
 import 'package:my_app/views/pages/admin_event_requests_page.dart';
 import 'package:my_app/views/pages/admin_license_page.dart';
 import 'package:my_app/views/pages/admin_user_reports_page.dart';
@@ -55,16 +56,30 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _saveTown() async {
     setState(() => _isSaving = true);
-    await context
-        .read<IAuthRepository>()
-        .setHomeTown(_townController.text.trim());
-    if (!mounted) return;
-    setState(() {
-      _isSaving = false;
-      _isEditingTown = false;
-      _originalTown = _townController.text;
-    });
-    AppSnackbar.show(context, message: "Wohnort gespeichert");
+    try {
+      await guarded(context
+          .read<IAuthRepository>()
+          .setHomeTown(_townController.text.trim()));
+      if (!mounted) return;
+      setState(() {
+        _isEditingTown = false;
+        _originalTown = _townController.text;
+      });
+      AppSnackbar.show(context, message: "Wohnort gespeichert");
+    } on AsyncGuardTimeoutException {
+      if (!mounted) return;
+      setState(() {
+        _isEditingTown = false;
+        _originalTown = _townController.text;
+      });
+      AppSnackbar.show(context,
+          message: "Verbindung langsam – wird im Hintergrund synchronisiert");
+    } catch (e) {
+      if (!mounted) return;
+      AppSnackbar.show(context, message: "Fehler: $e");
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   void _cancelEditTown() {
@@ -567,7 +582,8 @@ class _SettingsPageState extends State<SettingsPage> {
                       final email = context.read<IAuthRepository>().currentUser?.email;
                       if (email == null) return;
                       try {
-                        await context.read<IAuthRepository>().resetPassword(email);
+                        await guarded(
+                            context.read<IAuthRepository>().resetPassword(email));
                         if (ctx.mounted) Navigator.pop(ctx);
                         if (context.mounted) {
                           AppSnackbar.show(context,
@@ -957,13 +973,13 @@ class _SettingsPageState extends State<SettingsPage> {
                       });
                       try {
                         final auth = context.read<IAuthRepository>();
-                        await auth.reauthenticate(password);
+                        await guarded(auth.reauthenticate(password));
                         // Sheet sofort schließen bevor der lange Cleanup startet.
                         // Sonst kollidiert der Firebase-Auth-State-Change mit
                         // dem noch offenen TextField/TextEditingController.
                         if (ctx.mounted) Navigator.pop(ctx);
                         if (!context.mounted) return;
-                        await auth.deleteAccount();
+                        await guarded(auth.deleteAccount());
                         if (context.mounted) {
                           Navigator.popUntil(
                               context, (route) => route.isFirst);

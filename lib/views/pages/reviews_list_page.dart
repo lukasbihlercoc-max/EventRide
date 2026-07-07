@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:my_app/data/review.dart';
 import 'package:my_app/utils/app_route.dart';
+import 'package:my_app/utils/async_guard.dart';
 import 'package:my_app/views/pages/public_profile_page.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/widgets/review_card_widget.dart';
@@ -35,14 +36,14 @@ class _ReviewsListPageState extends State<ReviewsListPage> {
   Future<void> _load() async {
     try {
       final db = FirebaseFirestore.instance;
-      final results = await Future.wait([
+      final results = await guarded(Future.wait([
         db
             .collection('reviews')
             .where('reviewedId', isEqualTo: widget.userId)
             .limit(50)
             .get(),
         db.collection('users').doc(widget.userId).get(),
-      ]);
+      ]));
       if (!mounted) return;
 
       final reviewSnap = results[0] as QuerySnapshot;

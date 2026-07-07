@@ -4,6 +4,7 @@ import 'dart:ui'; // Für ImageFilter.blur
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_app/data/interfaces/i_auth_repository.dart';
 import 'package:my_app/utils/app_route.dart';
+import 'package:my_app/utils/async_guard.dart';
 import 'package:my_app/views/pages/email_verification_page.dart';
 import 'package:my_app/config/legal_texts.dart';
 import 'package:my_app/views/pages/legal_page.dart';
@@ -351,13 +352,13 @@ class _RegisterPageState extends State<RegisterPage> {
     try {
       final auth = context.read<IAuthRepository>();
       final email = _emailController.text.trim();
-      await auth.register(
+      await guarded(auth.register(
         firstName: _firstNameController.text.trim(),
         lastName: _lastNameController.text.trim(),
         email: email,
         password: _passwordController.text,
-      );
-      await auth.sendEmailVerification();
+      ));
+      await guarded(auth.sendEmailVerification());
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
           AppRoute(

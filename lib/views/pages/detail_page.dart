@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:my_app/data/anfrage_daten.dart';
 import 'package:my_app/data/anfrage_service.dart';
 import 'package:my_app/utils/app_route.dart';
+import 'package:my_app/utils/async_guard.dart';
 import 'package:my_app/data/chat_service.dart';
 import 'package:my_app/data/event_daten.dart';
 import 'package:my_app/data/event_service.dart';
@@ -938,15 +939,18 @@ class _EinladungsBottomSheetState extends State<_EinladungsBottomSheet> {
     setState(() => _loading = true);
     final anfrageService = context.read<AnfrageService>();
     try {
-      final ok = await anfrageService.acceptAnfrageAtomisch(
+      final ok = await guarded(anfrageService.acceptAnfrageAtomisch(
         anfrage: widget.einladung,
         seatsAccepted: 1,
-      );
-      if (!ok || !mounted) {
-        setState(() => _loading = false);
-        return;
+      ));
+      if (!ok || !mounted) return;
+      setState(() => _angenommen = true);
+    } on AsyncGuardTimeoutException {
+      // Cloud Function arbeitet auf fester Anfrage-ID - idempotent, wird bei
+      // Timeout als erledigt behandelt statt den Fehler zu zeigen.
+      if (mounted) {
+        setState(() => _angenommen = true);
       }
-      if (mounted) setState(() { _loading = false; _angenommen = true; });
     } on FirebaseFunctionsException catch (e) {
       if (!mounted) return;
       final msg = switch (e.code) {
@@ -956,7 +960,8 @@ class _EinladungsBottomSheetState extends State<_EinladungsBottomSheet> {
         _ => 'Fehler: ${e.message ?? e.code}',
       };
       AppSnackbar.show(context, message: msg);
-      setState(() => _loading = false);
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -964,19 +969,28 @@ class _EinladungsBottomSheetState extends State<_EinladungsBottomSheet> {
     HapticFeedback.mediumImpact();
     setState(() => _loading = true);
     final chatService = context.read<ChatService>();
-    await context.read<AnfrageService>().ablehnenAnfrage(widget.einladung);
-    if (!mounted) return;
-    chatService.sendStatusNotification(
-      fahrtId: widget.einladung.fahrtId,
-      ownerId: widget.einladung.fahrtOwnerId,
-      requesterId: widget.einladung.requesterId,
-      eventName: widget.einladung.eventName,
-      startOrt: widget.einladung.startOrt,
-      zielOrt: widget.einladung.zielOrt,
-      seatsRequested: widget.einladung.seatsRequested,
-      text: 'Einladung wurde abgelehnt.',
-    );
-    Navigator.pop(context);
+    try {
+      await guarded(
+          context.read<AnfrageService>().ablehnenAnfrage(widget.einladung));
+      if (!mounted) return;
+      chatService.sendStatusNotification(
+        fahrtId: widget.einladung.fahrtId,
+        ownerId: widget.einladung.fahrtOwnerId,
+        requesterId: widget.einladung.requesterId,
+        eventName: widget.einladung.eventName,
+        startOrt: widget.einladung.startOrt,
+        zielOrt: widget.einladung.zielOrt,
+        seatsRequested: widget.einladung.seatsRequested,
+        text: 'Einladung wurde abgelehnt.',
+      );
+      Navigator.pop(context);
+    } on AsyncGuardTimeoutException {
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) AppSnackbar.show(context, message: 'Fehler: $e');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
@@ -1273,15 +1287,16 @@ class _EinladungCardState extends State<_EinladungCard> {
     setState(() => _loading = true);
     final anfrageService = context.read<AnfrageService>();
     try {
-      final ok = await anfrageService.acceptAnfrageAtomisch(
+      final ok = await guarded(anfrageService.acceptAnfrageAtomisch(
         anfrage: widget.einladung,
         seatsAccepted: 1,
-      );
-      if (!ok || !mounted) {
-        setState(() => _loading = false);
-        return;
-      }
-      if (mounted) setState(() { _loading = false; _angenommen = true; });
+      ));
+      if (!ok || !mounted) return;
+      setState(() => _angenommen = true);
+    } on AsyncGuardTimeoutException {
+      // Cloud Function arbeitet auf fester Anfrage-ID - idempotent, wird bei
+      // Timeout als erledigt behandelt statt den Fehler zu zeigen.
+      if (mounted) setState(() => _angenommen = true);
     } on FirebaseFunctionsException catch (e) {
       if (!mounted) return;
       final msg = switch (e.code) {
@@ -1291,15 +1306,25 @@ class _EinladungCardState extends State<_EinladungCard> {
         _ => 'Fehler: ${e.message ?? e.code}',
       };
       AppSnackbar.show(context, message: msg);
-      setState(() => _loading = false);
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   Future<void> _ablehnen() async {
     HapticFeedback.mediumImpact();
     setState(() => _loading = true);
-    await context.read<AnfrageService>().ablehnenAnfrage(widget.einladung);
-    if (mounted) setState(() { _loading = false; _abgelehnt = true; });
+    try {
+      await guarded(
+          context.read<AnfrageService>().ablehnenAnfrage(widget.einladung));
+      if (mounted) setState(() => _abgelehnt = true);
+    } on AsyncGuardTimeoutException {
+      if (mounted) setState(() => _abgelehnt = true);
+    } catch (e) {
+      if (mounted) AppSnackbar.show(context, message: 'Fehler: $e');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override

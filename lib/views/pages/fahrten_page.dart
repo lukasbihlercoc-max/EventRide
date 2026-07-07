@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:my_app/utils/app_route.dart';
+import 'package:my_app/utils/async_guard.dart';
 import 'package:my_app/views/widgets/app_card.dart';
 import 'package:my_app/views/widgets/trust_shields_widget.dart';
 
@@ -2605,17 +2606,20 @@ class _EinladungButtonsState extends State<_EinladungButtons> {
     setState(() => _loading = true);
     final anfrageService = context.read<AnfrageService>();
     try {
-      final ok = await anfrageService.acceptAnfrageAtomisch(
+      final ok = await guarded(anfrageService.acceptAnfrageAtomisch(
         anfrage: widget.anfrage,
         seatsAccepted: 1,
-      );
-      if (!ok || !mounted) {
-        if (mounted) setState(() => _loading = false);
-        return;
-      }
+      ));
+      if (!ok || !mounted) return;
+      widget.onInteracted?.call();
+      AppSnackbar.show(context, message: 'Einladung angenommen!');
+    } on AsyncGuardTimeoutException {
+      // Cloud Function arbeitet auf fester Anfrage-ID - idempotent, wird bei
+      // Timeout als erledigt behandelt statt den Fehler zu zeigen.
       if (mounted) {
         widget.onInteracted?.call();
-        AppSnackbar.show(context, message: 'Einladung angenommen!');
+        AppSnackbar.show(context,
+            message: 'Verbindung langsam – wird im Hintergrund synchronisiert');
       }
     } on FirebaseFunctionsException catch (e) {
       if (!mounted) return;
@@ -2626,17 +2630,29 @@ class _EinladungButtonsState extends State<_EinladungButtons> {
         _ => 'Fehler: ${e.message ?? e.code}',
       };
       AppSnackbar.show(context, message: msg);
-      setState(() => _loading = false);
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   Future<void> _ablehnen() async {
     setState(() => _loading = true);
-    await context.read<AnfrageService>().ablehnenAnfrage(widget.anfrage);
-    if (mounted) {
-      widget.onInteracted?.call();
-      AppSnackbar.show(context, message: 'Einladung abgelehnt.');
-      setState(() => _loading = false);
+    try {
+      await guarded(context.read<AnfrageService>().ablehnenAnfrage(widget.anfrage));
+      if (mounted) {
+        widget.onInteracted?.call();
+        AppSnackbar.show(context, message: 'Einladung abgelehnt.');
+      }
+    } on AsyncGuardTimeoutException {
+      if (mounted) {
+        widget.onInteracted?.call();
+        AppSnackbar.show(context,
+            message: 'Verbindung langsam – wird im Hintergrund synchronisiert');
+      }
+    } catch (e) {
+      if (mounted) AppSnackbar.show(context, message: 'Fehler: $e');
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
