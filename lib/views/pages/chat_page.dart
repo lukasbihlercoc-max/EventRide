@@ -19,7 +19,6 @@ import 'package:my_app/views/pages/public_profile_page.dart';
 import 'package:my_app/views/widgets/app_card.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
-import 'package:my_app/views/widgets/trust_shields_widget.dart';
 import 'package:my_app/views/widgets/user_avatar_widget.dart';
 
 class ChatPage extends StatefulWidget {
@@ -185,15 +184,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(widget.otherUserName,
-                          style: const TextStyle(fontSize: 16, height: 1.2)),
-                      const SizedBox(width: 6),
-                      TrustShieldsByUserId(userId: widget.otherUserId, size: 12),
-                    ],
-                  ),
+                  Text(widget.otherUserName,
+                      style: const TextStyle(fontSize: 16, height: 1.2)),
                   if (subtitle != null)
                     Text(subtitle,
                         style: const TextStyle(
@@ -222,6 +214,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 elevation: 0,
                 surfaceTintColor: Colors.transparent,
                 centerTitle: false,
+                titleSpacing: 0,
                 title: _appBarTitle(),
               ),
               body: const Center(
@@ -264,6 +257,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   elevation: 0,
                   surfaceTintColor: Colors.transparent,
                   centerTitle: false,
+                  titleSpacing: 0,
                   title: _appBarTitle(),
                 ),
                 body: GestureDetector(
@@ -769,9 +763,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   if (data.uhrzeit != null)
                     _InfoRow(
                         icon: Icons.access_time, label: data.uhrzeit!),
-                  if (data.ownerName != null)
-                    _InfoRow(
-                        icon: Icons.person, label: data.ownerName!),
                   _InfoRow(
                     icon: Icons.event_seat,
                     label:
@@ -1093,27 +1084,36 @@ class _InfoBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        border: Border.all(color: color.withValues(alpha: 0.5)),
-        borderRadius: BorderRadius.circular(20),
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.sizeOf(context).width * 0.7,
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: color),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: color,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.15),
+          border: Border.all(color: color.withValues(alpha: 0.5)),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: color),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
