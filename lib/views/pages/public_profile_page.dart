@@ -16,6 +16,7 @@ import 'package:my_app/views/widgets/app_snackbar.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/widgets/trust_shields_widget.dart';
 import 'package:my_app/views/widgets/app_bottom_sheet.dart';
+import 'package:my_app/views/pages/reviews_list_page.dart';
 import 'package:my_app/views/widgets/review_card_widget.dart';
 import 'package:my_app/views/widgets/user_avatar_widget.dart';
 import 'package:provider/provider.dart';
@@ -593,6 +594,8 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
                         canReview: _canReview && !_hasReviewed,
                         hasReviewed: _hasReviewed,
                         onReview: _openReviewSheet,
+                        userId: widget.userId,
+                        userName: _name,
                       ),
                     ],
                   ),
@@ -1253,6 +1256,8 @@ class _ReviewsSection extends StatelessWidget {
   final bool canReview;
   final bool hasReviewed;
   final VoidCallback onReview;
+  final String userId;
+  final String userName;
 
   const _ReviewsSection({
     required this.avg,
@@ -1261,6 +1266,8 @@ class _ReviewsSection extends StatelessWidget {
     required this.canReview,
     required this.hasReviewed,
     required this.onReview,
+    required this.userId,
+    required this.userName,
   });
 
   @override
@@ -1282,6 +1289,37 @@ class _ReviewsSection extends StatelessWidget {
           const SizedBox(height: 8),
         ],
         if (count > 0) _ReviewList(reviews: reviews) else const _ReviewsEmptyState(),
+        if (count > 5) ...[
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              AppRoute(
+                builder: (_) => ReviewsListPage(userId: userId, userName: userName),
+              ),
+            ),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 9),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.04),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Alle $count Bewertungen ansehen',
+                    style: const TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right, color: Colors.white38, size: 14),
+                ],
+              ),
+            ),
+          ),
+        ],
         if (canReview) ...[
           const SizedBox(height: 16),
           SizedBox(
