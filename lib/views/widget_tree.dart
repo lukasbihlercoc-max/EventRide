@@ -16,6 +16,7 @@ import 'package:my_app/views/pages/settings_page.dart';
 import 'package:my_app/views/widgets/appbar_widget.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/widgets/navbar_widget.dart';
+import 'package:my_app/views/widgets/offline_banner_widget.dart';
 import 'package:my_app/views/widgets/sizehelper_widget.dart';
 
 import 'package:provider/provider.dart';
@@ -127,6 +128,9 @@ class WidgetTree extends StatelessWidget {
                 right: 16,
                 child: NavBarWidget(),
               ),
+
+              // Offline-Hinweis – rendert über allem, auch der Navbar
+              const OfflineBanner(),
             ],
           );
         },

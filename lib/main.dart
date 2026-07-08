@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:my_app/data/block_service.dart';
+import 'package:my_app/data/connectivity_service.dart';
 import 'package:my_app/data/chat_service.dart';
 import 'package:my_app/data/notification_service.dart';
 import 'package:my_app/data/seen_anfragen_service.dart';
@@ -112,6 +113,7 @@ void main() async {
 
   final authRepository = FirebaseAuthRepository();
   final blockService = BlockService();
+  final connectivityService = ConnectivityService()..start();
 
   final anfrageRepository = FirestoreAnfrageRepository.create();
   final anfrageService = AnfrageService();
@@ -209,6 +211,7 @@ void main() async {
     interessentenService: interessentenService,
     notificationService: notificationService,
     blockService: blockService,
+    connectivityService: connectivityService,
   ));
 }
 
@@ -224,6 +227,7 @@ class MyApp extends StatefulWidget {
   final InteressentenService interessentenService;
   final NotificationService notificationService;
   final BlockService blockService;
+  final ConnectivityService connectivityService;
 
   const MyApp({
     super.key,
@@ -238,6 +242,7 @@ class MyApp extends StatefulWidget {
     required this.interessentenService,
     required this.notificationService,
     required this.blockService,
+    required this.connectivityService,
   });
 
   @override
@@ -373,6 +378,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         Provider<IUserRepository>.value(value: widget.userRepository),
         Provider<NotificationService>.value(value: widget.notificationService),
         ChangeNotifierProvider<BlockService>.value(value: widget.blockService),
+        ChangeNotifierProvider<ConnectivityService>.value(
+          value: widget.connectivityService,
+        ),
       ],
 
       
