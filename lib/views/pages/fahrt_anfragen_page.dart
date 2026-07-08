@@ -77,15 +77,31 @@ class FahrtAnfragenPage extends StatelessWidget {
                   );
                 }
 
-                return ListView.builder(
-                  itemCount: mitfahrer.length,
-                  itemBuilder: (context, index) => _AnfrageCard(
-                    key: ValueKey(mitfahrer[index].id),
-                    anfrage: mitfahrer[index],
-                    fahrt: aktuelleFahrt,
-                    conversation: null,
-                    istVergangen: true,
-                  ),
+                final chatService = context.read<ChatService>();
+                return StreamBuilder<List<ChatConversation>>(
+                  stream: chatService.conversationsStream(fahrt.ownerId),
+                  builder: (context, convoSnap) {
+                    final convos = convoSnap.data ?? [];
+                    final convoMap = {for (final c in convos) c.id: c};
+
+                    ChatConversation? getConvo(AnfrageDaten a) =>
+                        convoMap[chatService.buildConversationId(
+                          fahrtId: fahrt.id,
+                          userA: fahrt.ownerId,
+                          userB: a.requesterId,
+                        )];
+
+                    return ListView.builder(
+                      itemCount: mitfahrer.length,
+                      itemBuilder: (context, index) => _AnfrageCard(
+                        key: ValueKey(mitfahrer[index].id),
+                        anfrage: mitfahrer[index],
+                        fahrt: aktuelleFahrt,
+                        conversation: getConvo(mitfahrer[index]),
+                        istVergangen: true,
+                      ),
+                    );
+                  },
                 );
               }
 
