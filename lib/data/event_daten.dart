@@ -123,3 +123,13 @@ class Event {
   /// Komfort: JSON-String (optional)
   String toJsonString() => toMap().toString();
 }
+
+/// Zeitpunkt, ab dem ein Event als "vorbei" gilt (lokale Zeit):
+/// 6:00 Uhr des Tages nach dem Event-Datum.
+/// Wird sowohl für die Event-Sichtbarkeit (FirestoreEventRepository.watch())
+/// als auch für die Fahrt-Klassifizierung "vergangen" (fahrten_page.dart,
+/// public_profile_page.dart) verwendet, damit beide konsistent sind.
+DateTime eventHideAfter(DateTime eventDatum) {
+  final local = eventDatum.toLocal();
+  return DateTime(local.year, local.month, local.day + 1, 6, 0);
+}

@@ -219,7 +219,7 @@ void _showEventInfoDialog(BuildContext context, Event event) {
 /// UND weniger als 30 Tage her ist → Anzeige-Grenze.
 bool _istVergangen(DateTime eventDatum) {
   if (eventDatum.year == 2000) return false; // unbekanntes Datum → aktiv lassen
-  final ende = eventDatum.add(const Duration(hours: 3));
+  final ende = eventHideAfter(eventDatum);
   final anzeigeGrenze = ende.add(const Duration(days: 30));
   final now = DateTime.now();
   return ende.isBefore(now) && anzeigeGrenze.isAfter(now);

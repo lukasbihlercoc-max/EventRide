@@ -32,9 +32,7 @@ class FirestoreEventRepository implements IEventRepository {
           .map((doc) => Event.fromMap({...doc.data(), 'id': doc.id}))
           .where((e) {
             // Event bleibt sichtbar bis 6:00 Uhr des Folgetags (lokale Zeit)
-            final local = e.datum.toLocal();
-            final hideAfter = DateTime(local.year, local.month, local.day + 1, 6, 0);
-            return now.isBefore(hideAfter);
+            return now.isBefore(eventHideAfter(e.datum));
           })
           .toList();
       _cache

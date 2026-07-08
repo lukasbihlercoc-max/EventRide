@@ -6,6 +6,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:my_app/data/app_user.dart';
+import 'package:my_app/data/event_daten.dart';
 import 'package:my_app/utils/app_route.dart';
 import 'package:my_app/utils/async_guard.dart';
 import 'package:my_app/data/block_service.dart';
@@ -45,7 +46,7 @@ Color _parseCarColor(String? raw) {
 
 bool _istVergangen(DateTime eventDatum) {
   if (eventDatum.year == 2000) return false;
-  final ende = eventDatum.add(const Duration(hours: 3));
+  final ende = eventHideAfter(eventDatum);
   final anzeigeGrenze = ende.add(const Duration(days: 30));
   final now = DateTime.now();
   return ende.isBefore(now) && anzeigeGrenze.isAfter(now);
