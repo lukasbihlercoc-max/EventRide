@@ -690,6 +690,7 @@ class _AngeboteneFahrtenTabState extends State<_AngeboteneFahrtenTab>
                       child: _VergangeneGlassSection(
                         fahrten: vergangeneFahrten,
                         datumCache: datumCache,
+                        unreadByFahrtId: unreadByFahrtId,
                       ),
                     ),
                   const SliverToBoxAdapter(child: SizedBox(height: 130)),
@@ -4052,10 +4053,12 @@ class _VergangeneAnfrageCard extends StatelessWidget {
 class _VergangeneGlassSection extends StatefulWidget {
   final List<FahrtDaten> fahrten;
   final Map<String, DateTime> datumCache;
+  final Map<String, int> unreadByFahrtId;
 
   const _VergangeneGlassSection({
     required this.fahrten,
     required this.datumCache,
+    required this.unreadByFahrtId,
   });
 
   @override
@@ -4149,6 +4152,7 @@ class _VergangeneGlassSectionState extends State<_VergangeneGlassSection>
             child: _VergangeneGlassCard(
               fahrt: fahrten[i],
               eventDatum: widget.datumCache[fahrten[i].eventId] ?? fahrten[i].eventDatum ?? DateTime(2000),
+              unreadChatCount: widget.unreadByFahrtId[fahrten[i].id] ?? 0,
             ),
           ),
         // Ausklappbare Karten
@@ -4166,6 +4170,7 @@ class _VergangeneGlassSectionState extends State<_VergangeneGlassSection>
                           fahrt: fahrt,
                           eventDatum:
                               widget.datumCache[fahrt.eventId] ?? fahrt.eventDatum ?? DateTime(2000),
+                          unreadChatCount: widget.unreadByFahrtId[fahrt.id] ?? 0,
                         ),
                       ),
                   ],
@@ -4226,10 +4231,12 @@ class _VergangeneGlassSectionState extends State<_VergangeneGlassSection>
 class _VergangeneGlassCard extends StatelessWidget {
   final FahrtDaten fahrt;
   final DateTime eventDatum;
+  final int unreadChatCount;
 
   const _VergangeneGlassCard({
     required this.fahrt,
     required this.eventDatum,
+    this.unreadChatCount = 0,
   });
 
   @override
@@ -4301,20 +4308,67 @@ class _VergangeneGlassCard extends StatelessWidget {
                           builder: (_) => FahrtAnfragenPage(fahrt: fahrt, istVergangen: true),
                         ),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.inbox_outlined,
-                              size: 13, color: Colors.white30),
-                          SizedBox(width: 4),
+                          Icon(
+                            Icons.inbox_outlined,
+                            size: 13,
+                            color: unreadChatCount > 0
+                                ? const Color(0xFFF5A04A)
+                                : Colors.white30,
+                          ),
+                          const SizedBox(width: 4),
                           Text(
                             'Anfragen ansehen',
-                            style:
-                                TextStyle(color: Colors.white30, fontSize: 12),
+                            style: TextStyle(
+                              color: unreadChatCount > 0
+                                  ? const Color(0xFFF5A04A)
+                                  : Colors.white30,
+                              fontSize: 12,
+                              fontWeight: unreadChatCount > 0
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                            ),
                           ),
-                          SizedBox(width: 2),
-                          Icon(Icons.chevron_right,
-                              size: 14, color: Colors.white24),
+                          if (unreadChatCount > 0) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 1),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(10),
+                                color: const Color(0xFFF5A04A)
+                                    .withValues(alpha: 0.18),
+                                border: Border.all(
+                                    color: const Color(0xFFF5A04A)
+                                        .withValues(alpha: 0.5)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.chat_bubble_rounded,
+                                      color: Color(0xFFF5A04A), size: 10),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    '$unreadChatCount',
+                                    style: const TextStyle(
+                                        color: Color(0xFFF5A04A),
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 11),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                          const SizedBox(width: 2),
+                          Icon(
+                            Icons.chevron_right,
+                            size: 14,
+                            color: unreadChatCount > 0
+                                ? const Color(0xFFF5A04A).withValues(alpha: 0.7)
+                                : Colors.white24,
+                          ),
                         ],
                       ),
                     ),
