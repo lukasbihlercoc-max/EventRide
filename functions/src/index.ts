@@ -861,6 +861,58 @@ export const onEventRequestUpdated = onDocumentUpdated(
 );
 
 // ──────────────────────────────────────────────────────────────────────────────
+// Event bearbeitet (Name/Datum geändert) → verknüpfte Fahrten aktualisieren,
+// damit "vergangene Fahrten" nicht dauerhaft den alten Namen/Datum zeigen.
+// ──────────────────────────────────────────────────────────────────────────────
+
+const FIRESTORE_BATCH_LIMIT = 500;
+
+async function batchUpdateAll(
+  docs: FirebaseFirestore.QueryDocumentSnapshot[],
+  data: Record<string, unknown>
+): Promise<void> {
+  for (let i = 0; i < docs.length; i += FIRESTORE_BATCH_LIMIT) {
+    const chunk = docs.slice(i, i + FIRESTORE_BATCH_LIMIT);
+    const batch = db.batch();
+    chunk.forEach((doc) => batch.update(doc.ref, data));
+    await batch.commit();
+  }
+}
+
+export const onEventUpdated = onDocumentUpdated(
+  "events/{eventId}",
+  async (event) => {
+    const before = event.data?.before?.data();
+    const after = event.data?.after?.data();
+    if (!before || !after) return;
+
+    const nameChanged = before["name"] !== after["name"];
+    const datumChanged = before["datum"] !== after["datum"];
+    if (!nameChanged && !datumChanged) return;
+
+    const eventId = event.params["eventId"];
+    const fahrtenSnap = await db.collection("fahrten")
+      .where("eventId", "==", eventId)
+      .get();
+    if (fahrtenSnap.empty) return;
+
+    const update: Record<string, unknown> = {};
+    if (nameChanged) update["eventName"] = after["name"];
+    if (datumChanged) {
+      const parsed = new Date(after["datum"] as string);
+      if (!isNaN(parsed.getTime())) {
+        update["eventDatum"] = parsed.getTime();
+      }
+    }
+    if (Object.keys(update).length === 0) return;
+
+    await batchUpdateAll(fahrtenSnap.docs, update);
+
+    console.log(`[onEventUpdated] ${fahrtenSnap.size} Fahrten aktualisiert für Event ${eventId}`);
+  }
+);
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Täglicher Cleanup: offene Anfragen löschen, deren Event > 48h vergangen ist
 // ──────────────────────────────────────────────────────────────────────────────
 
