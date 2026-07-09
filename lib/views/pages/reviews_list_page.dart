@@ -159,6 +159,7 @@ class _ReviewsListPageState extends State<ReviewsListPage> {
                 ),
               ),
             ),
+            expanded: true,
           ),
         );
       },

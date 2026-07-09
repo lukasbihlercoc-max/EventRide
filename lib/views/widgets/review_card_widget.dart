@@ -30,12 +30,17 @@ class ReviewCard extends StatelessWidget {
   final VoidCallback? onReviewerTap;
   final VoidCallback? onCardTap;
 
+  /// true = voller Text ohne Kürzung (z.B. auf der eigenen Listen-Seite,
+  /// wo der Nutzer bereits aktiv hingetippt hat, um alles zu lesen).
+  final bool expanded;
+
   const ReviewCard({
     super.key,
     required this.review,
     this.onReport,
     this.onReviewerTap,
     this.onCardTap,
+    this.expanded = false,
   });
 
   @override
@@ -118,8 +123,8 @@ class ReviewCard extends StatelessWidget {
                 review.comment,
                 style: const TextStyle(
                     color: Colors.white70, fontSize: 13, height: 1.4),
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
+                maxLines: expanded ? null : 3,
+                overflow: expanded ? TextOverflow.visible : TextOverflow.ellipsis,
               ),
             ],
           ],
