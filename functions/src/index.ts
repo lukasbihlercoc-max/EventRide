@@ -30,13 +30,23 @@ async function getTokens(userId: string): Promise<string[]> {
   return (doc.data()?.fcmTokens as string[]) ?? [];
 }
 
+// Gleiche Fallback-Kette wie clientseitig (firebase_auth_repository.dart _toAppUser):
+// Firestore firstName+lastName → Firebase-Auth-displayName (Google-Login-Nutzer haben
+// nie firstName/lastName in Firestore, nur den Auth-displayName) → String-Fallback.
 async function getUserName(userId: string, fallback: string): Promise<string> {
   const doc = await db.doc(`users/${userId}`).get();
   const data = doc.data() ?? {};
   const first = (data["firstName"] as string | undefined) ?? "";
   const last = (data["lastName"] as string | undefined) ?? "";
   const name = `${first} ${last}`.trim();
-  return name || fallback;
+  if (name) return name;
+  try {
+    const authUser = await admin.auth().getUser(userId);
+    if (authUser.displayName) return authUser.displayName;
+  } catch (_) {
+    // Nutzer evtl. gelöscht — String-Fallback verwenden
+  }
+  return fallback;
 }
 
 interface NotificationPayload {
@@ -77,6 +87,22 @@ async function sendNotification(
   }
 }
 
+// Verhindert doppelte Verarbeitung bei Firestore-Trigger-Redelivery (at-least-once
+// Zustellung, z.B. nach transientem Fehler/Timeout in einer vorherigen Ausführung).
+// event.id ist bei einer Redelivery desselben Events identisch, bei einem neuen
+// Event immer neu — schützt so nicht nur vor doppelten Push-Notifications, sondern
+// auch vor doppelter Ausführung anderer nicht-idempotenter Seiteneffekte
+// (z.B. FieldValue.increment auf freiePlaetze).
+async function claimEventOnce(eventId: string): Promise<boolean> {
+  const ref = db.collection("processedTriggerEvents").doc(eventId);
+  try {
+    await ref.create({at: admin.firestore.FieldValue.serverTimestamp()});
+    return true;
+  } catch (e) {
+    return false; // Dokument existiert schon → Event wurde bereits verarbeitet
+  }
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Trigger 1: Anfrage-Status geändert → Mitfahrer benachrichtigen
 // ──────────────────────────────────────────────────────────────────────────────
@@ -86,6 +112,7 @@ export const onAnfrageUpdated = onDocumentUpdated(
   async (event) => {
     const change = event.data;
     if (!change) return;
+    if (!(await claimEventOnce(event.id))) return;
 
     const before = change.before.data();
     const after = change.after.data();
@@ -193,6 +220,7 @@ export const onAnfrageCreated = onDocumentCreated(
   async (event) => {
     const snap = event.data;
     if (!snap) return;
+    if (!(await claimEventOnce(event.id))) return;
 
     const data = snap.data();
     const vonFahrer = data["vonFahrer"] === true;
@@ -238,6 +266,7 @@ export const onFahrtDeleted = onDocumentDeleted(
   async (event) => {
     const fahrt = event.data?.data();
     if (!fahrt) return;
+    if (!(await claimEventOnce(event.id))) return;
 
     const fahrtId = event.params["fahrtId"];
     const eventName = (fahrt["eventName"] as string | undefined) ?? "das Event";
@@ -321,6 +350,7 @@ export const onLicenseRequestWritten = onDocumentWritten(
     const submittedAfter = after["submittedAt"];
     if (submittedBefore && submittedAfter &&
         submittedBefore.isEqual(submittedAfter)) return;
+    if (!(await claimEventOnce(event.id))) return;
 
     const userName = await getUserName(event.params["uid"], "Ein Nutzer");
 
@@ -352,6 +382,7 @@ export const onEventRequestCreated = onDocumentCreated(
   async (event) => {
     const snap = event.data;
     if (!snap) return;
+    if (!(await claimEventOnce(event.id))) return;
 
     const data = snap.data();
     const uid = data["uid"] as string | undefined;
@@ -391,6 +422,7 @@ export const onUserReportCreated = onDocumentCreated(
   async (event) => {
     const snap = event.data;
     if (!snap) return;
+    if (!(await claimEventOnce(event.id))) return;
 
     const data = snap.data();
     const reporterUid = data["reporterUid"] as string | undefined;
@@ -792,6 +824,7 @@ export const onMessageCreated = onDocumentCreated(
 
     const msg = snap.data();
     if (msg["isSystem"] === true) return;
+    if (!(await claimEventOnce(event.id))) return;
 
     const convSnap = await db
       .doc(`chat_conversations/${event.params["convId"]}`)
@@ -842,6 +875,7 @@ export const onEventRequestUpdated = onDocumentUpdated(
     if (!before || !after) return;
 
     if (before["status"] !== "pending" || after["status"] !== "approved") return;
+    if (!(await claimEventOnce(event.id))) return;
 
     const uid = after["uid"] as string | undefined;
     if (!uid) return;
@@ -915,6 +949,35 @@ export const onEventUpdated = onDocumentUpdated(
 // ──────────────────────────────────────────────────────────────────────────────
 // Täglicher Cleanup: offene Anfragen löschen, deren Event > 48h vergangen ist
 // ──────────────────────────────────────────────────────────────────────────────
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Täglicher Cleanup: alte Idempotenz-Marker aus claimEventOnce() löschen,
+// damit die processedTriggerEvents-Collection nicht unbegrenzt wächst.
+// ──────────────────────────────────────────────────────────────────────────────
+
+export const cleanupProcessedTriggerEvents = onSchedule(
+  {schedule: "every day 02:00", timeZone: "Europe/Vienna"},
+  async () => {
+    const cutoff = admin.firestore.Timestamp.fromMillis(
+      Date.now() - 7 * 24 * 60 * 60 * 1000
+    );
+    const snapshot = await db
+      .collection("processedTriggerEvents")
+      .where("at", "<", cutoff)
+      .get();
+
+    if (snapshot.empty) return;
+
+    for (let i = 0; i < snapshot.docs.length; i += FIRESTORE_BATCH_LIMIT) {
+      const chunk = snapshot.docs.slice(i, i + FIRESTORE_BATCH_LIMIT);
+      const batch = db.batch();
+      chunk.forEach((doc) => batch.delete(doc.ref));
+      await batch.commit();
+    }
+
+    console.log(`Cleanup: ${snapshot.size} alte Idempotenz-Marker gelöscht`);
+  }
+);
 
 export const cleanupAbgelaufeneAnfragen = onSchedule(
   {schedule: "every day 03:00", timeZone: "Europe/Vienna"},
