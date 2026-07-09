@@ -2278,7 +2278,7 @@ class _OwnReviewsSectionState extends State<_OwnReviewsSection> {
           ),
           if (review != _reviews!.last) const SizedBox(height: 6),
         ],
-        if (totalCount > 2) ...[
+        if (totalCount > 0) ...[
           const SizedBox(height: 8),
           GestureDetector(
             onTap: _openList,

@@ -1289,7 +1289,7 @@ class _ReviewsSection extends StatelessWidget {
           const SizedBox(height: 8),
         ],
         if (count > 0) _ReviewList(reviews: reviews) else const _ReviewsEmptyState(),
-        if (count > 5) ...[
+        if (count > 0) ...[
           const SizedBox(height: 8),
           GestureDetector(
             onTap: () => Navigator.push(
