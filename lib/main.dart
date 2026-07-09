@@ -33,7 +33,9 @@ import 'package:my_app/data/firebase/firebase_auth_repository.dart';
 import 'package:my_app/views/auth/auth_gate.dart';
 import 'package:my_app/views/pages/admin_event_requests_page.dart';
 import 'package:my_app/views/pages/admin_license_page.dart';
+import 'package:my_app/views/pages/admin_user_reports_page.dart';
 import 'package:my_app/views/pages/user_event_requests_page.dart';
+import 'package:my_app/views/pages/reviews_list_page.dart';
 import 'package:my_app/views/pages/chat_page.dart';
 import 'package:my_app/data/firebase/firestore_anfrage_repository.dart';
 import 'package:my_app/data/firebase/firestore_interessenten_repository.dart';
@@ -141,8 +143,12 @@ void main() async {
     selectedPageNotifier.value = 1; // Fahrten-Tab
   };
 
-  notificationService.onReviewTapped = () {
-    selectedPageNotifier.value = 2; // Profil-Tab
+  notificationService.onReviewTapped = (reviewedId) {
+    final ctx = navigatorKey.currentContext;
+    if (ctx == null || !ctx.mounted) return;
+    Navigator.of(ctx).push(AppRoute(
+      builder: (_) => ReviewsListPage(userId: reviewedId, userName: ''),
+    ));
   };
 
   notificationService.onLicenseReviewTapped = () {
@@ -166,6 +172,14 @@ void main() async {
     if (ctx == null || !ctx.mounted) return;
     Navigator.of(ctx).push(AppRoute(
       builder: (_) => const UserEventRequestsPage(),
+    ));
+  };
+
+  notificationService.onUserReportTapped = () {
+    final ctx = navigatorKey.currentContext;
+    if (ctx == null || !ctx.mounted) return;
+    Navigator.of(ctx).push(AppRoute(
+      builder: (_) => const AdminUserReportsPage(),
     ));
   };
 

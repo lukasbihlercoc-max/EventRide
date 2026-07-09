@@ -29,7 +29,8 @@ class NotificationService {
   VoidCallback? onAnfrageTapped;
 
   /// Wird aufgerufen wenn der User auf eine Bewertungs-Notification tippt.
-  VoidCallback? onReviewTapped;
+  /// Parameter: reviewedId (= eigene userId, für direkte Navigation zur Bewertungsliste)
+  Function(String reviewedId)? onReviewTapped;
 
   /// Wird aufgerufen wenn der Admin auf eine Führerschein-Notification tippt.
   VoidCallback? onLicenseReviewTapped;
@@ -39,6 +40,9 @@ class NotificationService {
 
   /// Wird aufgerufen wenn der Nutzer auf eine "Event angenommen"-Notification tippt.
   VoidCallback? onUserEventRequestTapped;
+
+  /// Wird aufgerufen wenn der Admin auf eine Nutzer-Meldungs-Notification tippt.
+  VoidCallback? onUserReportTapped;
 
   StreamSubscription<List<ChatConversation>>? _chatSub;
   StreamSubscription<String>? _tokenRefreshSub;
@@ -326,7 +330,12 @@ class NotificationService {
     } else if (type == 'event_request_approved') {
       onUserEventRequestTapped?.call();
     } else if (type == 'review') {
-      onReviewTapped?.call();
+      final reviewedId = data['reviewedId'] as String?;
+      if (reviewedId != null && reviewedId.isNotEmpty) {
+        onReviewTapped?.call(reviewedId);
+      }
+    } else if (type == 'user_report') {
+      onUserReportTapped?.call();
     }
   }
 
