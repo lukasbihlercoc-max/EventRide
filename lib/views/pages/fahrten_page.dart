@@ -498,7 +498,18 @@ class _FahrtenTabBarState extends State<_FahrtenTabBar> {
             (a) => a.fahrtOwnerId == widget.userId &&
                    a.status == AnfrageStatus.offen &&
                    !a.vonFahrer);
-        final showMeineFahrtenDot = hasDriverChatUnread || hasOffeneEingehende;
+
+        final unseenAcceptedInviteIds = anfrageService.alleAnfragen
+            .where((a) =>
+                a.fahrtOwnerId == widget.userId &&
+                a.vonFahrer &&
+                a.status == AnfrageStatus.akzeptiert)
+            .map((a) => a.id);
+        final hasUnseenAcceptedInvite =
+            seenService.unseenFahrerCount(widget.userId, unseenAcceptedInviteIds) > 0;
+
+        final showMeineFahrtenDot =
+            hasDriverChatUnread || hasOffeneEingehende || hasUnseenAcceptedInvite;
 
         return TabBar(
           controller: widget.tabController,
@@ -1660,6 +1671,17 @@ class _FahrerGlassCard extends StatelessWidget {
       );
     });
 
+    // Vom Fahrer eingeladene Personen, die mittlerweile akzeptiert haben,
+    // aber der Fahrer hat es noch nicht gesehen — zählt zusätzlich zu "offen".
+    final unseenAcceptedInviteIds = context
+        .watch<AnfrageService>()
+        .getAnfragenForFahrt(fahrt.id)
+        .where((a) => a.vonFahrer && a.status == AnfrageStatus.akzeptiert)
+        .map((a) => a.id);
+    final unseenAcceptedCount = context
+        .watch<SeenAnfragenService>()
+        .unseenFahrerCount(fahrt.ownerId, unseenAcceptedInviteIds);
+    final attentionCount = counts.offen + unseenAcceptedCount;
 
     final gesamtPlaetze = fahrt.freiePlaetze + counts.belegt;
     final uhrzeit = fahrt.uhrzeit.format(context);
@@ -1894,7 +1916,7 @@ class _FahrerGlassCard extends StatelessWidget {
                                           fontSize: 14,
                                         ),
                                       ),
-                                      if (counts.offen > 0) ...[
+                                      if (attentionCount > 0) ...[
                                         const SizedBox(width: 8),
                                         Container(
                                           padding: const EdgeInsets.symmetric(
@@ -1907,7 +1929,7 @@ class _FahrerGlassCard extends StatelessWidget {
                                             ),
                                           ),
                                           child: Text(
-                                            '${counts.offen}',
+                                            '$attentionCount',
                                             style: const TextStyle(
                                               color: Colors.white,
                                               fontWeight: FontWeight.w600,

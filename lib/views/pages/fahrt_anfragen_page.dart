@@ -7,6 +7,7 @@ import 'package:my_app/utils/app_route.dart';
 import 'package:my_app/utils/async_guard.dart';
 import 'package:my_app/data/anfrage_service.dart';
 import 'package:my_app/data/fahrt_service.dart';
+import 'package:my_app/data/seen_anfragen_service.dart';
 import 'package:my_app/views/widgets/trust_shields_widget.dart';
 import 'package:my_app/data/chat_service.dart';
 import 'package:my_app/data/interessenten_daten.dart';
@@ -32,7 +33,9 @@ class FahrtAnfragenPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
+    return _MarkFahrerSeenOnMount(
+      fahrt: fahrt,
+      child: Stack(
       children: [
         AppBackground(child: Container()),
         Container(color: Colors.black.withValues(alpha: 0.4)),
@@ -283,8 +286,45 @@ class FahrtAnfragenPage extends StatelessWidget {
           ),
         ),
       ],
+      ),
     );
   }
+}
+
+/// Markiert beim ersten Anzeigen dieser Fahrt alle vom Fahrer verschickten
+/// und mittlerweile akzeptierten Einladungen als "gesehen" (löscht Punkt/Zahl
+/// bei "Meine Fahrten"), unabhängig davon, ob sonst noch etwas zu tun ist.
+class _MarkFahrerSeenOnMount extends StatefulWidget {
+  final FahrtDaten fahrt;
+  final Widget child;
+
+  const _MarkFahrerSeenOnMount({required this.fahrt, required this.child});
+
+  @override
+  State<_MarkFahrerSeenOnMount> createState() =>
+      _MarkFahrerSeenOnMountState();
+}
+
+class _MarkFahrerSeenOnMountState extends State<_MarkFahrerSeenOnMount> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final ids = context
+          .read<AnfrageService>()
+          .getAnfragenForFahrt(widget.fahrt.id)
+          .where((a) => a.vonFahrer && a.status == AnfrageStatus.akzeptiert)
+          .map((a) => a.id)
+          .toList();
+      context
+          .read<SeenAnfragenService>()
+          .markFahrerAsSeen(widget.fahrt.ownerId, ids);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 // ---------------------------------------------------------------------------
