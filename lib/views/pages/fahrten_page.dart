@@ -3289,15 +3289,33 @@ class _KennzeichenSection extends StatefulWidget {
 }
 
 class _KennzeichenSectionState extends State<_KennzeichenSection> {
+  // Cache über Widget-Lebenszyklen hinweg (z.B. Tab-Wechsel), damit die
+  // Karte bei erneutem Mounten nicht wieder bei "lädt" beginnt.
+  static final Map<String, ({String plate, DateTime? releasedAt})> _cache = {};
+
   // null = lädt noch; '' = kein Plate; 'LOCKED:ISO' = noch gesperrt
   String? _plate;
   DateTime? _releasedAt;
   bool _loaded = false;
+  Timer? _revealTimer;
 
   @override
   void initState() {
     super.initState();
+    final cached = _cache[widget.fahrtId];
+    if (cached != null) {
+      _plate = cached.plate;
+      _releasedAt = cached.releasedAt;
+      _loaded = true;
+      _scheduleRevealTimer();
+    }
     _load();
+  }
+
+  @override
+  void dispose() {
+    _revealTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -3307,17 +3325,30 @@ class _KennzeichenSectionState extends State<_KennzeichenSection> {
           .call({'fahrtId': widget.fahrtId});
       final data = result.data as Map<String, dynamic>;
       if (!mounted) return;
-      final plate = data['plate'] as String?;
+      final plate = data['plate'] as String? ?? '';
       final releasedAtStr = data['releasedAt'] as String?;
+      final releasedAt =
+          releasedAtStr != null ? DateTime.tryParse(releasedAtStr) : null;
+      _cache[widget.fahrtId] = (plate: plate, releasedAt: releasedAt);
       setState(() {
-        _plate = plate ?? '';
-        _releasedAt =
-            releasedAtStr != null ? DateTime.tryParse(releasedAtStr) : null;
+        _plate = plate;
+        _releasedAt = releasedAt;
         _loaded = true;
       });
+      _scheduleRevealTimer();
     } catch (_) {
-      if (mounted) setState(() => _loaded = true);
+      if (mounted && !_loaded) setState(() => _loaded = true);
     }
+  }
+
+  void _scheduleRevealTimer() {
+    _revealTimer?.cancel();
+    final releasedAt = _releasedAt;
+    if (releasedAt == null) return;
+    final delay = releasedAt.difference(DateTime.now());
+    _revealTimer = Timer(delay.isNegative ? Duration.zero : delay, () {
+      if (mounted) _load();
+    });
   }
 
   String _formatDate(DateTime dt) {
