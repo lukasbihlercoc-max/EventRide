@@ -28,96 +28,102 @@ class ReviewCard extends StatelessWidget {
   final Review review;
   final VoidCallback? onReport;
   final VoidCallback? onReviewerTap;
+  final VoidCallback? onCardTap;
 
   const ReviewCard({
     super.key,
     required this.review,
     this.onReport,
     this.onReviewerTap,
+    this.onCardTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              GestureDetector(
-                onTap: onReviewerTap,
-                child: UserAvatarWidget(
-                  name: review.reviewerName,
-                  photoUrl: review.reviewerPhotoUrl,
-                  radius: 15,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: GestureDetector(
-                  onTap: onReviewerTap,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              review.reviewerName,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          TrustShieldsByUserId(userId: review.reviewerId, size: 12),
-                        ],
-                      ),
-                      Text(
-                        reviewRelativeTime(review.createdAt),
-                        style: const TextStyle(color: Colors.white38, fontSize: 11),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Row(
-                children: List.generate(5, (i) {
-                  final filled = i < review.rating;
-                  return Icon(
-                    filled ? Icons.star_rounded : Icons.star_outline_rounded,
-                    size: 13,
-                    color: filled ? Colors.amber : Colors.white24,
-                  );
-                }),
-              ),
-              if (onReport != null) ...[
-                const SizedBox(width: 4),
+    return GestureDetector(
+      onTap: onCardTap,
+      behavior: HitTestBehavior.opaque,
+      child: AppCard(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
                 GestureDetector(
-                  onTap: onReport,
-                  child: const Padding(
-                    padding: EdgeInsets.only(left: 2),
-                    child: Icon(Icons.more_horiz, size: 16, color: Colors.white24),
+                  onTap: onReviewerTap,
+                  child: UserAvatarWidget(
+                    name: review.reviewerName,
+                    photoUrl: review.reviewerPhotoUrl,
+                    radius: 15,
                   ),
                 ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: onReviewerTap,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                review.reviewerName,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            TrustShieldsByUserId(userId: review.reviewerId, size: 12),
+                          ],
+                        ),
+                        Text(
+                          reviewRelativeTime(review.createdAt),
+                          style: const TextStyle(color: Colors.white38, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Row(
+                  children: List.generate(5, (i) {
+                    final filled = i < review.rating;
+                    return Icon(
+                      filled ? Icons.star_rounded : Icons.star_outline_rounded,
+                      size: 13,
+                      color: filled ? Colors.amber : Colors.white24,
+                    );
+                  }),
+                ),
+                if (onReport != null) ...[
+                  const SizedBox(width: 4),
+                  GestureDetector(
+                    onTap: onReport,
+                    child: const Padding(
+                      padding: EdgeInsets.only(left: 2),
+                      child: Icon(Icons.more_horiz, size: 16, color: Colors.white24),
+                    ),
+                  ),
+                ],
               ],
-            ],
-          ),
-          if (review.comment.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              review.comment,
-              style: const TextStyle(
-                  color: Colors.white70, fontSize: 13, height: 1.4),
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
             ),
+            if (review.comment.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                review.comment,
+                style: const TextStyle(
+                    color: Colors.white70, fontSize: 13, height: 1.4),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

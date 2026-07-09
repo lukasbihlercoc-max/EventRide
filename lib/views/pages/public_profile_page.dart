@@ -1288,8 +1288,11 @@ class _ReviewsSection extends StatelessWidget {
           _RatingSummary(avg: avg!, count: count),
           const SizedBox(height: 8),
         ],
-        if (count > 0) _ReviewList(reviews: reviews) else const _ReviewsEmptyState(),
-        if (count > 0) ...[
+        if (count > 0)
+          _ReviewList(reviews: reviews, userId: userId, userName: userName)
+        else
+          const _ReviewsEmptyState(),
+        if (count > 5) ...[
           const SizedBox(height: 8),
           GestureDetector(
             onTap: () => Navigator.push(
@@ -1433,8 +1436,14 @@ class _RatingSummary extends StatelessWidget {
 
 class _ReviewList extends StatelessWidget {
   final List<Review> reviews;
+  final String userId;
+  final String userName;
 
-  const _ReviewList({required this.reviews});
+  const _ReviewList({
+    required this.reviews,
+    required this.userId,
+    required this.userName,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1442,7 +1451,7 @@ class _ReviewList extends StatelessWidget {
     return Column(
       children: [
         for (final review in reviews) ...[
-          _ReviewCard(review: review),
+          _ReviewCard(review: review, userId: userId, userName: userName),
           if (review != reviews.last) const SizedBox(height: 8),
         ],
       ],
@@ -1452,8 +1461,14 @@ class _ReviewList extends StatelessWidget {
 
 class _ReviewCard extends StatelessWidget {
   final Review review;
+  final String userId;
+  final String userName;
 
-  const _ReviewCard({required this.review});
+  const _ReviewCard({
+    required this.review,
+    required this.userId,
+    required this.userName,
+  });
 
   void _showReportSheet(BuildContext context) {
     final reporterId = FirebaseAuth.instance.currentUser?.uid;
@@ -1488,6 +1503,12 @@ class _ReviewCard extends StatelessWidget {
             name: review.reviewerName,
             photoUrl: review.reviewerPhotoUrl,
           ),
+        ),
+      ),
+      onCardTap: () => Navigator.push(
+        context,
+        AppRoute(
+          builder: (_) => ReviewsListPage(userId: userId, userName: userName),
         ),
       ),
     );
