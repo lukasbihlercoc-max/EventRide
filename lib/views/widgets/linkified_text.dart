@@ -2,10 +2,17 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-final _urlPattern = RegExp(r'https?://[^\s]+', caseSensitive: false);
+// Erkennt entweder "[Text](https://…)" (eigener, kurzer Linktext) oder eine
+// nackte URL (wird dann selbst als Linktext angezeigt).
+final _linkPattern = RegExp(
+  r'\[([^\]]+)\]\((https?://[^\s)]+)\)|(https?://[^\s]+)',
+  caseSensitive: false,
+);
 
 /// Zeigt Text an und macht enthaltene http(s)-Links antippbar (öffnen extern
 /// im Browser) — z.B. für Ticket-Links in Event-Beschreibungen.
+/// Unterstützt sowohl nackte URLs als auch "[Linktext](URL)" für einen
+/// kurzen, selbst gewählten Linktext statt der vollen URL.
 class LinkifiedText extends StatefulWidget {
   final String text;
   final TextStyle? style;
@@ -43,7 +50,7 @@ class _LinkifiedTextState extends State<LinkifiedText> {
   Widget build(BuildContext context) {
     _disposeRecognizers();
 
-    final matches = _urlPattern.allMatches(widget.text);
+    final matches = _linkPattern.allMatches(widget.text);
     if (matches.isEmpty) {
       return Text(widget.text, style: widget.style);
     }
@@ -55,19 +62,28 @@ class _LinkifiedTextState extends State<LinkifiedText> {
         spans.add(TextSpan(text: widget.text.substring(lastEnd, match.start)));
       }
 
-      // Satzzeichen am Ende ausschließen (z.B. "https://x.at." → Punkt gehört
-      // zum Satz, nicht zur URL).
-      var url = match.group(0)!;
       var end = match.end;
-      while (url.isNotEmpty && '.,!?;:)'.contains(url[url.length - 1])) {
-        url = url.substring(0, url.length - 1);
-        end--;
+      String label;
+      String url;
+      if (match.group(2) != null) {
+        // "[Text](URL)" — Linktext frei gewählt, URL bleibt unangetastet.
+        label = match.group(1)!;
+        url = match.group(2)!;
+      } else {
+        // Nackte URL — Satzzeichen am Ende ausschließen (z.B. "https://x.at."
+        // → Punkt gehört zum Satz, nicht zur URL).
+        url = match.group(3)!;
+        while (url.isNotEmpty && '.,!?;:)'.contains(url[url.length - 1])) {
+          url = url.substring(0, url.length - 1);
+          end--;
+        }
+        label = url;
       }
 
       final recognizer = TapGestureRecognizer()..onTap = () => _open(url);
       _recognizers.add(recognizer);
       spans.add(TextSpan(
-        text: url,
+        text: label,
         style: const TextStyle(
           color: Color(0xFFF5A04A),
           decoration: TextDecoration.underline,
