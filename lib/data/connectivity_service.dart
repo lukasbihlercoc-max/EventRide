@@ -6,16 +6,23 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
-class ConnectivityService with ChangeNotifier {
+class ConnectivityService with ChangeNotifier, WidgetsBindingObserver {
   bool _isOffline = false;
   bool get isOffline => _isOffline;
 
   StreamSubscription<List<ConnectivityResult>>? _connSub;
   Timer? _reachabilityTimer;
 
+  // Steigt bei jedem neuen Check — verhindert, dass ein Check, der während
+  // des Hintergrundmodus hängen blieb, verspätet einen neueren Zustand
+  // überschreibt (Race Condition bei schnellem Minimieren/Zurückkehren).
+  int _checkGeneration = 0;
+
   void start() {
+    WidgetsBinding.instance.addObserver(this);
+
     _connSub = Connectivity().onConnectivityChanged.listen((results) {
       final hasInterface = results.any((r) => r != ConnectivityResult.none);
       if (!hasInterface) {
@@ -25,23 +32,43 @@ class ConnectivityService with ChangeNotifier {
       }
     });
 
-    _reachabilityTimer = Timer.periodic(const Duration(seconds: 20), (_) {
-      _checkReachability();
-    });
-
+    _startPeriodicChecks();
     _checkReachability();
   }
 
+  void _startPeriodicChecks() {
+    _reachabilityTimer?.cancel();
+    _reachabilityTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      _checkReachability();
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Sofort neu prüfen statt auf den nächsten periodischen Tick zu warten —
+      // sonst kann nach Rückkehr aus dem Hintergrund bis zu 20s ein veralteter
+      // (evtl. falscher) Zustand angezeigt werden.
+      _startPeriodicChecks();
+      _checkReachability();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      _reachabilityTimer?.cancel();
+    }
+  }
+
   Future<void> _checkReachability() async {
+    final myGeneration = ++_checkGeneration;
     try {
       await FirebaseFirestore.instance
           .collection('events')
           .limit(1)
           .get(const GetOptions(source: Source.server))
           .timeout(const Duration(seconds: 5));
-      _setOffline(false);
+      if (myGeneration == _checkGeneration) _setOffline(false);
     } catch (_) {
-      _setOffline(true);
+      if (myGeneration == _checkGeneration) _setOffline(true);
     }
   }
 
@@ -53,6 +80,7 @@ class ConnectivityService with ChangeNotifier {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _connSub?.cancel();
     _reachabilityTimer?.cancel();
     super.dispose();
