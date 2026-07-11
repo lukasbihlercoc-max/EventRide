@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:my_app/utils/app_route.dart';
 import 'package:my_app/utils/async_guard.dart';
 import 'package:my_app/views/widgets/app_card.dart';
+import 'package:my_app/views/widgets/linkified_text.dart';
 import 'package:my_app/views/widgets/trust_shields_widget.dart';
 
 import 'package:my_app/data/app_user.dart';
@@ -131,7 +132,7 @@ void _showEventInfoDialog(BuildContext context, Event event) {
               if (event.beschreibung.trim().isNotEmpty) ...[
                 Divider(
                     color: Colors.white.withValues(alpha: 0.10), height: 28),
-                Text(event.beschreibung,
+                LinkifiedText(event.beschreibung,
                     style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.80),
                         fontSize: 14,

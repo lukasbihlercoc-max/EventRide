@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:my_app/data/fahrt_anfrage_service.dart';
 import 'package:my_app/data/fahrt_service.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
+import 'package:my_app/views/widgets/linkified_text.dart';
 import 'package:provider/provider.dart';
 
 import 'package:my_app/data/fahrt_daten.dart';
@@ -147,7 +148,7 @@ void showEventDetailsPopup(BuildContext context, Event event) {
                   const Divider(color: Colors.white70, thickness: 1, height: 12),
                   const SizedBox(height: 12),
                   if (event.beschreibung.trim().isNotEmpty)
-                    Text(
+                    LinkifiedText(
                       event.beschreibung,
                       style: const TextStyle(color: Colors.white, fontSize: 16),
                     ),

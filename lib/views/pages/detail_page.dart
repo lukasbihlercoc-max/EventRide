@@ -29,6 +29,7 @@ import 'package:my_app/views/auth/auth_guard.dart';
 import 'package:my_app/views/auth/verification_guard.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
+import 'package:my_app/views/widgets/linkified_text.dart';
 import 'package:my_app/views/widgets/fahrtencard_widget/interessenten_bottom_sheet.dart';
 
 Future<void> _openEventNavigation(double lat, double lng) async {
@@ -255,16 +256,16 @@ class DetailPage extends StatelessWidget {
                               color: Colors.white,
                             );
                             if (sep <= 0) {
-                              return Text(event.beschreibung, style: textStyle);
+                              return LinkifiedText(event.beschreibung, style: textStyle);
                             }
                             final eintritt = event.beschreibung.substring(0, sep);
                             final rest = event.beschreibung.substring(sep + 2);
                             return Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(eintritt, style: textStyle),
+                                LinkifiedText(eintritt, style: textStyle),
                                 SizedBox(height: width * 0.035),
-                                Text(rest, style: textStyle),
+                                LinkifiedText(rest, style: textStyle),
                               ],
                             );
                           }),
