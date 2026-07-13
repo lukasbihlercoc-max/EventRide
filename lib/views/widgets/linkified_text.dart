@@ -2,15 +2,24 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-// Erkennt entweder "[Text](https://…)" (eigener, kurzer Linktext) oder eine
-// nackte URL (wird dann selbst als Linktext angezeigt).
+// Erkennt entweder "[Text](https://…)" (eigener, kurzer Linktext), eine
+// nackte URL (wird dann selbst als Linktext angezeigt) oder eine
+// österreichische Telefonnummer (z.B. für Festbus-Hotlines).
+// Telefon-Erkennung: beginnt mit "+43", "0043" oder "0", danach 6–12 weitere
+// Ziffern (optional getrennt durch Leerzeichen, "/" oder "-"). Punkt ist
+// bewusst kein erlaubtes Trennzeichen, damit Datumsangaben (z.B. "13.07.2026")
+// nicht fälschlich als Telefonnummer erkannt werden.
 final _linkPattern = RegExp(
-  r'\[([^\]]+)\]\((https?://[^\s)]+)\)|(https?://[^\s]+)',
+  r'\[([^\]]+)\]\((https?://[^\s)]+)\)'
+  r'|(https?://[^\s]+)'
+  r'|((?<![\d.])(?:\+43[\s/-]?|0043[\s/-]?|0)(?:[\s/-]?\d){6,12}(?!\d))',
   caseSensitive: false,
 );
 
-/// Zeigt Text an und macht enthaltene http(s)-Links antippbar (öffnen extern
-/// im Browser) — z.B. für Ticket-Links in Event-Beschreibungen.
+/// Zeigt Text an und macht enthaltene http(s)-Links sowie Telefonnummern
+/// antippbar — Links öffnen extern im Browser, Telefonnummern öffnen die
+/// Telefon-App mit vorausgefüllter Nummer (z.B. für Ticket-Links oder
+/// Festbus-Hotlines in Event-Beschreibungen).
 /// Unterstützt sowohl nackte URLs als auch "[Linktext](URL)" für einen
 /// kurzen, selbst gewählten Linktext statt der vollen URL.
 class LinkifiedText extends StatefulWidget {
@@ -46,6 +55,17 @@ class _LinkifiedTextState extends State<LinkifiedText> {
     }
   }
 
+  Future<void> _call(String rawNumber) async {
+    var number = rawNumber.replaceAll(RegExp(r'[\s/-]'), '');
+    if (number.startsWith('0043')) {
+      number = '+43${number.substring(4)}';
+    }
+    final uri = Uri(scheme: 'tel', path: number);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     _disposeRecognizers();
@@ -64,23 +84,30 @@ class _LinkifiedTextState extends State<LinkifiedText> {
 
       var end = match.end;
       String label;
-      String url;
+      VoidCallback onTap;
       if (match.group(2) != null) {
         // "[Text](URL)" — Linktext frei gewählt, URL bleibt unangetastet.
         label = match.group(1)!;
-        url = match.group(2)!;
+        final url = match.group(2)!;
+        onTap = () => _open(url);
+      } else if (match.group(4) != null) {
+        // Telefonnummer — antippbar, öffnet die Telefon-App.
+        label = match.group(4)!;
+        final number = label;
+        onTap = () => _call(number);
       } else {
         // Nackte URL — Satzzeichen am Ende ausschließen (z.B. "https://x.at."
         // → Punkt gehört zum Satz, nicht zur URL).
-        url = match.group(3)!;
+        var url = match.group(3)!;
         while (url.isNotEmpty && '.,!?;:)'.contains(url[url.length - 1])) {
           url = url.substring(0, url.length - 1);
           end--;
         }
         label = url;
+        onTap = () => _open(url);
       }
 
-      final recognizer = TapGestureRecognizer()..onTap = () => _open(url);
+      final recognizer = TapGestureRecognizer()..onTap = onTap;
       _recognizers.add(recognizer);
       spans.add(TextSpan(
         text: label,
