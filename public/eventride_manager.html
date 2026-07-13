@@ -394,6 +394,7 @@ select option{background:var(--surface);color:var(--text)}
       <button class="tab-btn" onclick="switchTab('accounts')" id="tab-accounts">📱 Accounts</button>
       <button class="tab-btn" onclick="switchTab('eventanfragen')" id="tab-eventanfragen">Event-Anfragen <span class="tab-badge" id="badge-eventanfragen" style="display:none">0</span></button>
       <button class="tab-btn" onclick="switchTab('fuehrerscheine')" id="tab-fuehrerscheine">Führerscheine <span class="tab-badge" id="badge-fuehrerscheine" style="display:none">0</span></button>
+      <button class="tab-btn" onclick="switchTab('nutzer')" id="tab-nutzer">👥 Nutzer</button>
     </div>
 
     <div id="content"></div>
@@ -556,6 +557,14 @@ let bezInlineLinkId = '';
 let multiConfirmedIds = new Set();
 let gemeindeMeta = {};
 
+// ---- APP-NUTZER STATE ----
+let appUsers = [];
+let userSearch = "";
+let userFilterLicense = "Alle";
+let userSortField = "lastSeen";
+let userSortDir = "desc";
+let expandedUserIds = new Set();
+
 // ---- AUTH ----
 const ALLOWED_EMAILS = ['lukas.bihler.coc@gmail.com', 'matzematze666@gmail.com', 'chiara.bihler.cb@gmail.com'];
 
@@ -689,6 +698,11 @@ function initFS() {
     updateAdminBadges();
     if(curTab === "fuehrerscheine") renderFuehrerscheine();
   }, e => { console.warn("licenseRequests read error", e); });
+
+  db.collection("users").onSnapshot(snap => {
+    appUsers = snap.docs.map(d => ({_uid: d.id, ...d.data()}));
+    if(curTab === "nutzer") renderNutzer();
+  }, e => { console.warn("users read error", e); });
 }
 
 // ---- DATE UTILS ----
@@ -860,6 +874,7 @@ function render() {
   else if(curTab==="accounts") renderAccounts();
   else if(curTab==="eventanfragen") renderEventAnfragen();
   else if(curTab==="fuehrerscheine") renderFuehrerscheine();
+  else if(curTab==="nutzer") renderNutzer();
 }
 
 function switchTab(t) {
@@ -3885,6 +3900,214 @@ async function rejectLicenseReq(uid) {
   } catch(e) {
     showToast('Fehler: ' + e.message, false);
   }
+}
+
+// ── NUTZER-ÜBERSICHT ─────────────────────────────────────────────
+
+function tsToDate(ts) {
+  if (!ts) return null;
+  return ts.toDate ? ts.toDate() : new Date(ts.seconds * 1000);
+}
+
+function fmtDate(d) {
+  return d ? d.toLocaleDateString('de-AT', {day:'2-digit',month:'2-digit',year:'numeric'}) : '–';
+}
+
+function fmtRelative(d) {
+  if (!d) return 'nie';
+  const diffMin = Math.floor((Date.now() - d.getTime()) / 60000);
+  if (diffMin < 1) return 'gerade eben';
+  if (diffMin < 60) return `vor ${diffMin} Min.`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return `vor ${diffH} Std.`;
+  const diffD = Math.floor(diffH / 24);
+  if (diffD < 30) return `vor ${diffD} Tag${diffD !== 1 ? 'en' : ''}`;
+  return fmtDate(d);
+}
+
+function userDisplayName(u) {
+  const name = `${u.firstName || ''} ${u.lastName || ''}`.trim();
+  return name || u.name || u.email || '(ohne Namen)';
+}
+
+function licenseBadge(status) {
+  if (status === 'verified') return `<span class="badge" style="background:var(--green-bg);color:var(--green-t);border-color:rgba(26,127,55,.18)">✓ Verifiziert</span>`;
+  if (status === 'pending') return `<span class="badge" style="background:var(--accent-soft);color:var(--accent-h);border-color:rgba(245,160,74,.25)">⏳ Ausstehend</span>`;
+  if (status === 'rejected') return `<span class="badge" style="background:var(--red-bg);color:var(--red-t);border-color:rgba(207,34,46,.18)">✕ Abgelehnt</span>`;
+  return `<span class="badge" style="background:var(--surface-2);color:var(--text-3);border-color:var(--border)">– Keine</span>`;
+}
+
+function verifyIcon(ok, label) {
+  return `<span title="${esc(label)}" style="color:${ok?'var(--green)':'var(--text-3)'};font-size:13px;margin-right:6px">${ok?'✓':'✕'} ${esc(label)}</span>`;
+}
+
+function toggleUserExpand(uid) {
+  if (expandedUserIds.has(uid)) expandedUserIds.delete(uid);
+  else expandedUserIds.add(uid);
+  renderNutzer();
+}
+
+function renderNutzer() {
+  const searchEl = document.getElementById('user-search-input');
+  const hadFocus = searchEl && document.activeElement === searchEl;
+  const cursorPos = hadFocus ? searchEl.selectionStart : -1;
+
+  let users = [...appUsers];
+  if (userFilterLicense !== 'Alle') users = users.filter(u => (u.licenseStatus || 'none') === userFilterLicense);
+  if (userSearch) {
+    const q = userSearch.toLowerCase();
+    users = users.filter(u => userDisplayName(u).toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q));
+  }
+
+  users.sort((a, b) => {
+    let va, vb;
+    if (userSortField === 'lastSeen' || userSortField === 'createdAt') {
+      va = tsToDate(a[userSortField])?.getTime() || 0;
+      vb = tsToDate(b[userSortField])?.getTime() || 0;
+    } else {
+      va = (userDisplayName(a) || '').toLowerCase();
+      vb = (userDisplayName(b) || '').toLowerCase();
+    }
+    const cmp = va < vb ? -1 : va > vb ? 1 : 0;
+    return userSortDir === 'asc' ? cmp : -cmp;
+  });
+
+  const total = appUsers.length;
+  const emailVerCount = appUsers.filter(u => u.emailVerified).length;
+  const licenseVerCount = appUsers.filter(u => u.licenseStatus === 'verified').length;
+  const activeCount = appUsers.filter(u => {
+    const d = tsToDate(u.lastSeen);
+    return d && (Date.now() - d.getTime()) < 7 * 24 * 3600 * 1000;
+  }).length;
+
+  const thSort = (field, label) => {
+    const active = userSortField === field;
+    const arrow = active ? (userSortDir === 'asc' ? ' ↑' : ' ↓') : '';
+    return `<th onclick="userToggleSort('${field}')" style="${active?'color:var(--text);':''}white-space:nowrap">${label}${arrow}</th>`;
+  };
+
+  const rows = users.map(u => {
+    const uid = u._uid;
+    const isOpen = expandedUserIds.has(uid);
+    const created = tsToDate(u.createdAt);
+    const lastSeen = tsToDate(u.lastSeen);
+    const avatar = u.photoUrl
+      ? `<img src="${esc(u.photoUrl)}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0">`
+      : `<div style="width:32px;height:32px;border-radius:50%;background:var(--surface-3);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:var(--text-2);flex-shrink:0">${esc(userDisplayName(u)[0]?.toUpperCase()||'?')}</div>`;
+
+    let row = `<tr>
+      <td>
+        <div style="display:flex;align-items:center;gap:10px">
+          ${avatar}
+          <div style="min-width:0">
+            <div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px">${esc(userDisplayName(u))}${u.isAdmin?' <span class="badge" style="background:var(--surface-2);color:var(--text-2);border-color:var(--border);font-size:10px">Admin</span>':''}</div>
+          </div>
+        </div>
+      </td>
+      <td style="font-size:12px;color:var(--text-2);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(u.email||'')}</td>
+      <td style="white-space:nowrap;font-size:12px">${verifyIcon(!!u.emailVerified,'E-Mail')}${verifyIcon(!!u.phoneVerified,'Tel.')}</td>
+      <td style="white-space:nowrap">${licenseBadge(u.licenseStatus||'none')}</td>
+      <td style="font-size:12px;white-space:nowrap">${fmtDate(created)}</td>
+      <td style="font-size:12px;white-space:nowrap">${fmtRelative(lastSeen)}</td>
+      <td style="width:1%">
+        <button class="small" onclick="toggleUserExpand('${uid}')" title="Details">${isOpen?'▲':'▼'}</button>
+      </td>
+    </tr>`;
+
+    if (isOpen) {
+      const hasLicensePhoto = (u.licenseStatus || 'none') !== 'none';
+      row += `<tr><td colspan="7" style="padding:16px;background:var(--surface-2);border-bottom:2px solid var(--border)">
+        <div style="display:flex;gap:24px;flex-wrap:wrap">
+          <div style="flex:1;min-width:220px;font-size:12px;line-height:2">
+            <div><strong>Heimatort:</strong> ${esc(u.homeTown||'–')}</div>
+            <div><strong>Bewertung:</strong> ${u.ratingAvg!=null?`${u.ratingAvg.toFixed(1)} ★ (${u.ratingCount||0})`:'noch keine'}</div>
+            ${u.car ? `<div><strong>Fahrzeug:</strong> ${esc(u.car.make||'')} ${esc(u.car.model||'')} ${u.car.color?'· '+esc(u.car.color):''} ${u.car.seats?'· '+u.car.seats+' Sitze':''}</div>` : ''}
+            ${u.licenseStatus==='rejected' && u.licenseRejectReason ? `<div><strong>Ablehnungsgrund:</strong> ${esc(u.licenseRejectReason)}</div>` : ''}
+          </div>
+          ${hasLicensePhoto ? `<div style="flex:1;min-width:220px">
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-3);margin-bottom:6px">Führerschein-Foto</div>
+            <div id="user-license-img-${uid}" class="license-img-wrap"><span style="color:var(--text-3);font-size:13px">⏳ Lädt…</span></div>
+            ${u.licenseStatus==='pending' ? `<div class="btn-row" style="margin-top:10px">
+              <button class="danger" onclick="rejectLicenseReq('${uid}')">✕ Ablehnen</button>
+              <button class="primary" onclick="approveLicenseReq('${uid}')">✓ Genehmigen</button>
+            </div>` : ''}
+          </div>` : ''}
+        </div>
+      </td></tr>`;
+    }
+    return row;
+  }).join('');
+
+  const tableHtml = rows || `<tr><td colspan="7" style="text-align:center;padding:4rem;color:var(--text-3)">Keine Nutzer gefunden.</td></tr>`;
+  const hasFilter = userFilterLicense !== 'Alle' || userSearch;
+
+  document.getElementById('content').innerHTML = `
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:1.5rem;align-items:stretch">
+      <div class="ig-stat-chip" style="border-color:var(--border)">
+        <div class="ig-stat-num" style="color:var(--accent)">${total}</div>
+        <div class="ig-stat-lbl">Nutzer gesamt</div>
+      </div>
+      <div class="ig-stat-chip" style="background:rgba(26,127,55,.07);border-color:rgba(26,127,55,.18)">
+        <div class="ig-stat-num" style="color:var(--green)">${emailVerCount}</div>
+        <div class="ig-stat-lbl" style="color:var(--green-t)">E-Mail verifiziert</div>
+      </div>
+      <div class="ig-stat-chip" style="background:rgba(26,127,55,.07);border-color:rgba(26,127,55,.18)">
+        <div class="ig-stat-num" style="color:var(--green)">${licenseVerCount}</div>
+        <div class="ig-stat-lbl" style="color:var(--green-t)">Führerschein verifiziert</div>
+      </div>
+      <div class="ig-stat-chip" style="background:rgba(9,105,218,.06);border-color:rgba(9,105,218,.18)">
+        <div class="ig-stat-num" style="color:var(--blue-t)">${activeCount}</div>
+        <div class="ig-stat-lbl" style="color:var(--blue-t)">Aktiv (7 Tage)</div>
+      </div>
+    </div>
+
+    <div class="filter-bar" style="margin-bottom:14px">
+      <input id="user-search-input" type="text" placeholder="Name / E-Mail…" value="${esc(userSearch)}" oninput="userSearch=this.value;renderNutzer()" style="width:220px">
+      <select onchange="userFilterLicense=this.value;renderNutzer()">
+        <option value="Alle" ${userFilterLicense==='Alle'?'selected':''}>Alle Führerschein-Status</option>
+        <option value="verified" ${userFilterLicense==='verified'?'selected':''}>Verifiziert</option>
+        <option value="pending" ${userFilterLicense==='pending'?'selected':''}>Ausstehend</option>
+        <option value="rejected" ${userFilterLicense==='rejected'?'selected':''}>Abgelehnt</option>
+        <option value="none" ${userFilterLicense==='none'?'selected':''}>Keine</option>
+      </select>
+      ${hasFilter?`<button class="small danger" onclick="userFilterLicense='Alle';userSearch='';renderNutzer()">✕ Filter</button>`:''}
+      <span class="filter-count">${users.length} von ${total}</span>
+    </div>
+
+    <div class="ig-table-wrap">
+      <table class="ig-table">
+        <thead>
+          <tr>
+            ${thSort('name','Nutzer')}
+            <th>E-Mail</th>
+            <th>Verifizierung</th>
+            <th>Führerschein</th>
+            ${thSort('createdAt','Erstellt am')}
+            ${thSort('lastSeen','Zuletzt online')}
+            <th style="width:1%"></th>
+          </tr>
+        </thead>
+        <tbody>${tableHtml}</tbody>
+      </table>
+    </div>
+  `;
+
+  users.forEach(u => {
+    if (expandedUserIds.has(u._uid) && (u.licenseStatus || 'none') !== 'none') {
+      loadStorageImage(`user-license-img-${u._uid}`, `users/${u._uid}/license.jpg`);
+    }
+  });
+
+  if (hadFocus) {
+    const el = document.getElementById('user-search-input');
+    if (el) { el.focus(); if (cursorPos >= 0) el.setSelectionRange(cursorPos, cursorPos); }
+  }
+}
+
+function userToggleSort(field) {
+  if (userSortField === field) userSortDir = userSortDir === 'asc' ? 'desc' : 'asc';
+  else { userSortField = field; userSortDir = field === 'name' ? 'asc' : 'desc'; }
+  renderNutzer();
 }
 
 // ── CSV-Import für Flyer-Einreichungen ──────────────────────────
