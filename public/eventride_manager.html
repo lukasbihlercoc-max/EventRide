@@ -1485,53 +1485,85 @@ async function submitQuickIgAdd() {
 
 // ---- ADD MODAL ----
 function openAdd(prefill) {
-  addFormData = Object.assign({name:"",datum:"",uhrzeit:"20:00",gemeinde:"",bezirk:"Spittal",veranstalter:"örtlich",eintritt:"",beschreibung:"",typ:"e1",quelle:"",quelleTyp:"",quelleLink:"",srcZitat:"",sicherheit:"mittel",adresse:"",latitude:null,longitude:null,notiz:"",infoAusstehend:false}, prefill||{});
+  addFormData = Object.assign({name:"",datum:"",uhrzeit:"20:00",gemeinde:"",bezirk:"Spittal",veranstalter:"örtlich",eintritt:"",beschreibung:"",typ:"e1",quelle:"",quelleTyp:"",quelleLink:"",srcZitat:"",sicherheit:"mittel",adresse:"",latitude:null,longitude:null,notiz:"",infoAusstehend:false,pinned:false,mehrtaegig:false,von:"",bis:""}, prefill||{});
+  renderAddForm();
+  document.getElementById("modal-add").style.display="flex";
+  setupAutocompleteWhenReady('add-adresse', addFormData, 'add-coords', 'add-coords-text', 'add-no-coords-warn');
+}
+
+function renderAddForm() {
   const bezSelect = BEZIRKE.map(b=>`<option value="${b}" ${b===addFormData.bezirk?"selected":""}>${b}</option>`).join("");
   const typSelect = [['e1','Kirchtage/Feste'],['e2','Feuerwehr'],['e3','Disco/Party'],['e4','Ball'],['e5','Krampus'],['e6','Festival/Open-Air'],['e7','Sommer/Strand']]
-    .map(([v,l])=>`<option value="${v}" ${v==="e1"?"selected":""}>${l}</option>`).join("");
-  document.getElementById("add-form").innerHTML = `<div class="edit-grid">
-    <span class="edit-label">Name *</span><input placeholder="Eventname" oninput="addFormData.name=this.value">
-    <span class="edit-label">Datum *</span><input placeholder="TT.MM.JJJJ" oninput="addFormData.datum=this.value">
-    <span class="edit-label">Uhrzeit</span><input value="20:00" oninput="addFormData.uhrzeit=this.value">
+    .map(([v,l])=>`<option value="${v}" ${v===addFormData.typ?"selected":""}>${l}</option>`).join("");
+  const datumFieldsHtml = addFormData.mehrtaegig ? `
+    <span class="edit-label">Von *</span><input value="${esc(addFormData.von||"")}" placeholder="TT.MM.JJJJ" oninput="addFormData.von=this.value">
+    <span class="edit-label">Bis *</span><input value="${esc(addFormData.bis||"")}" placeholder="TT.MM.JJJJ" oninput="addFormData.bis=this.value">
+  ` : `
+    <span class="edit-label">Datum *</span><input value="${esc(addFormData.datum||"")}" placeholder="TT.MM.JJJJ" oninput="addFormData.datum=this.value">
+  `;
+  document.getElementById("add-form").innerHTML = `
+  <div style="margin-bottom:14px;display:flex;gap:16px;flex-wrap:wrap">
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+      <input type="checkbox" ${addFormData.pinned?'checked':''} style="width:15px;height:15px;accent-color:var(--accent)"
+        onchange="addFormData.pinned=this.checked">
+      📌 Angepinnt
+    </label>
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+      <input type="checkbox" ${addFormData.mehrtaegig?'checked':''} style="width:15px;height:15px;accent-color:var(--accent)"
+        onchange="addFormData.mehrtaegig=this.checked;renderAddForm();">
+      📅 Mehrtägiges Event
+    </label>
+  </div>
+  <div class="edit-grid">
+    <span class="edit-label">Name *</span><input value="${esc(addFormData.name||"")}" placeholder="Eventname" oninput="addFormData.name=this.value">
+    ${datumFieldsHtml}
+    <span class="edit-label">Uhrzeit</span><input value="${esc(addFormData.uhrzeit||"20:00")}" oninput="addFormData.uhrzeit=this.value">
     <span class="edit-label">Gemeinde *</span><input placeholder="z.B. Seeboden" value="${esc(addFormData.gemeinde||"")}" oninput="addFormData.gemeinde=this.value">
     <span class="edit-label">Bezirk</span><select onchange="addFormData.bezirk=this.value">${bezSelect}</select>
     <span class="edit-label">Typ</span><select onchange="addFormData.typ=this.value">${typSelect}</select>
-    <span class="edit-label">Veranstalter</span><input value="örtlich" oninput="addFormData.veranstalter=this.value">
-    <span class="edit-label">Eintritt</span><input placeholder="z.B. kostenlos / 12 €" oninput="addFormData.eintritt=this.value">
-    <span class="edit-label">Beschreibung</span><textarea oninput="addFormData.beschreibung=this.value" style="font-size:12px;padding:7px 10px;resize:vertical" rows="2" placeholder="Kurzbeschreibung (optional)"></textarea>
+    <span class="edit-label">Veranstalter</span><input value="${esc(addFormData.veranstalter||"örtlich")}" oninput="addFormData.veranstalter=this.value">
+    <span class="edit-label">Eintritt</span><input value="${esc(addFormData.eintritt||"")}" placeholder="z.B. kostenlos / 12 €" oninput="addFormData.eintritt=this.value">
+    <span class="edit-label">Beschreibung</span><textarea oninput="addFormData.beschreibung=this.value" style="font-size:12px;padding:7px 10px;resize:vertical" rows="2" placeholder="Kurzbeschreibung (optional)">${esc(addFormData.beschreibung||"")}</textarea>
     <span class="edit-label">Notiz</span>
     <div>
-      <textarea oninput="addFormData.notiz=this.value" style="font-size:12px;padding:7px 10px;resize:vertical" rows="2" placeholder="Interne Notiz (nur im Manager sichtbar)"></textarea>
+      <textarea oninput="addFormData.notiz=this.value" style="font-size:12px;padding:7px 10px;resize:vertical" rows="2" placeholder="Interne Notiz (nur im Manager sichtbar)">${esc(addFormData.notiz||"")}</textarea>
       <label style="font-size:12px;display:flex;align-items:center;gap:6px;margin-top:4px;cursor:pointer">
-        <input type="checkbox" onchange="addFormData.infoAusstehend=this.checked" style="width:14px;height:14px;accent-color:var(--accent)">
+        <input type="checkbox" ${addFormData.infoAusstehend?'checked':''} onchange="addFormData.infoAusstehend=this.checked" style="width:14px;height:14px;accent-color:var(--accent)">
         ⏳ Info noch ausstehend
       </label>
     </div>
-    <span class="edit-label">Quelle</span><input placeholder="URL oder Quelle" oninput="addFormData.quelle=this.value">
-    <span class="edit-label">Adresse</span><input id="add-adresse" placeholder="Adresse suchen…" oninput="addFormData.adresse=this.value">
+    <span class="edit-label">Quelle</span><input value="${esc(addFormData.quelle||"")}" placeholder="URL oder Quelle" oninput="addFormData.quelle=this.value">
+    <span class="edit-label">Adresse</span><input id="add-adresse" value="${esc(addFormData.adresse||"")}" placeholder="Adresse suchen…" oninput="addFormData.adresse=this.value">
     <span class="edit-label">Koordinaten</span>
     <div>
       <input placeholder="46.7513, 14.0364 (aus Google Maps)" style="width:100%;box-sizing:border-box" oninput="handleCoordsInput(this.value,addFormData,'add-coords','add-coords-text','add-no-coords-warn','add-adresse')">
-      <div id="add-coords" style="display:none;font-size:11px;color:#27AE60;margin-top:2px">📍 <span id="add-coords-text"></span></div>
+      <div id="add-coords" style="display:${addFormData.latitude!=null?'block':'none'};font-size:11px;color:#27AE60;margin-top:2px">📍 <span id="add-coords-text">${addFormData.latitude!=null?addFormData.latitude.toFixed(5)+', '+addFormData.longitude.toFixed(5):''}</span></div>
       <div id="add-no-coords-warn" style="font-size:11px;color:#e67e22;margin-top:2px">⚠ Keine Koordinaten – kein Map-Pin in der App</div>
     </div>
   </div>`;
-  document.getElementById("modal-add").style.display="flex";
   setupAutocompleteWhenReady('add-adresse', addFormData, 'add-coords', 'add-coords-text', 'add-no-coords-warn');
 }
 
 function closeAdd() { document.getElementById("modal-add").style.display="none"; }
 
 function submitAdd() {
-  if(!addFormData.name||!addFormData.datum){alert("Name und Datum Pflicht.");return;}
+  if (addFormData.mehrtaegig) {
+    if (!addFormData.name || !addFormData.von || !addFormData.bis) { alert("Name, Von- und Bis-Datum sind Pflicht."); return; }
+  } else if (!addFormData.name || !addFormData.datum) {
+    alert("Name und Datum Pflicht."); return;
+  }
   if(!addFormData.gemeinde){alert("Gemeinde ist ein Pflichtfeld.");return;}
   if(isDupe(addFormData.name)){
     if(!confirm(`"${addFormData.name}" scheint bereits zu existieren. Trotzdem hinzufügen?`)) return;
   }
-  const yr = getYear(addFormData.datum);
+  // Für die Recherche-Liste (Sortierung, Jahres-Check etc.) dient bei
+  // mehrtägigen Kandidaten weiterhin "Von" als datum — Von/Bis werden
+  // zusätzlich mitgespeichert und beim "In App hochladen" wieder gelesen.
+  const effectiveDatum = addFormData.mehrtaegig ? addFormData.von : addFormData.datum;
+  const yr = getYear(effectiveDatum);
   db.collection("pending_events").add({
     name: addFormData.name,
-    datum: addFormData.datum,
+    datum: effectiveDatum,
     uhrzeit: addFormData.uhrzeit || '',
     gemeinde: addFormData.gemeinde,
     bezirk: addFormData.bezirk || '',
@@ -1552,6 +1584,10 @@ function submitAdd() {
     geprueft: false, inApp: false,
     notiz: addFormData.notiz || '',
     infoAusstehend: !!addFormData.infoAusstehend,
+    pinned: !!addFormData.pinned,
+    mehrtaegig: !!addFormData.mehrtaegig,
+    von: addFormData.mehrtaegig ? addFormData.von : '',
+    bis: addFormData.mehrtaegig ? addFormData.bis : '',
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   }).then(()=>closeAdd()).catch(e=>alert("Fehler: "+e.message));
 }
@@ -2336,6 +2372,10 @@ function openFlyerUpload(index) {
     quellen: [],
     infoAusstehend: false,
     notiz: '',
+    pinned: false,
+    mehrtaegig: false,
+    von: '',
+    bis: '',
   };
 
   const allOffen = flyerEvents.filter(e => e.status === "offen");
@@ -2368,11 +2408,15 @@ function skipFlyerEvent() {
 
 function submitFlyerUpload() {
   if (!uploadData.name || !uploadData.standort) { alert('Name und Standort sind Pflichtfelder.'); return; }
-  if (!uploadData.datum) { alert('Bitte ein Datum eingeben.'); return; }
+  if (uploadData.mehrtaegig) {
+    if (!uploadData.von || !uploadData.bis) { alert('Bitte Von- und Bis-Datum eingeben.'); return; }
+  } else if (!uploadData.datum) {
+    alert('Bitte ein Datum eingeben.'); return;
+  }
   if (isDupe(uploadData.name)) {
     if (!confirm(`"${uploadData.name}" scheint bereits zu existieren. Trotzdem hochladen?`)) return;
   } else {
-    const dupes = findApprovalDupes(uploadData.name, uploadData.datum);
+    const dupes = findApprovalDupes(uploadData.name, uploadData.datum || uploadData.von);
     if (dupes.length > 0) {
       const names = dupes.slice(0, 3).map(d => `"${d.name}"`).join(', ');
       if (!confirm(`⚠ Mögliches Duplikat gefunden:\n${names}\n\nTrotzdem hochladen?`)) return;
@@ -2426,6 +2470,48 @@ function submitFlyerUpload() {
     return;
   }
 
+  // Mehrtägiges Event: läuft komplett über die createEventContainer Cloud
+  // Function (einzige Implementierung der Tages-Generierung, siehe
+  // functions/src/index.ts) — keine eigene Tages-Berechnung hier.
+  if (uploadData.mehrtaegig) {
+    const eintrittText = uploadData.eintritt.trim();
+    const beschreibungText = uploadData.beschreibung.trim();
+    const _flyerParts = [];
+    if (eintrittText) {
+      const _eLines = eintrittText.split('\n').map(l => l.trim()).filter(Boolean);
+      _flyerParts.push('Eintritt:\n' + _eLines.map(l => /€/.test(l) ? l : l + ' €').join('\n'));
+    }
+    _flyerParts.push('Einlass ab ' + uhr + ' Uhr');
+    if (beschreibungText) _flyerParts.push(beschreibungText);
+    functionsRef.httpsCallable('createEventContainer')({
+      name: uploadData.name,
+      standort: uploadData.standort,
+      typ: normalizeTyp(uploadData.typ),
+      beschreibung: _flyerParts.join('\n\n'),
+      adresse: uploadData.adresse || uploadData.standort || '',
+      latitude: uploadData.latitude || null,
+      longitude: uploadData.longitude || null,
+      uhrzeit: uhr,
+      pinned: !!uploadData.pinned,
+      von: `${uploadData.von}T00:00:00.000Z`,
+      bis: `${uploadData.bis}T00:00:00.000Z`,
+    }).then(() => {
+      flyerEvents[flyerUploadIndex].status = "hochgeladen";
+      updateFlyerList();
+      showToast('✓ ' + uploadData.name + ' in App gespeichert');
+      const nextIdx = flyerEvents.findIndex((e, i) => i > flyerUploadIndex && e.status === "offen");
+      if (nextIdx >= 0) { openFlyerUpload(nextIdx); return; }
+      const anyOffen = flyerEvents.findIndex(e => e.status === "offen");
+      if (anyOffen >= 0) { openFlyerUpload(anyOffen); return; }
+      showFlyerCompletion();
+    }).catch(e => {
+      btn.disabled = false;
+      btn.textContent = '↑ In App speichern';
+      alert('Fehler: ' + e.message);
+    });
+    return;
+  }
+
   const datumISO = `${uploadData.datum}T${uhr}:00.000Z`;
   const eintrittText = uploadData.eintritt.trim();
   const beschreibungText = uploadData.beschreibung.trim();
@@ -2446,7 +2532,11 @@ function submitFlyerUpload() {
     beschreibung: combinedBeschreibung, eintritt: uploadData.eintritt || '',
     typ: normalizeTyp(uploadData.typ), latitude: uploadData.latitude || null, longitude: uploadData.longitude || null,
     mgrSrcQuelleTyp: 'flyer', mgrSrcQuelleLink: uploadData.quelleLink || '', mgrSrcIgAccount: uploadData.igUsername || '',
-    id: _flyerRef.id, createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    id: _flyerRef.id,
+    pinned: !!uploadData.pinned,
+    isContainer: false,
+    containerId: null,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   }).then(() => {
     flyerEvents[flyerUploadIndex].status = "hochgeladen";
     updateFlyerList();
@@ -2482,6 +2572,13 @@ function showFlyerCompletion() {
 }
 
 // ---- UPLOAD MODAL ----
+// Konvertiert ein TT.MM.JJJJ-Datum (pending_events-Format) in yyyy-mm-dd
+// für <input type="date"> im Upload-Formular.
+function toDateInputValue(datumStr) {
+  const d = parseDatum(datumStr);
+  return d ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` : '';
+}
+
 function openUpload(id) {
   isFlyerMode = false;
   const ev = pending.find(e => e._id === id);
@@ -2509,10 +2606,10 @@ function openUpload(id) {
     quellen: [],
     infoAusstehend: false,
     notiz: '',
-    pinned: false,
-    mehrtaegig: false,
-    von: '',
-    bis: '',
+    pinned: !!ev.pinned,
+    mehrtaegig: !!ev.mehrtaegig,
+    von: ev.von ? toDateInputValue(ev.von) : '',
+    bis: ev.bis ? toDateInputValue(ev.bis) : '',
   };
   document.getElementById('upload-form-content').innerHTML = uploadFormHTML();
   document.getElementById('up-eintritt').value = uploadData.eintritt;
