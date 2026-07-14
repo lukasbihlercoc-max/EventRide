@@ -1,6 +1,7 @@
 // admin_event_requests_page.dart
 import 'dart:async';
 import 'dart:typed_data';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:my_app/utils/async_guard.dart';
 import 'package:my_app/utils/platform_pickers.dart';
@@ -273,6 +274,12 @@ class _ReviewSheetState extends State<_ReviewSheet> {
 
   bool _actioning = false;
 
+  // Mehrtägiges Event
+  bool _mehrtaegig = false;
+  bool _pinned = false;
+  late final TextEditingController _vonCtrl;
+  late final TextEditingController _bisCtrl;
+
   @override
   void initState() {
     super.initState();
@@ -286,6 +293,8 @@ class _ReviewSheetState extends State<_ReviewSheet> {
     _typ = _kTypLabels.containsKey(req.eventTyp) ? req.eventTyp! : 'e0';
     _latitude = req.latitude;
     _longitude = req.longitude;
+    _vonCtrl = TextEditingController();
+    _bisCtrl = TextEditingController();
 
     if (req.submissionType == 'flyer' && req.flyerPath != null) {
       _loadFlyer(req.flyerPath!);
@@ -304,6 +313,8 @@ class _ReviewSheetState extends State<_ReviewSheet> {
     _uhrzeitCtrl.dispose();
     _adresseCtrl.dispose();
     _beschreibungCtrl.dispose();
+    _vonCtrl.dispose();
+    _bisCtrl.dispose();
     super.dispose();
   }
 
@@ -443,6 +454,67 @@ class _ReviewSheetState extends State<_ReviewSheet> {
   }
 
   Future<void> _publish() async {
+    if (_mehrtaegig) {
+      if (_vonCtrl.text.trim().isEmpty || _bisCtrl.text.trim().isEmpty) {
+        AppSnackbar.show(context, message: 'Bitte Von- und Bis-Datum auswählen');
+        return;
+      }
+      DateTime von;
+      DateTime bis;
+      try {
+        von = DateFormat('dd.MM.yyyy').parseStrict(_vonCtrl.text.trim(), true);
+        bis = DateFormat('dd.MM.yyyy').parseStrict(_bisCtrl.text.trim(), true);
+      } catch (_) {
+        AppSnackbar.show(context, message: 'Ungültiges Datumformat (TT.MM.JJJJ)');
+        return;
+      }
+
+      setState(() => _actioning = true);
+      try {
+        // createEventContainer übernimmt hier auch das Setzen von
+        // eventRequests.status='approved' (eventRequestId mitgegeben) —
+        // ersetzt approveEventRequest für den Mehrtägig-Fall.
+        await guarded(
+          FirebaseFunctions.instance.httpsCallable('createEventContainer').call({
+            'name': _nameCtrl.text.trim().isEmpty
+                ? 'Unbenanntes Event'
+                : _nameCtrl.text.trim(),
+            'standort': _standortCtrl.text.trim().isEmpty
+                ? 'Unbekannt'
+                : _standortCtrl.text.trim(),
+            'typ': _typ,
+            'beschreibung': _beschreibungCtrl.text.trim(),
+            'adresse': _adresseCtrl.text.trim().isEmpty
+                ? 'Adresse nicht angegeben'
+                : _adresseCtrl.text.trim(),
+            'latitude': _latitude,
+            'longitude': _longitude,
+            'uhrzeit': _uhrzeitCtrl.text.trim().isEmpty ? null : _uhrzeitCtrl.text.trim(),
+            'pinned': _pinned,
+            'von': von.toIso8601String(),
+            'bis': bis.toIso8601String(),
+            'eventRequestId': widget.request.id,
+          }),
+        );
+
+        if (mounted) {
+          Navigator.pop(context);
+          AppSnackbar.show(context, message: 'Event veröffentlicht.');
+        }
+      } on AsyncGuardTimeoutException {
+        if (mounted) {
+          Navigator.pop(context);
+          AppSnackbar.show(context,
+              message: 'Verbindung langsam – wird im Hintergrund synchronisiert');
+        }
+      } catch (e) {
+        if (mounted) AppSnackbar.show(context, message: 'Fehler: $e');
+      } finally {
+        if (mounted) setState(() => _actioning = false);
+      }
+      return;
+    }
+
     if (_datumCtrl.text.trim().isEmpty) {
       AppSnackbar.show(context, message: 'Bitte ein Datum eintragen');
       return;
@@ -474,6 +546,7 @@ class _ReviewSheetState extends State<_ReviewSheet> {
             : _adresseCtrl.text.trim(),
         latitude: _latitude,
         longitude: _longitude,
+        pinned: _pinned,
       );
 
       await guarded(context
@@ -624,6 +697,31 @@ class _ReviewSheetState extends State<_ReviewSheet> {
     );
   }
 
+  Widget _checkboxTile({
+    required String label,
+    required bool value,
+    required ValueChanged<bool?> onChanged,
+  }) {
+    return InkWell(
+      onTap: () => onChanged(!value),
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          children: [
+            Checkbox(
+              value: value,
+              onChanged: onChanged,
+              activeColor: _kAccent,
+              side: const BorderSide(color: Colors.white70, width: 1.5),
+            ),
+            Text(label, style: const TextStyle(color: Colors.white, fontSize: 14)),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildForm() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -633,37 +731,95 @@ class _ReviewSheetState extends State<_ReviewSheet> {
           style: _kInputText,
           decoration: _inputStyle('Eventname'),
         ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _datumCtrl,
-          style: _kInputText,
-          decoration: _inputStyle('Datum',
-              suffixIcon: const Icon(Icons.calendar_today_outlined,
-                  color: Colors.white38, size: 18)),
-          readOnly: true,
-          onTap: () async {
-            DateTime initial = DateTime.now();
-            if (_datumCtrl.text.trim().isNotEmpty) {
-              try {
-                initial = DateFormat('dd.MM.yyyy')
-                    .parseStrict(_datumCtrl.text.trim(), true);
-              } catch (_) {}
-            }
-            final picked = await showPlatformDatePicker(
-              context,
-              initialDate: initial,
-              firstDate: DateTime(2000),
-              lastDate: DateTime(2100),
-            );
-            if (picked != null) {
-              setState(() {
-                _datumCtrl.text = DateFormat('dd.MM.yyyy').format(picked);
-              });
-              _updateSimilarEvents();
-            }
-          },
+        const SizedBox(height: 8),
+        _checkboxTile(
+          label: 'Angepinnt',
+          value: _pinned,
+          onChanged: (v) => setState(() => _pinned = v ?? false),
         ),
-        const SizedBox(height: 12),
+        _checkboxTile(
+          label: 'Mehrtägiges Event',
+          value: _mehrtaegig,
+          onChanged: (v) => setState(() => _mehrtaegig = v ?? false),
+        ),
+        const SizedBox(height: 4),
+        if (_mehrtaegig) ...[
+          TextFormField(
+            controller: _vonCtrl,
+            style: _kInputText,
+            decoration: _inputStyle('Von',
+                suffixIcon: const Icon(Icons.calendar_today_outlined,
+                    color: Colors.white38, size: 18)),
+            readOnly: true,
+            onTap: () async {
+              final picked = await showPlatformDatePicker(
+                context,
+                initialDate: DateTime.now(),
+                firstDate: DateTime(2000),
+                lastDate: DateTime(2100),
+              );
+              if (picked != null) {
+                setState(() {
+                  _vonCtrl.text = DateFormat('dd.MM.yyyy').format(picked);
+                });
+              }
+            },
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _bisCtrl,
+            style: _kInputText,
+            decoration: _inputStyle('Bis',
+                suffixIcon: const Icon(Icons.calendar_today_outlined,
+                    color: Colors.white38, size: 18)),
+            readOnly: true,
+            onTap: () async {
+              final picked = await showPlatformDatePicker(
+                context,
+                initialDate: DateTime.now(),
+                firstDate: DateTime(2000),
+                lastDate: DateTime(2100),
+              );
+              if (picked != null) {
+                setState(() {
+                  _bisCtrl.text = DateFormat('dd.MM.yyyy').format(picked);
+                });
+              }
+            },
+          ),
+          const SizedBox(height: 12),
+        ] else ...[
+          TextFormField(
+            controller: _datumCtrl,
+            style: _kInputText,
+            decoration: _inputStyle('Datum',
+                suffixIcon: const Icon(Icons.calendar_today_outlined,
+                    color: Colors.white38, size: 18)),
+            readOnly: true,
+            onTap: () async {
+              DateTime initial = DateTime.now();
+              if (_datumCtrl.text.trim().isNotEmpty) {
+                try {
+                  initial = DateFormat('dd.MM.yyyy')
+                      .parseStrict(_datumCtrl.text.trim(), true);
+                } catch (_) {}
+              }
+              final picked = await showPlatformDatePicker(
+                context,
+                initialDate: initial,
+                firstDate: DateTime(2000),
+                lastDate: DateTime(2100),
+              );
+              if (picked != null) {
+                setState(() {
+                  _datumCtrl.text = DateFormat('dd.MM.yyyy').format(picked);
+                });
+                _updateSimilarEvents();
+              }
+            },
+          ),
+          const SizedBox(height: 12),
+        ],
         TextFormField(
           controller: _uhrzeitCtrl,
           style: _kInputText,

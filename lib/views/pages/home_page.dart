@@ -8,6 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:my_app/data/notifiers.dart';
+import 'package:my_app/data/event_daten.dart';
 import 'package:my_app/views/pages/email_verification_page.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/widgets/sizehelper_widget.dart';
@@ -856,7 +857,38 @@ class _HomePageState extends State<HomePage> {
                   _homeTownLat != null &&
                   _homeTownLng != null;
 
+              // Kind-Events eines mehrtägigen Containers nach containerId
+              // gruppieren (jeweils nach Datum sortiert) — sie erscheinen
+              // nie einzeln in der Hauptliste, nur aufgeklappt im Container.
+              final childrenByContainer = <String, List<Event>>{};
+              for (final e in events) {
+                final containerId = e.containerId;
+                if (containerId == null) continue;
+                childrenByContainer.putIfAbsent(containerId, () => []).add(e);
+              }
+              for (final list in childrenByContainer.values) {
+                list.sort((a, b) => a.datum.compareTo(b.datum));
+              }
+
+              bool matchesDatumFilter(DateTime datum) {
+                if (datumMode == 'heute') {
+                  final d = datum.toLocal();
+                  return d.year == today.year &&
+                      d.month == today.month &&
+                      d.day == today.day;
+                } else if (datumMode == 'wochenende') {
+                  return _isThisWeekend(datum, today);
+                } else if (datumMode == 'datum' && customDatum != null) {
+                  final d = datum.toLocal();
+                  return d.year == customDatum.year &&
+                      d.month == customDatum.month &&
+                      d.day == customDatum.day;
+                }
+                return true;
+              }
+
               final filteredEvents = events.where((event) {
+                if (event.containerId != null) return false;
                 if (query.isNotEmpty &&
                     !event.name.toLowerCase().contains(query) &&
                     !event.standort.toLowerCase().contains(query) &&
@@ -866,15 +898,11 @@ class _HomePageState extends State<HomePage> {
                 if (favourites != null && !favourites.contains(event.stabileId)) {
                   return false;
                 }
-                if (datumMode == 'heute') {
-                  final d = event.datum.toLocal();
-                  if (d.year != today.year || d.month != today.month || d.day != today.day) return false;
-                } else if (datumMode == 'wochenende') {
-                  if (!_isThisWeekend(event.datum, today)) return false;
-                } else if (datumMode == 'datum' && customDatum != null) {
-                  final d = event.datum.toLocal();
-                  if (d.year != customDatum.year || d.month != customDatum.month || d.day != customDatum.day) return false;
-                }
+                final children = childrenByContainer[event.id];
+                final matchesDate = (children != null && children.isNotEmpty)
+                    ? children.any((c) => matchesDatumFilter(c.datum))
+                    : matchesDatumFilter(event.datum);
+                if (!matchesDate) return false;
                 if (selectedTyp != null && event.typ != selectedTyp) return false;
                 if (hasCoords) {
                   final lat = event.latitude;
@@ -903,10 +931,29 @@ class _HomePageState extends State<HomePage> {
                   SliverToBoxAdapter(child: _buildFilterRow(context)),
                   SliverList(
                     delegate: SliverChildBuilderDelegate(
-                      (context, index) => RepaintBoundary(
-                        key: ValueKey(filteredEvents[index].stabileId),
-                        child: EventCard(event: filteredEvents[index]),
-                      ),
+                      (context, index) {
+                        final event = filteredEvents[index];
+                        final card = event.isContainer
+                            ? EventContainerCard(
+                                container: event,
+                                children: childrenByContainer[event.id] ?? [],
+                              )
+                            : EventCard(event: event);
+                        // Dezenter zusätzlicher Abstand zwischen gepinnten
+                        // und den restlichen Events.
+                        final isFirstUnpinned = !event.pinned &&
+                            index > 0 &&
+                            filteredEvents[index - 1].pinned;
+                        return RepaintBoundary(
+                          key: ValueKey(event.stabileId),
+                          child: isFirstUnpinned
+                              ? Padding(
+                                  padding: const EdgeInsets.only(top: 12),
+                                  child: card,
+                                )
+                              : card,
+                        );
+                      },
                       childCount: filteredEvents.length,
                     ),
                   ),

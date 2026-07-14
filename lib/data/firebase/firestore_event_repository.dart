@@ -28,13 +28,31 @@ class FirestoreEventRepository implements IEventRepository {
   Stream<List<Event>> watch() {
     return _firestore.collection(_collection).snapshots().map((snap) {
       final now = DateTime.now();
-      final events = snap.docs
+      final all = snap.docs
           .map((doc) => Event.fromMap({...doc.data(), 'id': doc.id}))
-          .where((e) {
-            // Event bleibt sichtbar bis 6:00 Uhr des Folgetags (lokale Zeit)
-            return now.isBefore(eventHideAfter(e.datum));
-          })
           .toList();
+
+      // Container-Events bleiben sichtbar, solange auch nur einer ihrer
+      // Kind-Tage noch nicht vorbei ist — dafür brauchen wir das späteste
+      // Kind-Datum je containerId aus demselben Snapshot.
+      final latestChildDatumByContainer = <String, DateTime>{};
+      for (final e in all) {
+        final containerId = e.containerId;
+        if (containerId == null) continue;
+        final current = latestChildDatumByContainer[containerId];
+        if (current == null || e.datum.isAfter(current)) {
+          latestChildDatumByContainer[containerId] = e.datum;
+        }
+      }
+
+      final events = all.where((e) {
+        final effectiveDatum = e.isContainer
+            ? (latestChildDatumByContainer[e.id] ?? e.datum)
+            : e.datum;
+        // Event bleibt sichtbar bis 6:00 Uhr des Folgetags (lokale Zeit)
+        return now.isBefore(eventHideAfter(effectiveDatum));
+      }).toList();
+
       _cache
         ..clear()
         ..addAll(events);

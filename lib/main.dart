@@ -108,6 +108,7 @@ void main() async {
 
   // Favoriten initialisieren
   await initFavouriteEvents();
+  await initExpandedEventContainers();
 
   // ----------------------------
   // Services initialisieren

@@ -1269,3 +1269,200 @@ export const cleanupDeletedUser = auth.user().onDelete(async (user) => {
     await batch.commit();
   }
 });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Mehrtägige Events (Container/Kind-Modell)
+//   – Container ist nur eine Hülle (isContainer:true), jeder Tag ein
+//     eigenständiges Event-Doc (containerId → Container-id).
+//   – Einzige Implementierung der Tages-Generierung/Feld-Sync: App und
+//     Manager-Website rufen dieselben drei Functions auf.
+// ──────────────────────────────────────────────────────────────────────────────
+
+const EVENT_MANAGER_EMAILS = [
+  "lukas.bihler.coc@gmail.com",
+  "matzematze666@gmail.com",
+  "chiara.bihler.cb@gmail.com",
+];
+
+async function assertEventManager(uid: string, email: string | undefined): Promise<void> {
+  if (email && EVENT_MANAGER_EMAILS.includes(email)) return;
+  const userDoc = await db.doc(`users/${uid}`).get();
+  if (userDoc.data()?.["isAdmin"] === true) return;
+  throw new HttpsError("permission-denied", "Keine Berechtigung für den Event Manager");
+}
+
+interface EventSharedFields {
+  name: string;
+  standort: string;
+  typ: string;
+  beschreibung: string;
+  adresse: string;
+  latitude: number | null;
+  longitude: number | null;
+  uhrzeit: string | null;
+}
+
+function parseSharedFields(data: Record<string, unknown>): EventSharedFields {
+  const name = data["name"];
+  const standort = data["standort"];
+  const typ = data["typ"];
+  const beschreibung = data["beschreibung"];
+  const adresse = data["adresse"];
+  if (
+    typeof name !== "string" || !name ||
+    typeof standort !== "string" || !standort ||
+    typeof typ !== "string" || !typ ||
+    typeof beschreibung !== "string" ||
+    typeof adresse !== "string" || !adresse
+  ) {
+    throw new HttpsError("invalid-argument", "Pflichtfelder fehlen (name/standort/typ/adresse)");
+  }
+  const latitude = data["latitude"];
+  const longitude = data["longitude"];
+  const uhrzeit = data["uhrzeit"];
+  return {
+    name,
+    standort,
+    typ,
+    beschreibung,
+    adresse,
+    latitude: typeof latitude === "number" ? latitude : null,
+    longitude: typeof longitude === "number" ? longitude : null,
+    uhrzeit: typeof uhrzeit === "string" && uhrzeit ? uhrzeit : null,
+  };
+}
+
+// Erzeugt die Liste der Kalendertage zwischen von/bis (inklusive), als
+// UTC-Mitternacht — konsistent mit der App, die Datumsangaben ebenfalls als
+// UTC-Mitternacht des jeweiligen Kalendertags speichert (siehe events_page.dart:
+// `DateFormat('dd.MM.yyyy').parseStrict(text, true)`).
+function eachDayUtc(von: Date, bis: Date): Date[] {
+  const days: Date[] = [];
+  let cursor = Date.UTC(von.getUTCFullYear(), von.getUTCMonth(), von.getUTCDate());
+  const end = Date.UTC(bis.getUTCFullYear(), bis.getUTCMonth(), bis.getUTCDate());
+  while (cursor <= end) {
+    days.push(new Date(cursor));
+    cursor += 24 * 60 * 60 * 1000;
+  }
+  return days;
+}
+
+export const createEventContainer = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Nicht eingeloggt");
+  }
+  await assertEventManager(request.auth.uid, request.auth.token.email);
+
+  const data = request.data as Record<string, unknown>;
+  const shared = parseSharedFields(data);
+  const pinned = data["pinned"] === true;
+  const eventRequestId = typeof data["eventRequestId"] === "string" ? data["eventRequestId"] : null;
+
+  const vonRaw = data["von"];
+  const bisRaw = data["bis"];
+  if (typeof vonRaw !== "string" || typeof bisRaw !== "string") {
+    throw new HttpsError("invalid-argument", "von/bis fehlen");
+  }
+  const von = new Date(vonRaw);
+  const bis = new Date(bisRaw);
+  if (isNaN(von.getTime()) || isNaN(bis.getTime()) || von.getTime() > bis.getTime()) {
+    throw new HttpsError("invalid-argument", "Ungültiger Zeitraum (von muss vor/gleich bis liegen)");
+  }
+
+  const days = eachDayUtc(von, bis);
+  const eventsRef = db.collection("events");
+  const containerRef = eventsRef.doc();
+  const batch = db.batch();
+
+  batch.set(containerRef, {
+    ...shared,
+    id: containerRef.id,
+    datum: days[0].toISOString(),
+    pinned,
+    isContainer: true,
+    containerId: null,
+  });
+
+  const childIds: string[] = [];
+  for (const day of days) {
+    const childRef = eventsRef.doc();
+    childIds.push(childRef.id);
+    batch.set(childRef, {
+      ...shared,
+      id: childRef.id,
+      datum: day.toISOString(),
+      pinned: false,
+      isContainer: false,
+      containerId: containerRef.id,
+    });
+  }
+
+  if (eventRequestId) {
+    batch.update(db.collection("eventRequests").doc(eventRequestId), {
+      status: "approved",
+      reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  }
+
+  await batch.commit();
+  return {containerId: containerRef.id, childIds};
+});
+
+export const updateEventContainer = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Nicht eingeloggt");
+  }
+  await assertEventManager(request.auth.uid, request.auth.token.email);
+
+  const data = request.data as Record<string, unknown>;
+  const containerId = data["containerId"];
+  if (typeof containerId !== "string" || !containerId) {
+    throw new HttpsError("invalid-argument", "containerId fehlt");
+  }
+  const shared = parseSharedFields(data);
+  const pinned = data["pinned"] === true;
+  const syncChildren = data["syncChildren"] === true;
+
+  const containerRef = db.collection("events").doc(containerId);
+  const batch = db.batch();
+  batch.update(containerRef, {...shared, pinned});
+
+  if (syncChildren) {
+    const childrenSnap = await db
+      .collection("events")
+      .where("containerId", "==", containerId)
+      .get();
+    for (const childDoc of childrenSnap.docs) {
+      batch.update(childDoc.ref, {...shared});
+    }
+  }
+
+  await batch.commit();
+  return {success: true};
+});
+
+export const deleteEventContainer = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Nicht eingeloggt");
+  }
+  await assertEventManager(request.auth.uid, request.auth.token.email);
+
+  const data = request.data as {containerId?: unknown};
+  const containerId = data.containerId;
+  if (typeof containerId !== "string" || !containerId) {
+    throw new HttpsError("invalid-argument", "containerId fehlt");
+  }
+
+  const childrenSnap = await db
+    .collection("events")
+    .where("containerId", "==", containerId)
+    .get();
+
+  const batch = db.batch();
+  batch.delete(db.collection("events").doc(containerId));
+  for (const childDoc of childrenSnap.docs) {
+    batch.delete(childDoc.ref);
+  }
+  await batch.commit();
+  return {success: true};
+});

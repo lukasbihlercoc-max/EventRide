@@ -1,6 +1,8 @@
 // events_page.dart
 import 'dart:async';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
+import 'package:my_app/utils/async_guard.dart';
 import 'package:my_app/utils/platform_pickers.dart';
 import 'package:my_app/views/widgets/places_autocomplete_field.dart';
 import 'package:my_app/views/widgets/app_snackbar.dart';
@@ -77,15 +79,23 @@ class _EventsPageState extends State<EventsPage> {
   final nameController = TextEditingController();
   final standortController = TextEditingController();
   final datumController = TextEditingController();
+  final vonController = TextEditingController();
+  final bisController = TextEditingController();
   final uhrzeitController = TextEditingController(text: '20:00');
   String? typ = "e0";
   final beschreibungController = TextEditingController();
   final adresseController = TextEditingController();
   double? _latitude;
   double? _longitude;
+  bool _pinned = false;
+  bool _mehrtaegig = false;
+  bool _syncChildren = true;
+  bool _saving = false;
 
   List<Event> _similarEvents = [];
   Timer? _debounceTimer;
+
+  bool get _isEditingContainer => widget.event?.isContainer ?? false;
 
   @override
   void initState() {
@@ -101,6 +111,7 @@ class _EventsPageState extends State<EventsPage> {
       adresseController.text = widget.event!.adresse;
       _latitude = widget.event!.latitude;
       _longitude = widget.event!.longitude;
+      _pinned = widget.event!.pinned;
     }
 
     nameController.addListener(_onTextChanged);
@@ -113,6 +124,8 @@ class _EventsPageState extends State<EventsPage> {
     nameController.dispose();
     standortController.dispose();
     datumController.dispose();
+    vonController.dispose();
+    bisController.dispose();
     uhrzeitController.dispose();
     beschreibungController.dispose();
     adresseController.dispose();
@@ -193,9 +206,107 @@ class _EventsPageState extends State<EventsPage> {
   }
 
   Future<void> _saveEvent() async {
+    if (_saving) return;
+
+    // Mehrtägig-Neuanlage: Von/Bis statt Einzeldatum, läuft komplett über
+    // die createEventContainer Cloud Function (einzige Implementierung der
+    // Tages-Generierung, siehe functions/src/index.ts).
+    if (widget.event == null && _mehrtaegig) {
+      if (vonController.text.trim().isEmpty || bisController.text.trim().isEmpty) {
+        AppSnackbar.show(context, message: "Bitte Von- und Bis-Datum auswählen");
+        return;
+      }
+      try {
+        final von = DateFormat("dd.MM.yyyy").parseStrict(vonController.text, true);
+        final bis = DateFormat("dd.MM.yyyy").parseStrict(bisController.text, true);
+        setState(() => _saving = true);
+        await guarded(
+          FirebaseFunctions.instance.httpsCallable('createEventContainer').call({
+            'name': nameController.text.trim().isEmpty
+                ? "Unbenanntes Event"
+                : nameController.text.trim(),
+            'standort': standortController.text.trim().isNotEmpty
+                ? standortController.text.trim()
+                : "Unbekannt",
+            'typ': typ ?? "e0",
+            'beschreibung': beschreibungController.text.trim(),
+            'adresse': adresseController.text.trim().isNotEmpty
+                ? adresseController.text.trim()
+                : "Adresse nicht angegeben",
+            'latitude': _latitude,
+            'longitude': _longitude,
+            'uhrzeit': uhrzeitController.text.trim().isEmpty
+                ? null
+                : uhrzeitController.text.trim(),
+            'pinned': _pinned,
+            'von': von.toIso8601String(),
+            'bis': bis.toIso8601String(),
+          }),
+        );
+        if (!mounted) return;
+        Navigator.pop(context);
+      } on FormatException {
+        if (mounted) AppSnackbar.show(context, message: "Ungültiges Datumformat");
+      } on AsyncGuardTimeoutException {
+        if (mounted) {
+          Navigator.pop(context);
+          AppSnackbar.show(context,
+              message: "Verbindung langsam – wird im Hintergrund synchronisiert");
+        }
+      } catch (e) {
+        if (mounted) AppSnackbar.show(context, message: "Fehler beim Speichern: $e");
+      } finally {
+        if (mounted) setState(() => _saving = false);
+      }
+      return;
+    }
+
     if (datumController.text.trim().isEmpty) {
-      if (!mounted) return;
       AppSnackbar.show(context, message: "Bitte ein Datum auswählen");
+      return;
+    }
+
+    // Container-Bearbeitung: läuft über updateEventContainer (optional mit
+    // Sync auf alle Kind-Tage), nicht über den normalen Einzel-Update-Pfad.
+    if (_isEditingContainer) {
+      try {
+        setState(() => _saving = true);
+        await guarded(
+          FirebaseFunctions.instance.httpsCallable('updateEventContainer').call({
+            'containerId': widget.event!.id,
+            'name': nameController.text.trim().isEmpty
+                ? widget.event!.name
+                : nameController.text.trim(),
+            'standort': standortController.text.trim().isNotEmpty
+                ? standortController.text.trim()
+                : widget.event!.standort,
+            'typ': typ ?? widget.event!.typ,
+            'beschreibung': beschreibungController.text.trim(),
+            'adresse': adresseController.text.trim().isNotEmpty
+                ? adresseController.text.trim()
+                : widget.event!.adresse,
+            'latitude': _latitude,
+            'longitude': _longitude,
+            'uhrzeit': uhrzeitController.text.trim().isEmpty
+                ? null
+                : uhrzeitController.text.trim(),
+            'pinned': _pinned,
+            'syncChildren': _syncChildren,
+          }),
+        );
+        if (!mounted) return;
+        Navigator.pop(context);
+      } on AsyncGuardTimeoutException {
+        if (mounted) {
+          Navigator.pop(context);
+          AppSnackbar.show(context,
+              message: "Verbindung langsam – wird im Hintergrund synchronisiert");
+        }
+      } catch (e) {
+        if (mounted) AppSnackbar.show(context, message: "Fehler beim Speichern: $e");
+      } finally {
+        if (mounted) setState(() => _saving = false);
+      }
       return;
     }
 
@@ -222,6 +333,7 @@ class _EventsPageState extends State<EventsPage> {
               : "Adresse nicht angegeben",
           latitude: _latitude,
           longitude: _longitude,
+          pinned: _pinned,
         );
         await eventService.add(newEvent);
       } else {
@@ -241,6 +353,7 @@ class _EventsPageState extends State<EventsPage> {
               : widget.event!.adresse,
           latitude: _latitude,
           longitude: _longitude,
+          pinned: _pinned,
         );
         await eventService.update(updatedEvent);
       }
@@ -254,6 +367,34 @@ class _EventsPageState extends State<EventsPage> {
       if (!mounted) return;
       AppSnackbar.show(context, message: "Fehler beim Speichern: $e");
     }
+  }
+
+  Widget _checkboxTile({
+    required String label,
+    required bool value,
+    required ValueChanged<bool?> onChanged,
+  }) {
+    return InkWell(
+      onTap: () => onChanged(!value),
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            Checkbox(
+              value: value,
+              onChanged: onChanged,
+              activeColor: _kAccent,
+              side: const BorderSide(color: Colors.white70, width: 1.5),
+            ),
+            Text(
+              label,
+              style: const TextStyle(color: Colors.white, fontSize: 15),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _typBadge(String typKey) {
@@ -378,41 +519,122 @@ class _EventsPageState extends State<EventsPage> {
                   decoration: getInputStyle("Eventname"),
                 ),
                 const SizedBox(height: 16),
-                TextFormField(
-                  controller: datumController,
-                  style: inputTextStyle,
-                  decoration: getInputStyle(
-                    "Datum",
-                    suffixIcon: const Icon(
-                      Icons.calendar_today_outlined,
-                      color: Colors.white38,
-                      size: 20,
-                    ),
-                  ),
-                  readOnly: true,
-                  onTap: () async {
-                    DateTime? pickedDate = await showPlatformDatePicker(
-                      context,
-                      initialDate: widget.event?.datum.toLocal() ?? DateTime.now(),
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime(2100),
-                    );
-                    if (pickedDate != null) {
-                      setState(() {
-                        datumController.text =
-                            DateFormat('dd.MM.yyyy').format(pickedDate);
-                      });
-                      _updateSimilarEvents();
-                    }
-                  },
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Bitte ein Datum auswählen';
-                    }
-                    return null;
-                  },
+                _checkboxTile(
+                  label: "Angepinnt",
+                  value: _pinned,
+                  onChanged: (v) => setState(() => _pinned = v ?? false),
                 ),
+                if (widget.event == null) ...[
+                  const SizedBox(height: 8),
+                  _checkboxTile(
+                    label: "Mehrtägiges Event",
+                    value: _mehrtaegig,
+                    onChanged: (v) => setState(() => _mehrtaegig = v ?? false),
+                  ),
+                ],
+                if (_isEditingContainer) ...[
+                  const SizedBox(height: 8),
+                  _checkboxTile(
+                    label: "Änderungen auf alle Tage übertragen",
+                    value: _syncChildren,
+                    onChanged: (v) => setState(() => _syncChildren = v ?? false),
+                  ),
+                ],
                 const SizedBox(height: 16),
+                if (widget.event == null && _mehrtaegig) ...[
+                  TextFormField(
+                    controller: vonController,
+                    style: inputTextStyle,
+                    decoration: getInputStyle(
+                      "Von",
+                      suffixIcon: const Icon(
+                        Icons.calendar_today_outlined,
+                        color: Colors.white38,
+                        size: 20,
+                      ),
+                    ),
+                    readOnly: true,
+                    onTap: () async {
+                      final pickedDate = await showPlatformDatePicker(
+                        context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2100),
+                      );
+                      if (pickedDate != null) {
+                        setState(() {
+                          vonController.text =
+                              DateFormat('dd.MM.yyyy').format(pickedDate);
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: bisController,
+                    style: inputTextStyle,
+                    decoration: getInputStyle(
+                      "Bis",
+                      suffixIcon: const Icon(
+                        Icons.calendar_today_outlined,
+                        color: Colors.white38,
+                        size: 20,
+                      ),
+                    ),
+                    readOnly: true,
+                    onTap: () async {
+                      final pickedDate = await showPlatformDatePicker(
+                        context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2100),
+                      );
+                      if (pickedDate != null) {
+                        setState(() {
+                          bisController.text =
+                              DateFormat('dd.MM.yyyy').format(pickedDate);
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                ] else ...[
+                  TextFormField(
+                    controller: datumController,
+                    style: inputTextStyle,
+                    decoration: getInputStyle(
+                      "Datum",
+                      suffixIcon: const Icon(
+                        Icons.calendar_today_outlined,
+                        color: Colors.white38,
+                        size: 20,
+                      ),
+                    ),
+                    readOnly: true,
+                    onTap: () async {
+                      DateTime? pickedDate = await showPlatformDatePicker(
+                        context,
+                        initialDate: widget.event?.datum.toLocal() ?? DateTime.now(),
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2100),
+                      );
+                      if (pickedDate != null) {
+                        setState(() {
+                          datumController.text =
+                              DateFormat('dd.MM.yyyy').format(pickedDate);
+                        });
+                        _updateSimilarEvents();
+                      }
+                    },
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Bitte ein Datum auswählen';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 TextFormField(
                   controller: uhrzeitController,
                   style: inputTextStyle,
@@ -503,15 +725,24 @@ class _EventsPageState extends State<EventsPage> {
                 _buildSimilarEventsSection(),
                 if (_similarEvents.isNotEmpty) const SizedBox(height: 16),
                 GestureDetector(
-                  onTap: _saveEvent,
+                  onTap: _saving ? null : _saveEvent,
                   child: Container(
                     width: double.infinity,
                     height: _kButtonHeight,
                     decoration: BoxDecoration(
-                      color: _kAccent,
+                      color: _saving ? _kAccent.withValues(alpha: 0.5) : _kAccent,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Row(
+                    child: _saving
+                        ? const Center(
+                            child: SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2),
+                            ),
+                          )
+                        : Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const Icon(Icons.save_outlined,

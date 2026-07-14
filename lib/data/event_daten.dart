@@ -16,6 +16,19 @@ class Event {
   /// nicht in toMap(), damit Client-Updates den Zähler nie überschreiben.
   final int interessentenCount;
 
+  /// Angepinnt: erscheint oben in der Liste, mit etwas mehr Abstand zu den
+  /// restlichen Events.
+  final bool pinned;
+
+  /// true = Container-Karte eines mehrtägigen Events (nur Hülle, keine
+  /// eigene Detailseite). Kind-Events (siehe [containerId]) sind
+  /// vollständig eigenständige Events und haben isContainer=false.
+  final bool isContainer;
+
+  /// Gesetzt bei einem Kind-Event eines mehrtägigen Containers, zeigt auf
+  /// die id des Container-Events. null = normales Event oder Container.
+  final String? containerId;
+
   // optional: alias für alte Verwendung
   String get stabileId => id;
 
@@ -31,6 +44,9 @@ class Event {
     this.latitude,
     this.longitude,
     this.interessentenCount = 0,
+    this.pinned = false,
+    this.isContainer = false,
+    this.containerId,
   })  : id = id ?? DateTime.now().millisecondsSinceEpoch.toString(),
         // Normalisiere Datum auf UTC intern, damit Firestore-kompatibel
         datum = datum.toUtc();
@@ -46,7 +62,8 @@ class Event {
     String? adresse,
     double? latitude,
     double? longitude,
-    // id bleibt absichtlich unverändert
+    bool? pinned,
+    // id, isContainer, containerId bleiben absichtlich unverändert
   }) {
     return Event(
       id: id,
@@ -60,6 +77,9 @@ class Event {
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
       interessentenCount: interessentenCount,
+      pinned: pinned ?? this.pinned,
+      isContainer: isContainer,
+      containerId: containerId,
     );
   }
 
@@ -77,6 +97,9 @@ class Event {
       'adresse': adresse,
       'latitude': latitude,
       'longitude': longitude,
+      'pinned': pinned,
+      'isContainer': isContainer,
+      'containerId': containerId,
     };
   }
 
@@ -117,6 +140,9 @@ class Event {
       latitude: (map['latitude'] as num?)?.toDouble(),
       longitude: (map['longitude'] as num?)?.toDouble(),
       interessentenCount: (map['interessentenCount'] as num?)?.toInt() ?? 0,
+      pinned: map['pinned'] as bool? ?? false,
+      isContainer: map['isContainer'] as bool? ?? false,
+      containerId: map['containerId'] as String?,
     );
   }
 

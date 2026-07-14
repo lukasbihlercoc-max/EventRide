@@ -66,6 +66,9 @@ class EventService with ChangeNotifier {
   }
 
   void _sort() {
-    _events.sort((a, b) => a.datum.compareTo(b.datum));
+    _events.sort((a, b) {
+      if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
+      return a.datum.compareTo(b.datum);
+    });
   }
 }

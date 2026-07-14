@@ -9,6 +9,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-functions-compat.js"></script>
 <style>
 /* ── Design tokens ── */
 :root{
@@ -474,6 +475,7 @@ const CFG = {
 firebase.initializeApp(CFG);
 const auth = firebase.auth();
 const db = firebase.firestore();
+const functionsRef = firebase.functions();
 
 // ---- THEME ----
 function applyTheme(t) {
@@ -658,7 +660,10 @@ function initFS() {
         createdAt: data.createdAt?.toMillis?.() || 0,
         mgrSrcQuelleTyp: data.mgrSrcQuelleTyp || '',
         mgrSrcQuelleLink: data.mgrSrcQuelleLink || '',
-        mgrSrcIgAccount: data.mgrSrcIgAccount || ''
+        mgrSrcIgAccount: data.mgrSrcIgAccount || '',
+        pinned: !!data.pinned,
+        isContainer: !!data.isContainer,
+        containerId: data.containerId || null
       };
     });
     render();
@@ -1576,8 +1581,8 @@ function renderInApp() {
         <div class="event-row status-inapp ${selId===ev._id?"selected":""} ${isPast(ev.datum)?"past":""}" onclick="selId=selId==='${ev._id}'?null:'${ev._id}';render()">
           ${typBadge(ev.typ)}
           <div style="flex:1;min-width:0">
-            <div class="event-name">${esc(ev.name)}</div>
-            <div class="event-meta">${esc(ev.gemeinde)}${ev.bezirk?" · "+esc(ev.bezirk):""}</div>
+            <div class="event-name">${ev.pinned?'📌 ':''}${ev.isContainer?'▼ ':ev.containerId?'└ ':''}${esc(ev.name)}</div>
+            <div class="event-meta">${esc(ev.gemeinde)}${ev.bezirk?" · "+esc(ev.bezirk):""}${ev.isContainer?" · Container":ev.containerId?" · Tag eines Containers":""}</div>
             ${ev.mgrSrcIgAccount?`<div style="font-size:10px;color:#9D174D;margin-top:1px">📱 @${esc(ev.mgrSrcIgAccount)}</div>`:ev.mgrSrcQuelleTyp?`<div style="font-size:10px;color:#888;margin-top:1px">${{flyer:'📄 Flyer',web:'🌐 Web',instagram:'📱 Instagram'}[ev.mgrSrcQuelleTyp]||ev.mgrSrcQuelleTyp}</div>`:''}
           </div>
           <div class="event-date" style="color:${isPast(ev.datum)?"#e74c3c":"#555"}">${fmt(ev.datum)}</div>
@@ -1591,6 +1596,7 @@ function renderInApp() {
 function appEventDetail(ev) {
   if (appEditMode) {
     const d = appEditData;
+    const isContainer = !!d.isContainer;
     const bezOpts = BEZIRKE.map(b=>`<option value="${b}" ${d.bezirk===b?'selected':''}>${b}</option>`).join('');
     const typOpts = [['e1','Kirchtage/Feste'],['e2','Feuerwehr'],['e3','Disco/Party'],['e4','Ball'],['e5','Krampus'],['e6','Festival/Open-Air'],['e7','Sommer/Strand']]
       .map(([v,l])=>`<option value="${v}" ${d.typ===v?'selected':''}>  ${l}</option>`).join('');
@@ -1598,14 +1604,26 @@ function appEventDetail(ev) {
     return `<div class="detail-panel">
       <div class="detail-top">
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <span style="font-weight:700;font-size:14px">In App bearbeiten</span>
+          <span style="font-weight:700;font-size:14px">${isContainer?'Container bearbeiten':'In App bearbeiten'}</span>
           <button class="icon-btn" onclick="cancelAppEdit()">×</button>
         </div>
       </div>
       <div class="detail-body">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;margin-bottom:10px">
+          <input type="checkbox" ${d.pinned?'checked':''} style="width:15px;height:15px;accent-color:var(--accent)"
+            onchange="appEditData.pinned=this.checked">
+          📌 Angepinnt
+        </label>
+        ${isContainer ? `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;margin-bottom:10px">
+          <input type="checkbox" ${d.syncChildren===false?'':'checked'} style="width:15px;height:15px;accent-color:var(--accent)"
+            onchange="appEditData.syncChildren=this.checked">
+          Änderungen auf alle Tage übertragen
+        </label>` : ''}
         <div class="edit-grid">
           <span class="edit-label">Name *</span><input value="${esc(d.name||'')}" oninput="appEditData.name=this.value">
-          <span class="edit-label">Datum *</span><input type="date" value="${d.datumISO||''}" onchange="appEditData.datumISO=this.value">
+          ${isContainer
+            ? `<span class="edit-label">Zeitraum</span><span class="field-val" style="font-size:12px;color:#888">${fmt(ev.datum)} (Start) – Tage einzeln über "In App"-Liste bearbeitbar</span>`
+            : `<span class="edit-label">Datum *</span><input type="date" value="${d.datumISO||''}" onchange="appEditData.datumISO=this.value">`}
           <span class="edit-label">Uhrzeit</span><input type="time" value="${esc(d.uhrzeit||'')}" onchange="appEditData.uhrzeit=this.value">
           <span class="edit-label">Standort *</span><input value="${esc(d.gemeinde||'')}" oninput="appEditData.gemeinde=this.value">
           <span class="edit-label">Bezirk</span><select onchange="appEditData.bezirk=this.value"><option value="">–</option>${bezOpts}</select>
@@ -1632,12 +1650,13 @@ function appEventDetail(ev) {
   }
 
   const hasCoords = ev.lat && ev.lng;
+  const childCount = ev.isContainer ? appEvents.filter(e => e.containerId === ev._id).length : 0;
   return `<div class="detail-panel">
     <div class="detail-top">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div>
-          <div class="detail-name">${esc(ev.name)}</div>
-          <div class="detail-badges">${typBadge(ev.typ)}<span class="badge badge-inapp">In App</span></div>
+          <div class="detail-name">${ev.pinned?'📌 ':''}${esc(ev.name)}</div>
+          <div class="detail-badges">${typBadge(ev.typ)}<span class="badge badge-inapp">In App</span>${ev.isContainer?`<span class="badge">Container · ${childCount} Tage</span>`:''}</div>
         </div>
         <div style="display:flex;gap:5px;flex-shrink:0;align-items:center">
           <button class="small primary" onclick="startAppEdit('${ev._id}')">✏ Bearbeiten</button>
@@ -1676,7 +1695,7 @@ function startAppEdit(id) {
   const datumISO = d
     ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
     : '';
-  appEditData = { ...ev, datumISO, typ: normalizeTyp(ev.typ) };
+  appEditData = { ...ev, datumISO, typ: normalizeTyp(ev.typ), pinned: !!ev.pinned, isContainer: !!ev.isContainer, syncChildren: true };
   appEditMode = true;
   render();
   initUploadAutocomplete();
@@ -1686,6 +1705,30 @@ function cancelAppEdit() { appEditMode = false; render(); }
 
 function saveAppEdit(id) {
   if (!appEditData.name || !appEditData.gemeinde) { alert('Name und Standort sind Pflichtfelder.'); return; }
+
+  // Container-Bearbeitung läuft über updateEventContainer (optional mit
+  // Sync auf alle Kind-Tage) — einzige Implementierung des Feld-Syncs,
+  // siehe functions/src/index.ts.
+  if (appEditData.isContainer) {
+    functionsRef.httpsCallable('updateEventContainer')({
+      containerId: id,
+      name: appEditData.name,
+      standort: appEditData.gemeinde,
+      typ: normalizeTyp(appEditData.typ),
+      beschreibung: appEditData.beschreibung || '',
+      adresse: appEditData.adresse || appEditData.gemeinde || '',
+      latitude: appEditData.lat || null,
+      longitude: appEditData.lng || null,
+      uhrzeit: appEditData.uhrzeit || '20:00',
+      pinned: !!appEditData.pinned,
+      syncChildren: appEditData.syncChildren !== false,
+    }).then(() => {
+      appEditMode = false;
+      showToast('✓ ' + appEditData.name + ' aktualisiert');
+    }).catch(e => alert('Fehler: ' + e.message));
+    return;
+  }
+
   if (!appEditData.datumISO) { alert('Bitte ein Datum eingeben.'); return; }
   const uhr = appEditData.uhrzeit || '20:00';
   const datumISO = `${appEditData.datumISO}T${uhr}:00.000Z`;
@@ -1703,6 +1746,7 @@ function saveAppEdit(id) {
     typ: normalizeTyp(appEditData.typ),
     latitude: appEditData.lat || null,
     longitude: appEditData.lng || null,
+    pinned: !!appEditData.pinned,
   }).then(() => {
     appEditMode = false;
     showToast('✓ ' + appEditData.name + ' aktualisiert');
@@ -1712,8 +1756,17 @@ function saveAppEdit(id) {
 function deleteAppEvent(id) {
   const ev = appEvents.find(e => e._id === id);
   if (!ev) return;
-  if (!confirm(`"${ev.name}" wirklich aus der App löschen?\n\nDiese Aktion kann nicht rückgängig gemacht werden.`)) return;
-  db.collection('events').doc(id).delete().then(() => {
+  const isContainer = !!ev.isContainer;
+  const warnMsg = isContainer
+    ? `"${ev.name}" und alle zugehörigen Tage werden unwiderruflich gelöscht.\n\nDiese Aktion kann nicht rückgängig gemacht werden.`
+    : `"${ev.name}" wirklich aus der App löschen?\n\nDiese Aktion kann nicht rückgängig gemacht werden.`;
+  if (!confirm(warnMsg)) return;
+
+  const deletion = isContainer
+    ? functionsRef.httpsCallable('deleteEventContainer')({ containerId: id })
+    : db.collection('events').doc(id).delete();
+
+  deletion.then(() => {
     selId = null; appEditMode = false;
     showToast('🗑 ' + ev.name + ' gelöscht');
   }).catch(e => alert('Fehler: ' + e.message));
@@ -2456,6 +2509,10 @@ function openUpload(id) {
     quellen: [],
     infoAusstehend: false,
     notiz: '',
+    pinned: false,
+    mehrtaegig: false,
+    von: '',
+    bis: '',
   };
   document.getElementById('upload-form-content').innerHTML = uploadFormHTML();
   document.getElementById('up-eintritt').value = uploadData.eintritt;
@@ -2608,11 +2665,31 @@ function uploadFormHTML() {
       <div style="font-size:11px;color:#7A4A00;margin-top:6px">Bitte prüfen ob es sich um das gleiche Event handelt, bevor du hochlädst.</div>
     </div>` : '';
   const csvBtnHtml = `<button class="small" style="margin-bottom:14px" onclick="toggleUploadCsvPanel()">📄 Daten aus Flyer</button>`;
-  return csvBtnHtml + warnHtml + `<div class="edit-grid">
-    <span class="edit-label">Name *</span>
-    <input id="up-name" value="${esc(uploadData.name)}" oninput="uploadData.name=this.value">
+  const pinMehrtaegigHtml = `<div style="margin-bottom:14px;display:flex;gap:16px;flex-wrap:wrap">
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+      <input type="checkbox" ${uploadData.pinned?'checked':''} style="width:15px;height:15px;accent-color:var(--accent)"
+        onchange="uploadData.pinned=this.checked">
+      📌 Angepinnt
+    </label>
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+      <input type="checkbox" ${uploadData.mehrtaegig?'checked':''} style="width:15px;height:15px;accent-color:var(--accent)"
+        onchange="uploadData.mehrtaegig=this.checked;document.getElementById('upload-form-content').innerHTML=uploadFormHTML();initUploadAutocomplete();">
+      📅 Mehrtägiges Event
+    </label>
+  </div>`;
+  const datumFieldsHtml = uploadData.mehrtaegig ? `
+    <span class="edit-label">Von *</span>
+    <input id="up-von" type="date" value="${uploadData.von||''}" onchange="uploadData.von=this.value">
+    <span class="edit-label">Bis *</span>
+    <input id="up-bis" type="date" value="${uploadData.bis||''}" onchange="uploadData.bis=this.value">
+  ` : `
     <span class="edit-label">Datum *</span>
     <input id="up-datum" type="date" value="${uploadData.datum}" onchange="uploadData.datum=this.value">
+  `;
+  return csvBtnHtml + warnHtml + pinMehrtaegigHtml + `<div class="edit-grid">
+    <span class="edit-label">Name *</span>
+    <input id="up-name" value="${esc(uploadData.name)}" oninput="uploadData.name=this.value">
+    ${datumFieldsHtml}
     <span class="edit-label">Uhrzeit</span>
     <input id="up-uhrzeit" type="time" value="${uploadData.uhrzeit}" onchange="uploadData.uhrzeit=this.value">
     <span class="edit-label">Standort *</span>
@@ -2838,7 +2915,11 @@ function parseCoordsInput(val) {
 
 function submitUpload() {
   if (!uploadData.name || !uploadData.standort) { alert('Name und Standort sind Pflichtfelder.'); return; }
-  if (!uploadData.datum) { alert('Bitte ein Datum eingeben.'); return; }
+  if (uploadData.mehrtaegig) {
+    if (!uploadData.von || !uploadData.bis) { alert('Bitte Von- und Bis-Datum eingeben.'); return; }
+  } else if (!uploadData.datum) {
+    alert('Bitte ein Datum eingeben.'); return;
+  }
   const uhr = uploadData.uhrzeit || '20:00';
   const btn = document.getElementById('btn-upload-submit');
   btn.disabled = true;
@@ -2857,6 +2938,41 @@ function submitUpload() {
       ...(newQuellen.length ? { quellen: newQuellen } : {})
     }).then(() => { closeUpload(); showToast('⏳ Als ausstehend markiert'); })
       .catch(e => { btn.disabled = false; btn.textContent = '↑ In App speichern'; alert('Fehler: ' + e.message); });
+    return;
+  }
+
+  // Mehrtägiges Event: läuft komplett über die createEventContainer Cloud
+  // Function (einzige Implementierung der Tages-Generierung, siehe
+  // functions/src/index.ts) — keine eigene Tages-Berechnung hier.
+  if (uploadData.mehrtaegig) {
+    const eintrittText = uploadData.eintritt.trim();
+    const beschreibungText = uploadData.beschreibung.trim();
+    const _parts = [];
+    if (eintrittText) {
+      const _eLines = eintrittText.split('\n').map(l => l.trim()).filter(Boolean);
+      _parts.push('Eintritt:\n' + _eLines.map(l => /€/.test(l) ? l : l + ' €').join('\n'));
+    }
+    _parts.push('Einlass ab ' + uhr + ' Uhr');
+    if (beschreibungText) _parts.push(beschreibungText);
+    functionsRef.httpsCallable('createEventContainer')({
+      name: uploadData.name,
+      standort: uploadData.standort,
+      typ: normalizeTyp(uploadData.typ),
+      beschreibung: _parts.join('\n\n'),
+      adresse: uploadData.adresse || uploadData.standort || '',
+      latitude: uploadData.latitude || null,
+      longitude: uploadData.longitude || null,
+      uhrzeit: uhr,
+      pinned: !!uploadData.pinned,
+      von: `${uploadData.von}T00:00:00.000Z`,
+      bis: `${uploadData.bis}T00:00:00.000Z`,
+    }).then(() => db.collection('pending_events').doc(uploadPendingId).update({ inApp: true }))
+      .then(() => { closeUpload(); showToast('✓ ' + uploadData.name + ' in App gespeichert'); })
+      .catch(e => {
+        btn.disabled = false;
+        btn.textContent = '↑ In App speichern';
+        alert('Fehler: ' + e.message);
+      });
     return;
   }
 
@@ -2888,6 +3004,9 @@ function submitUpload() {
     longitude: uploadData.longitude || null,
     mgrSrcQuelleTyp: uploadData.quelleTyp || '', mgrSrcQuelleLink: uploadData.quelleLink || '', mgrSrcIgAccount: '',
     id: _uploadRef.id,
+    pinned: !!uploadData.pinned,
+    isContainer: false,
+    containerId: null,
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   }).then(() => db.collection('pending_events').doc(uploadPendingId).update({ inApp: true }))
     .then(() => { closeUpload(); showToast('✓ ' + uploadData.name + ' in App gespeichert'); })
