@@ -663,7 +663,8 @@ function initFS() {
         mgrSrcIgAccount: data.mgrSrcIgAccount || '',
         pinned: !!data.pinned,
         isContainer: !!data.isContainer,
-        containerId: data.containerId || null
+        containerId: data.containerId || null,
+        adminOnly: !!data.adminOnly
       };
     });
     render();
@@ -1485,7 +1486,7 @@ async function submitQuickIgAdd() {
 
 // ---- ADD MODAL ----
 function openAdd(prefill) {
-  addFormData = Object.assign({name:"",datum:"",uhrzeit:"20:00",gemeinde:"",bezirk:"Spittal",veranstalter:"örtlich",eintritt:"",beschreibung:"",typ:"e1",quelle:"",quelleTyp:"",quelleLink:"",srcZitat:"",sicherheit:"mittel",adresse:"",latitude:null,longitude:null,notiz:"",infoAusstehend:false,pinned:false,mehrtaegig:false,von:"",bis:""}, prefill||{});
+  addFormData = Object.assign({name:"",datum:"",uhrzeit:"20:00",gemeinde:"",bezirk:"Spittal",veranstalter:"örtlich",eintritt:"",beschreibung:"",typ:"e1",quelle:"",quelleTyp:"",quelleLink:"",srcZitat:"",sicherheit:"mittel",adresse:"",latitude:null,longitude:null,notiz:"",infoAusstehend:false,pinned:false,mehrtaegig:false,von:"",bis:"",adminOnly:false}, prefill||{});
   renderAddForm();
   document.getElementById("modal-add").style.display="flex";
   setupAutocompleteWhenReady('add-adresse', addFormData, 'add-coords', 'add-coords-text', 'add-no-coords-warn');
@@ -1512,6 +1513,11 @@ function renderAddForm() {
       <input type="checkbox" ${addFormData.mehrtaegig?'checked':''} style="width:15px;height:15px;accent-color:var(--accent)"
         onchange="addFormData.mehrtaegig=this.checked;renderAddForm();">
       📅 Mehrtägiges Event
+    </label>
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+      <input type="checkbox" ${addFormData.adminOnly?'checked':''} style="width:15px;height:15px;accent-color:var(--accent)"
+        onchange="addFormData.adminOnly=this.checked">
+      🔒 Nur für Admins sichtbar (Test-Event)
     </label>
   </div>
   <div class="edit-grid">
@@ -1588,6 +1594,7 @@ function submitAdd() {
     mehrtaegig: !!addFormData.mehrtaegig,
     von: addFormData.mehrtaegig ? addFormData.von : '',
     bis: addFormData.mehrtaegig ? addFormData.bis : '',
+    adminOnly: !!addFormData.adminOnly,
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   }).then(()=>closeAdd()).catch(e=>alert("Fehler: "+e.message));
 }
@@ -1617,7 +1624,7 @@ function renderInApp() {
         <div class="event-row status-inapp ${selId===ev._id?"selected":""} ${isPast(ev.datum)?"past":""}" onclick="selId=selId==='${ev._id}'?null:'${ev._id}';render()">
           ${typBadge(ev.typ)}
           <div style="flex:1;min-width:0">
-            <div class="event-name">${ev.pinned?'📌 ':''}${ev.isContainer?'▼ ':ev.containerId?'└ ':''}${esc(ev.name)}</div>
+            <div class="event-name">${ev.pinned?'📌 ':''}${ev.adminOnly?'🔒 ':''}${ev.isContainer?'▼ ':ev.containerId?'└ ':''}${esc(ev.name)}</div>
             <div class="event-meta">${esc(ev.gemeinde)}${ev.bezirk?" · "+esc(ev.bezirk):""}${ev.isContainer?" · Container":ev.containerId?" · Tag eines Containers":""}</div>
             ${ev.mgrSrcIgAccount?`<div style="font-size:10px;color:#9D174D;margin-top:1px">📱 @${esc(ev.mgrSrcIgAccount)}</div>`:ev.mgrSrcQuelleTyp?`<div style="font-size:10px;color:#888;margin-top:1px">${{flyer:'📄 Flyer',web:'🌐 Web',instagram:'📱 Instagram'}[ev.mgrSrcQuelleTyp]||ev.mgrSrcQuelleTyp}</div>`:''}
           </div>
@@ -1649,6 +1656,11 @@ function appEventDetail(ev) {
           <input type="checkbox" ${d.pinned?'checked':''} style="width:15px;height:15px;accent-color:var(--accent)"
             onchange="appEditData.pinned=this.checked">
           📌 Angepinnt
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;margin-bottom:10px">
+          <input type="checkbox" ${d.adminOnly?'checked':''} style="width:15px;height:15px;accent-color:var(--accent)"
+            onchange="appEditData.adminOnly=this.checked">
+          🔒 Nur für Admins sichtbar (Test-Event)
         </label>
         ${isContainer ? `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;margin-bottom:10px">
           <input type="checkbox" ${d.syncChildren===false?'':'checked'} style="width:15px;height:15px;accent-color:var(--accent)"
@@ -1692,7 +1704,7 @@ function appEventDetail(ev) {
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div>
           <div class="detail-name">${ev.pinned?'📌 ':''}${esc(ev.name)}</div>
-          <div class="detail-badges">${typBadge(ev.typ)}<span class="badge badge-inapp">In App</span>${ev.isContainer?`<span class="badge">Container · ${childCount} Tage</span>`:''}</div>
+          <div class="detail-badges">${typBadge(ev.typ)}<span class="badge badge-inapp">In App</span>${ev.isContainer?`<span class="badge">Container · ${childCount} Tage</span>`:''}${ev.adminOnly?`<span class="badge" style="background:rgba(230,57,70,.12);color:#E63946;border-color:rgba(230,57,70,.3)">🔒 Nur Admin</span>`:''}</div>
         </div>
         <div style="display:flex;gap:5px;flex-shrink:0;align-items:center">
           <button class="small primary" onclick="startAppEdit('${ev._id}')">✏ Bearbeiten</button>
@@ -1757,6 +1769,7 @@ function saveAppEdit(id) {
       longitude: appEditData.lng || null,
       uhrzeit: appEditData.uhrzeit || '20:00',
       pinned: !!appEditData.pinned,
+      adminOnly: !!appEditData.adminOnly,
       syncChildren: appEditData.syncChildren !== false,
     }).then(() => {
       appEditMode = false;
@@ -1783,6 +1796,7 @@ function saveAppEdit(id) {
     latitude: appEditData.lat || null,
     longitude: appEditData.lng || null,
     pinned: !!appEditData.pinned,
+    adminOnly: !!appEditData.adminOnly,
   }).then(() => {
     appEditMode = false;
     showToast('✓ ' + appEditData.name + ' aktualisiert');
@@ -2376,6 +2390,7 @@ function openFlyerUpload(index) {
     mehrtaegig: false,
     von: '',
     bis: '',
+    adminOnly: false,
   };
 
   const allOffen = flyerEvents.filter(e => e.status === "offen");
@@ -2493,6 +2508,7 @@ function submitFlyerUpload() {
       longitude: uploadData.longitude || null,
       uhrzeit: uhr,
       pinned: !!uploadData.pinned,
+      adminOnly: !!uploadData.adminOnly,
       von: `${uploadData.von}T00:00:00.000Z`,
       bis: `${uploadData.bis}T00:00:00.000Z`,
     }).then(() => {
@@ -2534,6 +2550,7 @@ function submitFlyerUpload() {
     mgrSrcQuelleTyp: 'flyer', mgrSrcQuelleLink: uploadData.quelleLink || '', mgrSrcIgAccount: uploadData.igUsername || '',
     id: _flyerRef.id,
     pinned: !!uploadData.pinned,
+    adminOnly: !!uploadData.adminOnly,
     isContainer: false,
     containerId: null,
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -2610,6 +2627,7 @@ function openUpload(id) {
     mehrtaegig: !!ev.mehrtaegig,
     von: ev.von ? toDateInputValue(ev.von) : '',
     bis: ev.bis ? toDateInputValue(ev.bis) : '',
+    adminOnly: !!ev.adminOnly,
   };
   document.getElementById('upload-form-content').innerHTML = uploadFormHTML();
   document.getElementById('up-eintritt').value = uploadData.eintritt;
@@ -2772,6 +2790,11 @@ function uploadFormHTML() {
       <input type="checkbox" ${uploadData.mehrtaegig?'checked':''} style="width:15px;height:15px;accent-color:var(--accent)"
         onchange="uploadData.mehrtaegig=this.checked;document.getElementById('upload-form-content').innerHTML=uploadFormHTML();initUploadAutocomplete();">
       📅 Mehrtägiges Event
+    </label>
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+      <input type="checkbox" ${uploadData.adminOnly?'checked':''} style="width:15px;height:15px;accent-color:var(--accent)"
+        onchange="uploadData.adminOnly=this.checked">
+      🔒 Nur für Admins sichtbar (Test-Event)
     </label>
   </div>`;
   const datumFieldsHtml = uploadData.mehrtaegig ? `
@@ -3061,6 +3084,7 @@ function submitUpload() {
       longitude: uploadData.longitude || null,
       uhrzeit: uhr,
       pinned: !!uploadData.pinned,
+      adminOnly: !!uploadData.adminOnly,
       von: `${uploadData.von}T00:00:00.000Z`,
       bis: `${uploadData.bis}T00:00:00.000Z`,
     }).then(() => db.collection('pending_events').doc(uploadPendingId).update({ inApp: true }))
@@ -3102,6 +3126,7 @@ function submitUpload() {
     mgrSrcQuelleTyp: uploadData.quelleTyp || '', mgrSrcQuelleLink: uploadData.quelleLink || '', mgrSrcIgAccount: '',
     id: _uploadRef.id,
     pinned: !!uploadData.pinned,
+    adminOnly: !!uploadData.adminOnly,
     isContainer: false,
     containerId: null,
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),

@@ -88,6 +88,7 @@ class _EventsPageState extends State<EventsPage> {
   double? _latitude;
   double? _longitude;
   bool _pinned = false;
+  bool _adminOnly = false;
   bool _mehrtaegig = false;
   bool _syncChildren = true;
   bool _saving = false;
@@ -112,6 +113,7 @@ class _EventsPageState extends State<EventsPage> {
       _latitude = widget.event!.latitude;
       _longitude = widget.event!.longitude;
       _pinned = widget.event!.pinned;
+      _adminOnly = widget.event!.adminOnly;
     }
 
     nameController.addListener(_onTextChanged);
@@ -239,6 +241,7 @@ class _EventsPageState extends State<EventsPage> {
                 ? null
                 : uhrzeitController.text.trim(),
             'pinned': _pinned,
+            'adminOnly': _adminOnly,
             'von': von.toIso8601String(),
             'bis': bis.toIso8601String(),
           }),
@@ -291,6 +294,7 @@ class _EventsPageState extends State<EventsPage> {
                 ? null
                 : uhrzeitController.text.trim(),
             'pinned': _pinned,
+            'adminOnly': _adminOnly,
             'syncChildren': _syncChildren,
           }),
         );
@@ -334,6 +338,7 @@ class _EventsPageState extends State<EventsPage> {
           latitude: _latitude,
           longitude: _longitude,
           pinned: _pinned,
+          adminOnly: _adminOnly,
         );
         await eventService.add(newEvent);
       } else {
@@ -354,6 +359,7 @@ class _EventsPageState extends State<EventsPage> {
           latitude: _latitude,
           longitude: _longitude,
           pinned: _pinned,
+          adminOnly: _adminOnly,
         );
         await eventService.update(updatedEvent);
       }
@@ -523,6 +529,12 @@ class _EventsPageState extends State<EventsPage> {
                   label: "Angepinnt",
                   value: _pinned,
                   onChanged: (v) => setState(() => _pinned = v ?? false),
+                ),
+                const SizedBox(height: 8),
+                _checkboxTile(
+                  label: "Nur für Admins sichtbar (Test-Event)",
+                  value: _adminOnly,
+                  onChanged: (v) => setState(() => _adminOnly = v ?? false),
                 ),
                 if (widget.event == null) ...[
                   const SizedBox(height: 8),

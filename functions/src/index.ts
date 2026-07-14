@@ -1356,6 +1356,10 @@ export const createEventContainer = onCall(async (request) => {
   const data = request.data as Record<string, unknown>;
   const shared = parseSharedFields(data);
   const pinned = data["pinned"] === true;
+  // adminOnly muss auf JEDEM Dokument gesetzt sein (Container + jeder Tag),
+  // da die Firestore-Rules pro Dokument greifen — sonst blieben einzelne
+  // Tage trotz "Nur für Admins sichtbar" am Container öffentlich lesbar.
+  const adminOnly = data["adminOnly"] === true;
   const eventRequestId = typeof data["eventRequestId"] === "string" ? data["eventRequestId"] : null;
 
   const vonRaw = data["von"];
@@ -1381,6 +1385,7 @@ export const createEventContainer = onCall(async (request) => {
     pinned,
     isContainer: true,
     containerId: null,
+    adminOnly,
   });
 
   const childIds: string[] = [];
@@ -1394,6 +1399,7 @@ export const createEventContainer = onCall(async (request) => {
       pinned: false,
       isContainer: false,
       containerId: containerRef.id,
+      adminOnly,
     });
   }
 
@@ -1421,20 +1427,23 @@ export const updateEventContainer = onCall(async (request) => {
   }
   const shared = parseSharedFields(data);
   const pinned = data["pinned"] === true;
+  const adminOnly = data["adminOnly"] === true;
   const syncChildren = data["syncChildren"] === true;
 
   const containerRef = db.collection("events").doc(containerId);
   const batch = db.batch();
-  batch.update(containerRef, {...shared, pinned});
+  batch.update(containerRef, {...shared, pinned, adminOnly});
 
-  if (syncChildren) {
-    const childrenSnap = await db
-      .collection("events")
-      .where("containerId", "==", containerId)
-      .get();
-    for (const childDoc of childrenSnap.docs) {
-      batch.update(childDoc.ref, {...shared});
-    }
+  // adminOnly wird unabhängig von syncChildren immer an alle Tage
+  // weitergegeben — sonst könnte ein Container fälschlich live gehen,
+  // während einzelne Tage weiterhin öffentlich sichtbar bleiben (oder
+  // umgekehrt versehentlich für immer versteckt bleiben).
+  const childrenSnap = await db
+    .collection("events")
+    .where("containerId", "==", containerId)
+    .get();
+  for (const childDoc of childrenSnap.docs) {
+    batch.update(childDoc.ref, syncChildren ? {...shared, adminOnly} : {adminOnly});
   }
 
   await batch.commit();

@@ -277,6 +277,7 @@ class _ReviewSheetState extends State<_ReviewSheet> {
   // Mehrtägiges Event
   bool _mehrtaegig = false;
   bool _pinned = false;
+  bool _adminOnly = false;
   late final TextEditingController _vonCtrl;
   late final TextEditingController _bisCtrl;
 
@@ -491,6 +492,7 @@ class _ReviewSheetState extends State<_ReviewSheet> {
             'longitude': _longitude,
             'uhrzeit': _uhrzeitCtrl.text.trim().isEmpty ? null : _uhrzeitCtrl.text.trim(),
             'pinned': _pinned,
+            'adminOnly': _adminOnly,
             'von': von.toIso8601String(),
             'bis': bis.toIso8601String(),
             'eventRequestId': widget.request.id,
@@ -547,6 +549,7 @@ class _ReviewSheetState extends State<_ReviewSheet> {
         latitude: _latitude,
         longitude: _longitude,
         pinned: _pinned,
+        adminOnly: _adminOnly,
       );
 
       await guarded(context
@@ -741,6 +744,11 @@ class _ReviewSheetState extends State<_ReviewSheet> {
           label: 'Mehrtägiges Event',
           value: _mehrtaegig,
           onChanged: (v) => setState(() => _mehrtaegig = v ?? false),
+        ),
+        _checkboxTile(
+          label: 'Nur für Admins sichtbar (Test-Event)',
+          value: _adminOnly,
+          onChanged: (v) => setState(() => _adminOnly = v ?? false),
         ),
         const SizedBox(height: 4),
         if (_mehrtaegig) ...[

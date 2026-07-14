@@ -29,6 +29,11 @@ class Event {
   /// die id des Container-Events. null = normales Event oder Container.
   final String? containerId;
 
+  /// Test-Event: nur für Admin/Manager sichtbar (Firestore Rules blenden es
+  /// für alle anderen komplett aus), damit sich neue Events vor dem
+  /// Live-Gang für echte Nutzer testen lassen.
+  final bool adminOnly;
+
   // optional: alias für alte Verwendung
   String get stabileId => id;
 
@@ -47,6 +52,7 @@ class Event {
     this.pinned = false,
     this.isContainer = false,
     this.containerId,
+    this.adminOnly = false,
   })  : id = id ?? DateTime.now().millisecondsSinceEpoch.toString(),
         // Normalisiere Datum auf UTC intern, damit Firestore-kompatibel
         datum = datum.toUtc();
@@ -63,6 +69,7 @@ class Event {
     double? latitude,
     double? longitude,
     bool? pinned,
+    bool? adminOnly,
     // id, isContainer, containerId bleiben absichtlich unverändert
   }) {
     return Event(
@@ -80,6 +87,7 @@ class Event {
       pinned: pinned ?? this.pinned,
       isContainer: isContainer,
       containerId: containerId,
+      adminOnly: adminOnly ?? this.adminOnly,
     );
   }
 
@@ -100,6 +108,7 @@ class Event {
       'pinned': pinned,
       'isContainer': isContainer,
       'containerId': containerId,
+      'adminOnly': adminOnly,
     };
   }
 
@@ -143,6 +152,7 @@ class Event {
       pinned: map['pinned'] as bool? ?? false,
       isContainer: map['isContainer'] as bool? ?? false,
       containerId: map['containerId'] as String?,
+      adminOnly: map['adminOnly'] as bool? ?? false,
     );
   }
 

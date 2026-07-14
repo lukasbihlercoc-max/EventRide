@@ -48,6 +48,33 @@ double hintergrundHelligkeit(String typ)  {
 
 
 
+/// Kleiner Hinweis-Chip für Test-Events, die per Firestore-Rules nur für
+/// Admin/Manager sichtbar sind (normale Nutzer bekommen das Dokument gar
+/// nicht erst geliefert) — kein zusätzlicher isAdmin()-Check hier nötig.
+class _AdminOnlyBadge extends StatelessWidget {
+  const _AdminOnlyBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE63946).withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: const Text(
+        'TEST',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+}
+
 class EventCard extends StatelessWidget {
   final Event event;
   const EventCard({super.key, required this.event});
@@ -116,6 +143,10 @@ class EventCard extends StatelessWidget {
                 ),
               ),
             ),
+            if (event.adminOnly) ...[
+              const SizedBox(width: 6),
+              const _AdminOnlyBadge(),
+            ],
           ],
         ),
         subtitle: Column(
@@ -394,6 +425,10 @@ class EventContainerCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  if (container.adminOnly) ...[
+                    const SizedBox(width: 6),
+                    const _AdminOnlyBadge(),
+                  ],
                 ],
               ),
               subtitle: Padding(

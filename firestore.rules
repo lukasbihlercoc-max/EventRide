@@ -154,11 +154,13 @@ service cloud.firestore {
     // ----------------------------------------------------------------
     // events/{eventId}
     //
-    // Lesen:    Alle eingeloggten Nutzer
+    // Lesen:    Alle, außer adminOnly==true (dann nur Admin/Manager) —
+    //           damit lassen sich Test-Events anlegen, die normale
+    //           Nutzer nicht sehen.
     // Schreiben: Nur Admin
     // ----------------------------------------------------------------
     match /events/{eventId} {
-      allow read:  if true;
+      allow read:  if resource.data.get('adminOnly', false) == false || isAdmin() || isManager();
       allow write: if isAdmin() || isManager();
     }
 
