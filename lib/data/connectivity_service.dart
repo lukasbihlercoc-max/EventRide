@@ -20,6 +20,13 @@ class ConnectivityService with ChangeNotifier, WidgetsBindingObserver {
   // überschreibt (Race Condition bei schnellem Minimieren/Zurückkehren).
   int _checkGeneration = 0;
 
+  // Zählt fehlgeschlagene Checks in Folge. Ein einzelner Timeout reicht nicht
+  // für "offline" — direkt nach App-Resume ist die Firestore-Verbindung oft
+  // kurz kalt (Netzwerk/gRPC-Kanal muss neu aufgebaut werden) und ein 5s-Timeout
+  // schlägt fehl, obwohl eine normale Internetverbindung besteht. Erst der
+  // zweite Fehlschlag in Folge (kurz danach erneut geprüft) gilt als offline.
+  int _consecutiveFailures = 0;
+
   void start() {
     WidgetsBinding.instance.addObserver(this);
 
@@ -66,9 +73,21 @@ class ConnectivityService with ChangeNotifier, WidgetsBindingObserver {
           .limit(1)
           .get(const GetOptions(source: Source.server))
           .timeout(const Duration(seconds: 5));
-      if (myGeneration == _checkGeneration) _setOffline(false);
+      if (myGeneration != _checkGeneration) return;
+      _consecutiveFailures = 0;
+      _setOffline(false);
     } catch (_) {
-      if (myGeneration == _checkGeneration) _setOffline(true);
+      if (myGeneration != _checkGeneration) return;
+      _consecutiveFailures++;
+      if (_consecutiveFailures >= 2) {
+        _setOffline(true);
+      } else {
+        // Erster Fehlschlag: kein sofortiges "offline" — kurz danach erneut
+        // prüfen statt bis zum nächsten 20s-Tick zu warten.
+        Future.delayed(const Duration(seconds: 3), () {
+          if (myGeneration == _checkGeneration) _checkReachability();
+        });
+      }
     }
   }
 
