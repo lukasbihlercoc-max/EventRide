@@ -84,6 +84,7 @@ class EventCard extends StatelessWidget {
     final backgroundImage =
         getBackgroundImage(event.typ) ?? "assets/image/default.jpg";
     final count = event.interessentenCount;
+    final isAdmin = context.read<IAuthRepository>().isAdmin;
 
     return Padding(
       padding: const EdgeInsets.symmetric(
@@ -143,7 +144,7 @@ class EventCard extends StatelessWidget {
                 ),
               ),
             ),
-            if (event.adminOnly) ...[
+            if (event.adminOnly && isAdmin) ...[
               const SizedBox(width: 6),
               const _AdminOnlyBadge(),
             ],
@@ -425,7 +426,7 @@ class EventContainerCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  if (container.adminOnly) ...[
+                  if (container.adminOnly && isAdmin) ...[
                     const SizedBox(width: 6),
                     const _AdminOnlyBadge(),
                   ],

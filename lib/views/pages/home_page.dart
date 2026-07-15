@@ -147,42 +147,54 @@ Future<T?> _showGlassMenu<T>({
                       padding: const EdgeInsets.all(8),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
-                        children: options.map((opt) {
-                          final isSelected = opt.value == selected;
-                          return GestureDetector(
-                            onTap: () => Navigator.of(ctx).pop(opt.value),
-                            child: Container(
-                              height: 44,
-                              padding: const EdgeInsets.symmetric(horizontal: 14),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? Colors.white.withValues(alpha: 0.22)
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(12),
+                        children: [
+                          for (var i = 0; i < options.length; i++) ...[
+                            if (i > 0)
+                              Container(
+                                margin: const EdgeInsets.symmetric(horizontal: 6),
+                                height: 1,
+                                color: Colors.white.withValues(alpha: 0.10),
                               ),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      opt.label,
-                                      style: TextStyle(
-                                        color: Colors.white.withValues(
-                                            alpha: isSelected ? 1.0 : 0.90),
-                                        fontWeight: isSelected
-                                            ? FontWeight.bold
-                                            : FontWeight.w400,
-                                        fontSize: 14,
-                                      ),
-                                    ),
+                            Builder(builder: (_) {
+                              final opt = options[i];
+                              final isSelected = opt.value == selected;
+                              return GestureDetector(
+                                onTap: () => Navigator.of(ctx).pop(opt.value),
+                                child: Container(
+                                  constraints: const BoxConstraints(minHeight: 44),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? Colors.white.withValues(alpha: 0.22)
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
-                                  if (isSelected)
-                                    const Icon(Icons.check,
-                                        color: _kAccent, size: 18),
-                                ],
-                              ),
-                            ),
-                          );
-                        }).toList(),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          opt.label,
+                                          style: TextStyle(
+                                            color: Colors.white.withValues(
+                                                alpha: isSelected ? 1.0 : 0.90),
+                                            fontWeight: isSelected
+                                                ? FontWeight.bold
+                                                : FontWeight.w400,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ),
+                                      if (isSelected)
+                                        const Icon(Icons.check,
+                                            color: _kAccent, size: 18),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }),
+                          ],
+                        ],
                       ),
                     ),
                   ),
@@ -856,6 +868,11 @@ class _HomePageState extends State<HomePage> {
               final hasCoords = selectedRadius != null &&
                   _homeTownLat != null &&
                   _homeTownLng != null;
+              // Test-Events (adminOnly) sind clientseitig ausgeblendet für
+              // alle außer Admins — echte Nutzer sollen sie nie zu Gesicht
+              // bekommen, auch wenn eine Firestore-Rules-Lücke bei breiten
+              // Queries sie theoretisch mitliefern würde.
+              final isAdmin = context.read<IAuthRepository>().isAdmin;
 
               // Kind-Events eines mehrtägigen Containers nach containerId
               // gruppieren (jeweils nach Datum sortiert) — sie erscheinen
@@ -889,6 +906,7 @@ class _HomePageState extends State<HomePage> {
 
               final filteredEvents = events.where((event) {
                 if (event.containerId != null) return false;
+                if (event.adminOnly && !isAdmin) return false;
                 if (query.isNotEmpty &&
                     !event.name.toLowerCase().contains(query) &&
                     !event.standort.toLowerCase().contains(query) &&
