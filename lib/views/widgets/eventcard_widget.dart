@@ -1,4 +1,6 @@
 // eventcard_widget.dart
+import 'dart:ui';
+
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -48,6 +50,77 @@ double hintergrundHelligkeit(String typ)  {
 
 
 
+// ── Angepinnt: dezenter "Premium"-Look (goldener Rahmen + Badge) ───────────
+const _kGoldColor = Color(0xFFD4AF37);
+const _kGoldColorLight = Color(0xFFF0D890);
+const _kGoldTextColor = Color(0xFF3D2E00);
+
+/// Legt bei gepinnten Events einen dezenten goldenen Rahmen samt leichtem
+/// Glanz-Schatten um die Karte — signalisiert "bewusst hier platziert",
+/// ohne aufdringlich zu wirken.
+Widget _pinnedFrame({required bool pinned, required Widget child}) {
+  if (!pinned) return child;
+  return Container(
+    padding: const EdgeInsets.all(2),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: _kGoldColor.withValues(alpha: 0.65), width: 1.4),
+      boxShadow: [
+        BoxShadow(
+          color: _kGoldColor.withValues(alpha: 0.22),
+          blurRadius: 14,
+          spreadRadius: 0.5,
+        ),
+      ],
+    ),
+    child: child,
+  );
+}
+
+/// Kleines Goldbadge mit Pin-Icon + "Angepinnt"-Schriftzug, oben links auf
+/// der Karte (spiegelbildlich zum Favoriten-Stern oben rechts).
+class _PinnedBadge extends StatelessWidget {
+  const _PinnedBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [_kGoldColorLight, _kGoldColor],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.push_pin, size: 12, color: _kGoldTextColor),
+          SizedBox(width: 4),
+          Text(
+            'Angepinnt',
+            style: TextStyle(
+              color: _kGoldTextColor,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Kleiner Hinweis-Chip für Test-Events, die per Firestore-Rules nur für
 /// Admin/Manager sichtbar sind (normale Nutzer bekommen das Dokument gar
 /// nicht erst geliefert) — kein zusätzlicher isAdmin()-Check hier nötig.
@@ -86,12 +159,16 @@ class EventCard extends StatelessWidget {
     final count = event.interessentenCount;
     final isAdmin = context.read<IAuthRepository>().isAdmin;
 
+    final hasDescription = event.beschreibung.trim().isNotEmpty;
+
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: 16,
         vertical: 12,
-      ), 
-      child: ClipRRect(
+      ),
+      child: _pinnedFrame(
+        pinned: event.pinned,
+        child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: Stack(
   clipBehavior: Clip.none, // optional
@@ -117,38 +194,37 @@ class EventCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
       ),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
+        contentPadding: EdgeInsets.symmetric(
           horizontal: 16,
-          vertical: 12,
+          vertical: event.pinned ? 16 : 12,
         ),
-        title: Row(
-          children: [
-            if (event.pinned) ...[
-              const Icon(Icons.push_pin, size: 15, color: Color(0xFFF5A04A)),
-              const SizedBox(width: 6),
-            ],
-            Expanded(
-              child: Hero(
-                tag: event.stabileId,
-                child: Material(
-                  color: Colors.transparent,
-                  child: Text(
-                    event.name,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
+        title: Padding(
+          padding: EdgeInsets.only(top: event.pinned ? 22 : 0),
+          child: Row(
+            children: [
+              Expanded(
+                child: Hero(
+                  tag: event.stabileId,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: Text(
+                      event.name,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ),
-            ),
-            if (event.adminOnly && isAdmin) ...[
-              const SizedBox(width: 6),
-              const _AdminOnlyBadge(),
+              if (event.adminOnly && isAdmin) ...[
+                const SizedBox(width: 6),
+                const _AdminOnlyBadge(),
+              ],
             ],
-          ],
+          ),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -205,6 +281,19 @@ class EventCard extends StatelessWidget {
                 ],
               ],
             ),
+            if (event.pinned && hasDescription) ...[
+              const SizedBox(height: 8),
+              Text(
+                event.beschreibung.trim(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.75),
+                  fontSize: 12.5,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
           ],
         ),
         trailing: const Icon(
@@ -250,9 +339,17 @@ class EventCard extends StatelessWidget {
         },
       ),
     ),
+
+    // 4) 📌 ANGEPINNT-BADGE – oben links
+    if (event.pinned)
+      const Positioned(
+        left: 12,
+        top: 12,
+        child: _PinnedBadge(),
+      ),
   ],
 ),
-
+        ),
       ),
     );
   }
@@ -324,24 +421,27 @@ class EventContainerCard extends StatelessWidget {
 
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Column(
-              children: [
-                _buildHeader(
-                    context, backgroundImage, sortedChildren, expanded,
-                    interactive: !forceExpanded),
-                AnimatedCrossFade(
-                  firstChild: const SizedBox(width: double.infinity),
-                  secondChild:
-                      _buildDayList(context, displayChildren, dayNumberByChildId),
-                  crossFadeState: expanded
-                      ? CrossFadeState.showSecond
-                      : CrossFadeState.showFirst,
-                  duration: const Duration(milliseconds: 200),
-                  sizeCurve: Curves.easeInOut,
-                ),
-              ],
+          child: _pinnedFrame(
+            pinned: container.pinned,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Column(
+                children: [
+                  _buildHeader(
+                      context, backgroundImage, sortedChildren, expanded,
+                      interactive: !forceExpanded),
+                  AnimatedCrossFade(
+                    firstChild: const SizedBox(width: double.infinity),
+                    secondChild: _buildDayList(
+                        context, displayChildren, dayNumberByChildId),
+                    crossFadeState: expanded
+                        ? CrossFadeState.showSecond
+                        : CrossFadeState.showFirst,
+                    duration: const Duration(milliseconds: 200),
+                    sizeCurve: Curves.easeInOut,
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -407,6 +507,7 @@ class EventContainerCard extends StatelessWidget {
   }) {
     final rangeLabel = _dateRangeLabel(sortedChildren);
     final isAdmin = context.read<IAuthRepository>().isAdmin;
+    final hasDescription = container.beschreibung.trim().isNotEmpty;
 
     return GestureDetector(
       onTap: interactive ? () => _toggleExpanded(expanded) : null,
@@ -429,50 +530,69 @@ class EventContainerCard extends StatelessWidget {
                   .withValues(alpha: hintergrundHelligkeit(container.typ)),
             ),
             child: ListTile(
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              title: Row(
-                children: [
-                  if (container.pinned) ...[
-                    const Icon(Icons.push_pin,
-                        size: 15, color: Color(0xFFF5A04A)),
-                    const SizedBox(width: 6),
-                  ],
-                  Expanded(
-                    child: Text(
-                      container.name,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (container.adminOnly && isAdmin) ...[
-                    const SizedBox(width: 6),
-                    const _AdminOnlyBadge(),
-                  ],
-                ],
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: container.pinned ? 16 : 12,
               ),
-              subtitle: Padding(
-                padding: const EdgeInsets.only(top: 8),
+              title: Padding(
+                padding: EdgeInsets.only(top: container.pinned ? 22 : 0),
                 child: Row(
                   children: [
-                    const Icon(Icons.date_range,
-                        color: Colors.amberAccent, size: 16),
-                    const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        rangeLabel,
+                        container.name,
                         style: const TextStyle(
-                          color: Color.fromARGB(232, 255, 255, 255),
-                          fontSize: 16,
-                          fontWeight: FontWeight.w200,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    if (container.adminOnly && isAdmin) ...[
+                      const SizedBox(width: 6),
+                      const _AdminOnlyBadge(),
+                    ],
+                  ],
+                ),
+              ),
+              subtitle: Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.date_range,
+                            color: Colors.amberAccent, size: 16),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            rangeLabel,
+                            style: const TextStyle(
+                              color: Color.fromARGB(232, 255, 255, 255),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w200,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (container.pinned && hasDescription) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        container.beschreibung.trim(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.75),
+                          fontSize: 12.5,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -513,27 +633,51 @@ class EventContainerCard extends StatelessWidget {
               ),
             ),
           ),
+          if (container.pinned)
+            const Positioned(
+              left: 12,
+              top: 12,
+              child: _PinnedBadge(),
+            ),
         ],
       ),
     );
   }
 
+  /// Verschwommener Bereich (gleiche Breite wie die Header-Karte), in dem
+  /// jeder Tag als eigene, etwas schmälere, abgerundete Mini-Karte liegt —
+  /// dezent voneinander getrennt statt flächig aneinandergereiht.
   Widget _buildDayList(
     BuildContext context,
     List<Event> displayChildren,
     Map<String, int> dayNumberByChildId,
   ) {
-    return Container(
-      color: Colors.black.withValues(alpha: 0.55),
-      child: Column(
-        children: List.generate(displayChildren.length, (i) {
-          final child = displayChildren[i];
-          return _EventContainerDayRow(
-            event: child,
-            dayNumber: dayNumberByChildId[child.stabileId] ?? (i + 1),
-            isFirst: i == 0,
-          );
-        }),
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        child: Container(
+          color: Colors.black.withValues(alpha: 0.38),
+          padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+          child: Column(
+            children: List.generate(displayChildren.length, (i) {
+              final child = displayChildren[i];
+              return Padding(
+                padding: EdgeInsets.only(
+                    top: i == 0 ? 0 : 8),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    color: Colors.white.withValues(alpha: 0.07),
+                    child: _EventContainerDayRow(
+                      event: child,
+                      dayNumber: dayNumberByChildId[child.stabileId] ?? (i + 1),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
       ),
     );
   }
@@ -556,12 +700,10 @@ class EventContainerCard extends StatelessWidget {
 class _EventContainerDayRow extends StatelessWidget {
   final Event event;
   final int dayNumber;
-  final bool isFirst;
 
   const _EventContainerDayRow({
     required this.event,
     required this.dayNumber,
-    required this.isFirst,
   });
 
   @override
@@ -576,14 +718,7 @@ class _EventContainerDayRow extends StatelessWidget {
         );
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          border: isFirst
-              ? null
-              : Border(
-                  top: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-                ),
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Row(
           children: [
             Expanded(
