@@ -904,6 +904,13 @@ class _HomePageState extends State<HomePage> {
                 return true;
               }
 
+              // Ein Datums- oder Favoriten-Filter kann nur einen Teil der
+              // Tage eines Containers betreffen — dann soll der Container
+              // trotzdem erscheinen (wenn mind. ein Tag passt) und beim
+              // Aufklappen nur die passenden Tage zeigen.
+              final dateFilterActive = datumMode != null;
+              final favouritesFilterActive = favourites != null;
+
               final filteredEvents = events.where((event) {
                 if (event.containerId != null) return false;
                 if (event.adminOnly && !isAdmin) return false;
@@ -913,11 +920,16 @@ class _HomePageState extends State<HomePage> {
                     !event.typ.toLowerCase().contains(query)) {
                   return false;
                 }
-                if (favourites != null && !favourites.contains(event.stabileId)) {
-                  return false;
-                }
                 final children = childrenByContainer[event.id];
-                final matchesDate = (children != null && children.isNotEmpty)
+                final hasChildren = children != null && children.isNotEmpty;
+
+                if (favourites != null) {
+                  final isFav = hasChildren
+                      ? children.any((c) => favourites.contains(c.stabileId))
+                      : favourites.contains(event.stabileId);
+                  if (!isFav) return false;
+                }
+                final matchesDate = hasChildren
                     ? children.any((c) => matchesDatumFilter(c.datum))
                     : matchesDatumFilter(event.datum);
                 if (!matchesDate) return false;
@@ -951,12 +963,33 @@ class _HomePageState extends State<HomePage> {
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
                         final event = filteredEvents[index];
-                        final card = event.isContainer
-                            ? EventContainerCard(
-                                container: event,
-                                children: childrenByContainer[event.id] ?? [],
-                              )
-                            : EventCard(event: event);
+                        Widget card;
+                        if (event.isContainer) {
+                          final containerChildren =
+                              childrenByContainer[event.id] ?? [];
+                          final filterActive =
+                              dateFilterActive || favouritesFilterActive;
+                          final visibleChildren = filterActive
+                              ? containerChildren.where((c) {
+                                  if (favouritesFilterActive &&
+                                      !favourites.contains(c.stabileId)) {
+                                    return false;
+                                  }
+                                  if (dateFilterActive &&
+                                      !matchesDatumFilter(c.datum)) {
+                                    return false;
+                                  }
+                                  return true;
+                                }).toList()
+                              : null;
+                          card = EventContainerCard(
+                            container: event,
+                            children: containerChildren,
+                            visibleChildren: visibleChildren,
+                          );
+                        } else {
+                          card = EventCard(event: event);
+                        }
                         // Dezenter zusätzlicher Abstand zwischen gepinnten
                         // und den restlichen Events.
                         final isFirstUnpinned = !event.pinned &&

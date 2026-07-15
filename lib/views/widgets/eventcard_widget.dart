@@ -282,10 +282,17 @@ class EventContainerCard extends StatelessWidget {
   final Event container;
   final List<Event> children;
 
+  /// Wenn gesetzt (aktiver Datums- oder Favoriten-Filter, der nur einen Teil
+  /// der Tage betrifft), wird NUR diese Teilmenge angezeigt und die Karte
+  /// zwangsweise aufgeklappt — unabhängig vom gespeicherten Auf-/Zuklapp-
+  /// Zustand. null = normales Verhalten (alle Tage, normale Auf/Zu-Logik).
+  final List<Event>? visibleChildren;
+
   const EventContainerCard({
     super.key,
     required this.container,
     required this.children,
+    this.visibleChildren,
   });
 
   @override
@@ -294,6 +301,16 @@ class EventContainerCard extends StatelessWidget {
         getBackgroundImage(container.typ) ?? "assets/image/default.jpg";
     final sortedChildren = [...children]
       ..sort((a, b) => a.datum.compareTo(b.datum));
+    // "Tag N" bezieht sich immer auf die Position im vollständigen Zeitraum,
+    // auch wenn wegen eines Filters nur ein Teil der Tage angezeigt wird.
+    final dayNumberByChildId = <String, int>{
+      for (var i = 0; i < sortedChildren.length; i++)
+        sortedChildren[i].stabileId: i + 1,
+    };
+    final forceExpanded = visibleChildren != null;
+    final displayChildren = forceExpanded
+        ? ([...visibleChildren!]..sort((a, b) => a.datum.compareTo(b.datum)))
+        : sortedChildren;
     final now = DateTime.now();
     final defaultExpanded =
         sortedChildren.any((c) => _isSameCalendarDay(c.datum, now));
@@ -301,7 +318,9 @@ class EventContainerCard extends StatelessWidget {
     return ValueListenableBuilder<Map<String, bool>>(
       valueListenable: expandedEventContainersNotifier,
       builder: (context, expandedMap, _) {
-        final expanded = expandedMap[container.stabileId] ?? defaultExpanded;
+        final expanded = forceExpanded
+            ? true
+            : (expandedMap[container.stabileId] ?? defaultExpanded);
 
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -309,10 +328,13 @@ class EventContainerCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             child: Column(
               children: [
-                _buildHeader(context, backgroundImage, sortedChildren, expanded),
+                _buildHeader(
+                    context, backgroundImage, sortedChildren, expanded,
+                    interactive: !forceExpanded),
                 AnimatedCrossFade(
                   firstChild: const SizedBox(width: double.infinity),
-                  secondChild: _buildDayList(context, sortedChildren),
+                  secondChild:
+                      _buildDayList(context, displayChildren, dayNumberByChildId),
                   crossFadeState: expanded
                       ? CrossFadeState.showSecond
                       : CrossFadeState.showFirst,
@@ -380,13 +402,14 @@ class EventContainerCard extends StatelessWidget {
     BuildContext context,
     String backgroundImage,
     List<Event> sortedChildren,
-    bool expanded,
-  ) {
+    bool expanded, {
+    required bool interactive,
+  }) {
     final rangeLabel = _dateRangeLabel(sortedChildren);
     final isAdmin = context.read<IAuthRepository>().isAdmin;
 
     return GestureDetector(
-      onTap: () => _toggleExpanded(expanded),
+      onTap: interactive ? () => _toggleExpanded(expanded) : null,
       child: Stack(
         children: [
           Positioned.fill(
@@ -495,14 +518,19 @@ class EventContainerCard extends StatelessWidget {
     );
   }
 
-  Widget _buildDayList(BuildContext context, List<Event> sortedChildren) {
+  Widget _buildDayList(
+    BuildContext context,
+    List<Event> displayChildren,
+    Map<String, int> dayNumberByChildId,
+  ) {
     return Container(
       color: Colors.black.withValues(alpha: 0.55),
       child: Column(
-        children: List.generate(sortedChildren.length, (i) {
+        children: List.generate(displayChildren.length, (i) {
+          final child = displayChildren[i];
           return _EventContainerDayRow(
-            event: sortedChildren[i],
-            dayNumber: i + 1,
+            event: child,
+            dayNumber: dayNumberByChildId[child.stabileId] ?? (i + 1),
             isFirst: i == 0,
           );
         }),
@@ -538,6 +566,8 @@ class _EventContainerDayRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final count = event.interessentenCount;
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -570,13 +600,55 @@ class _EventContainerDayRow extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  Text(
-                    'Tag $dayNumber',
-                    style: const TextStyle(color: Colors.white54, fontSize: 11),
+                  Row(
+                    children: [
+                      Text(
+                        'Tag $dayNumber',
+                        style:
+                            const TextStyle(color: Colors.white54, fontSize: 11),
+                      ),
+                      if (count > 0) ...[
+                        const SizedBox(width: 8),
+                        const Icon(Icons.people, size: 12, color: Colors.white54),
+                        const SizedBox(width: 3),
+                        Text(
+                          '$count',
+                          style: const TextStyle(
+                              color: Colors.white54, fontSize: 11),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),
             ),
+            ValueListenableBuilder<Set<String>>(
+              valueListenable: favouriteEventsNotifier,
+              builder: (context, favourites, _) {
+                final isFav = favourites.contains(event.stabileId);
+                return InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () {
+                    final newSet = Set<String>.from(favourites);
+                    if (isFav) {
+                      newSet.remove(event.stabileId);
+                    } else {
+                      newSet.add(event.stabileId);
+                    }
+                    favouriteEventsNotifier.value = newSet;
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Icon(
+                      isFav ? Icons.star : Icons.star_border,
+                      color: isFav ? Colors.amber : Colors.white70,
+                      size: 20,
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(width: 4),
             const Icon(Icons.chevron_right_rounded,
                 size: 18, color: Colors.white38),
           ],
