@@ -16,19 +16,19 @@ import 'package:my_app/data/notifiers.dart';
 String? getBackgroundImage(String typ) {
   switch (typ) {
     case "e1":
-      return "assets/image/kirchtag6.png";
+      return "assets/image/kirchtag6.jpg";
     case "e2":
       return "assets/image/feuerwehr.png";
     case "e3":
-      return "assets/image/disco.png";
+      return "assets/image/disco.jpg";
     case "e4":
-      return "assets/image/Ball.png";
+      return "assets/image/Ball.jpg";
     case "e5":
       return "assets/image/krampus.jpg";
     case "e6":
-      return "assets/image/festival4.png";
+      return "assets/image/festival4.jpg";
     case "e7":
-      return "assets/image/beach.png";
+      return "assets/image/beach.jpg";
     default:
       return "assets/image/default.jpg";
   }

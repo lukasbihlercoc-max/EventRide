@@ -26,11 +26,11 @@ import 'package:my_app/views/pages/detail_page.dart';
 String getBackgroundImage(Fahrtrichtung richtung) {
   switch (richtung) {
     case Fahrtrichtung.hinfahrt:
-      return "assets/image/hinfahrt3.png";
+      return "assets/image/hinfahrt3.jpg";
     case Fahrtrichtung.rueckfahrt:
-      return "assets/image/rueckfahrt5.png";
+      return "assets/image/rueckfahrt5.jpg";
     case Fahrtrichtung.hinUndZurueck:
-      return "assets/image/hinundrueck5.png";
+      return "assets/image/hinundrueck5.jpg";
   }
 }
 

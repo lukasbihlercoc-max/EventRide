@@ -568,13 +568,13 @@ class _HomePageState extends State<HomePage> {
 
   void _precacheImages() {
     const images = [
-      'assets/image/kirchtag6.png',
+      'assets/image/kirchtag6.jpg',
       'assets/image/feuerwehr.png',
-      'assets/image/disco.png',
-      'assets/image/Ball.png',
+      'assets/image/disco.jpg',
+      'assets/image/Ball.jpg',
       'assets/image/krampus.jpg',
       'assets/image/kirchtag.jpg',
-      'assets/image/festival4.png',
+      'assets/image/festival4.jpg',
     ];
     for (final path in images) {
       precacheImage(AssetImage(path), context);
