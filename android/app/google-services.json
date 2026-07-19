@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "686951435694-1feu2pm3qogcrf9hnvg6bc9mrfhv31qb.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "at.eventride.app",
+            "certificate_hash": "6e07214dbfae909a10677ab634c42ad22ffd8f4e"
+          }
+        },
+        {
           "client_id": "686951435694-aksqlcb2u6erc7os1if3mvppgmf98k4p.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {

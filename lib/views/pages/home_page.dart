@@ -995,14 +995,80 @@ class _HomePageState extends State<HomePage> {
                         final isFirstUnpinned = !event.pinned &&
                             index > 0 &&
                             filteredEvents[index - 1].pinned;
+                        // Section-Header über dem ersten gepinnten Event —
+                        // gleiches Muster wie "VERGANGENE FAHRTEN" in
+                        // fahrten_page.dart (Divider–Icon–Text–Divider).
+                        // Erklärt Nutzern, warum das Event oben steht, und
+                        // macht Veranstaltern die Premium-Funktion sichtbar.
+                        final isFirstPinned = event.pinned &&
+                            (index == 0 || !filteredEvents[index - 1].pinned);
                         return RepaintBoundary(
                           key: ValueKey(event.stabileId),
-                          child: isFirstUnpinned
-                              ? Padding(
-                                  padding: const EdgeInsets.only(top: 12),
-                                  child: card,
+                          child: isFirstPinned
+                              ? Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Padding(
+                                      padding:
+                                          const EdgeInsets.fromLTRB(16, 24, 16, 4),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Divider(
+                                              color: Colors.white
+                                                  .withValues(alpha: 0.25),
+                                              thickness: 1,
+                                            ),
+                                          ),
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 10),
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.push_pin,
+                                                    size: 16, color: _kAccent),
+                                                const SizedBox(width: 4),
+                                                const Text(
+                                                  'EMPFOHLENE EVENTS',
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w700,
+                                                    letterSpacing: 1.2,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          Expanded(
+                                            child: Divider(
+                                              color: Colors.white
+                                                  .withValues(alpha: 0.25),
+                                              thickness: 1,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    card,
+                                  ],
                                 )
-                              : card,
+                              : isFirstUnpinned
+                                  ? Column(
+                                      children: [
+                                        Padding(
+                                          padding: const EdgeInsets.fromLTRB(
+                                              16, 16, 16, 8),
+                                          child: Divider(
+                                            color: Colors.white
+                                                .withValues(alpha: 0.25),
+                                            thickness: 1,
+                                          ),
+                                        ),
+                                        card,
+                                      ],
+                                    )
+                                  : card,
                         );
                       },
                       childCount: filteredEvents.length,
