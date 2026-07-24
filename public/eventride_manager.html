@@ -2458,6 +2458,64 @@ function skipFlyerEvent() {
   showFlyerCompletion();
 }
 
+// Findet einen bestehenden Recherche-Eintrag mit gleichem Namen + Datum, damit
+// ein direkt aus dem Flyer-Import in die App hochgeladenes Event keinen
+// doppelten Recherche-Eintrag erzeugt, falls es dort (z.B. über den CSV-Import)
+// bereits existiert.
+function findPendingMatchForMirror(name, datum) {
+  const n = normalizeName(name);
+  const d = parseDatum(datum);
+  if (!d) return null;
+  const dKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  return pending.find(e => {
+    if (normalizeName(e.name) !== n) return false;
+    const ed = parseDatum(e.datum);
+    return ed && `${ed.getFullYear()}-${ed.getMonth()}-${ed.getDate()}` === dKey;
+  }) || null;
+}
+
+// Spiegelt ein direkt aus dem Flyer-Import in die App hochgeladenes Event
+// zusätzlich in die Recherche-Liste, damit dort alle In-App-Events sichtbar
+// sind (als "in App" markiert). Aktualisiert einen bestehenden Treffer statt
+// einen neuen Eintrag anzulegen.
+function mirrorFlyerUploadToRecherche(effectiveDatum) {
+  const existing = findPendingMatchForMirror(uploadData.name, effectiveDatum);
+  if (existing) {
+    return db.collection('pending_events').doc(existing._id).update({ inApp: true, geprueft: true })
+      .catch(e => console.warn('Recherche-Spiegelung fehlgeschlagen', e));
+  }
+  const yr = getYear(effectiveDatum);
+  return db.collection('pending_events').add({
+    name: uploadData.name,
+    datum: effectiveDatum,
+    uhrzeit: uploadData.uhrzeit || '20:00',
+    gemeinde: uploadData.standort,
+    bezirk: uploadData.bezirk || '',
+    adresse: uploadData.adresse || uploadData.standort || '',
+    typ: normalizeTyp(uploadData.typ),
+    eintritt: uploadData.eintritt || '',
+    beschreibung: uploadData.beschreibung || '',
+    quelleTyp: 'flyer',
+    quelleLink: uploadData.quelleLink || '',
+    quellen: uploadData.quellen || [],
+    srcZitat: '', sicherheit: 'mittel',
+    latitude: uploadData.latitude || null,
+    longitude: uploadData.longitude || null,
+    status: yr >= 2026 ? 'confirmed' : 'check',
+    geprueft: true,
+    inApp: true,
+    notiz: uploadData.notiz || '',
+    pinned: !!uploadData.pinned,
+    mehrtaegig: !!uploadData.mehrtaegig,
+    von: uploadData.mehrtaegig ? uploadData.von : '',
+    bis: uploadData.mehrtaegig ? uploadData.bis : '',
+    adminOnly: !!uploadData.adminOnly,
+    mgrSrcIgAccount: uploadData.igUsername || '',
+    linkedIgAccount: uploadData.igUsername || '',
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  }).catch(e => console.warn('Recherche-Spiegelung fehlgeschlagen', e));
+}
+
 function submitFlyerUpload() {
   if (!uploadData.name || !uploadData.standort) { alert('Name und Standort sind Pflichtfelder.'); return; }
   if (uploadData.mehrtaegig) {
@@ -2548,7 +2606,7 @@ function submitFlyerUpload() {
       adminOnly: !!uploadData.adminOnly,
       von: `${uploadData.von}T00:00:00.000Z`,
       bis: `${uploadData.bis}T00:00:00.000Z`,
-    }).then(() => {
+    }).then(() => mirrorFlyerUploadToRecherche(uploadData.von)).then(() => {
       flyerEvents[flyerUploadIndex].status = "hochgeladen";
       updateFlyerList();
       showToast('✓ ' + uploadData.name + ' in App gespeichert');
@@ -2591,7 +2649,7 @@ function submitFlyerUpload() {
     isContainer: false,
     containerId: null,
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-  }).then(() => {
+  }).then(() => mirrorFlyerUploadToRecherche(uploadData.datum)).then(() => {
     flyerEvents[flyerUploadIndex].status = "hochgeladen";
     updateFlyerList();
     showToast('✓ ' + uploadData.name + ' in App gespeichert');
