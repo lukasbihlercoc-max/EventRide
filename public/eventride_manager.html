@@ -187,11 +187,7 @@ select option{background:var(--surface);color:var(--text)}
 .event-row.status-confirmed{border-left-color:var(--green)}
 .event-row.status-inapp{border-left-color:var(--blue)}
 .event-row.past{opacity:.38}
-/* Recherche-Liste: Events, die bereits in der App sind, zusätzlich zur
-   blauen Randfarbe optisch eingerückt (rechts unverändert) — auf einen
-   Blick vom Rest der Liste unterscheidbar, ohne Icons lesen zu müssen. */
-.event-row.recherche-inapp{margin-left:14px}
-.event-row.recherche-inapp:not(.selected){background:var(--blue-bg)}
+.tag-inapp{background:var(--blue-bg);color:var(--blue-t);font-size:11px;padding:2px 8px;border-radius:100px;font-weight:700;border:1px solid rgba(9,105,218,.16);flex-shrink:0;white-space:nowrap}
 .event-name{flex:1;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.1px;line-height:1.4}
 .event-meta{font-size:12px;color:var(--text-2);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
 .event-date{font-size:11px;font-weight:500;white-space:nowrap;color:var(--text-3)}
@@ -544,6 +540,7 @@ let isFlyerMode = false;
 let appEditMode = false;
 let appEditData = {};
 let expandedContainers = new Set();
+let expandedPendingIds = new Set();
 
 // ---- IG ACCOUNTS STATE ----
 let igAccounts = [];
@@ -900,7 +897,10 @@ function switchTab(t) {
 // ---- RECHERCHE TAB ----
 function getFiltered() {
   let evs = [...pending];
-  if(!showPast) evs = evs.filter(e=>!isMonthDayPast(e.datum));
+  // Bei mehrtägigen Events entscheidet der letzte Tag (bis), nicht der erste
+  // (datum) — sonst verschwindet ein noch laufendes mehrtägiges Event schon
+  // nach dem ersten Tag aus der Liste.
+  if(!showPast) evs = evs.filter(e=>!isMonthDayPast(e.mehrtaegig && e.bis ? e.bis : e.datum));
   if(fBez!=="Alle") evs = evs.filter(e=>e.bezirk===fBez);
   if(fTyp!=="Alle") evs = evs.filter(e=>e.typ===fTyp);
   if(fStatus==="confirmed") evs = evs.filter(e=>!isCheck(e));
@@ -956,6 +956,7 @@ function renderRecherche() {
         </button>
         <button class="small" onclick="fInfoAusstehend=!fInfoAusstehend;render()" style="${fInfoAusstehend?"background:var(--accent);color:#fff;border-color:var(--accent)":""}">⏳ Ausstehend</button>
         ${hasFilter?`<button class="small danger" onclick="fBez='Alle';fTyp='Alle';fStatus='Alle';fSearch='';fInfoAusstehend=false;render()">✕ Filter</button>`:""}
+        <button class="small" title="Prüft, ob jedes App-Event einen Recherche-Eintrag hat und legt fehlende an" onclick="backfillMissingRechercheEntries()">🔄 Fehlende App-Events nachtragen</button>
         <span class="filter-count">${evs.length} Events</span>
       </div>
       <div class="event-list-wrap">
@@ -973,9 +974,38 @@ function renderRecherche() {
   }
 }
 
+function togglePendingExpand(id) {
+  if (expandedPendingIds.has(id)) expandedPendingIds.delete(id); else expandedPendingIds.add(id);
+  render();
+}
+
+// Rein clientseitig berechnete Tage-Liste für ein mehrtägiges Recherche-Event
+// (pending_events legt dafür keine einzelnen Tages-Dokumente an, anders als
+// im Container-Modell der App — hier reicht eine reine Anzeige aus von/bis).
+function mehrtaegigDayCount(ev) {
+  const von = parseDatum(ev.von), bis = parseDatum(ev.bis);
+  if (!von || !bis) return 0;
+  return Math.round((bis - von) / 86400000) + 1;
+}
+
+function mehrtaegigDaysListHTML(ev) {
+  const von = parseDatum(ev.von), bis = parseDatum(ev.bis);
+  if (!von || !bis) return '';
+  const today = new Date(); today.setHours(0,0,0,0);
+  const days = [];
+  for (let cursor = new Date(von); cursor <= bis; cursor.setDate(cursor.getDate() + 1)) {
+    days.push(new Date(cursor));
+  }
+  return `<div class="event-row" style="margin-left:22px;padding-top:8px;padding-bottom:8px;background:var(--surface-2);cursor:default" onclick="event.stopPropagation()">
+    <div style="flex:1;min-width:0;font-size:12px;color:var(--text-2);display:flex;flex-wrap:wrap;gap:6px 16px">
+      ${days.map(d => `<span style="${d<today?'opacity:.45;text-decoration:line-through':''}">${d.toLocaleDateString('de-AT',{weekday:'short',day:'2-digit',month:'2-digit'})}</span>`).join('')}
+    </div>
+  </div>`;
+}
+
 function eventRow(ev, hasDupes=false) {
   const check = isCheck(ev);
-  const past = isPast(ev.datum);
+  const past = isPast(ev.mehrtaegig && ev.bis ? ev.bis : ev.datum);
   const isSel = selId===ev._id;
   const inApp = ev.inApp || appEvents.some(a=>a.name.trim().toLowerCase()===ev.name.trim().toLowerCase());
   const similarApp = !inApp && similarInApp(ev.name, ev.bezirk).length > 0;
@@ -983,7 +1013,6 @@ function eventRow(ev, hasDupes=false) {
 
   const icons = [];
   if(ev.geprueft) icons.push(`<span class="icon-check" title="Manuell geprüft">✓</span>`);
-  if(inApp) icons.push(`<span class="icon-upload" title="In App">↑</span>`);
   if(ev.infoAusstehend) icons.push(`<span style="font-size:10px;color:#D97706" title="Info noch ausstehend">⏳</span>`);
   if(similarApp) icons.push(`<span style="font-size:10px;background:#E6F1FB;color:#0C447C;padding:1px 6px;border-radius:8px;font-weight:600" title="Ähnliches Event möglicherweise bereits in App">~App</span>`);
   if(hasDupes) icons.push(`<span style="font-size:10px;background:#FFF3D6;color:#7A4A00;padding:1px 6px;border-radius:8px;font-weight:600">ähnlich</span>`);
@@ -992,18 +1021,30 @@ function eventRow(ev, hasDupes=false) {
   const qtypLabel = {web:'🌐 Web',flyer:'📄 Flyer',instagram:'📱 IG'};
   if(ev.quelleTyp && qtypLabel[ev.quelleTyp]) icons.push(`<span style="font-size:10px;${qtypStyle[ev.quelleTyp]};padding:1px 6px;border-radius:8px;font-weight:600">${qtypLabel[ev.quelleTyp]}</span>`);
 
-  return `<div class="event-row ${statusClass} ${inApp?"recherche-inapp":""} ${isSel?"selected":""} ${past&&!inApp?"past":""} ${hasDupes?"has-dupes":""}" onclick="selectEv('${ev._id}')">
+  const isMulti = !!ev.mehrtaegig;
+  const expanded = isMulti && expandedPendingIds.has(ev._id);
+  const toggleBtn = isMulti
+    ? `<button class="icon-btn" style="flex-shrink:0;padding:2px 4px;font-size:11px" onclick="event.stopPropagation();togglePendingExpand('${ev._id}')">${expanded?'▼':'▶'}</button>`
+    : '';
+  const dateHtml = isMulti && ev.von && ev.bis ? `${fmt(ev.von)} – ${fmt(ev.bis)}` : fmt(ev.datum);
+
+  const mainRow = `<div class="event-row ${statusClass} ${isSel?"selected":""} ${past&&!inApp?"past":""} ${hasDupes?"has-dupes":""}" onclick="selectEv('${ev._id}')">
+    ${toggleBtn}
     ${typBadge(ev.typ)}
     <div style="flex:1;min-width:0">
-      <div class="event-name" style="color:${check?"#7A4A00":"#1a1a1a"}">${check?"⚠ ":""}${esc(ev.name)}</div>
-      <div class="event-meta">${esc(ev.gemeinde)}${ev.bezirk?" · "+esc(ev.bezirk):""}</div>
+      <div style="display:flex;align-items:center;gap:6px;min-width:0">
+        <div class="event-name" style="color:${check?"#7A4A00":"#1a1a1a"};flex:1;min-width:0">${check?"⚠ ":""}${esc(ev.name)}</div>
+        ${inApp?`<span class="tag-inapp" title="Bereits in der App">✓ In App</span>`:""}
+      </div>
+      <div class="event-meta">${esc(ev.gemeinde)}${ev.bezirk?" · "+esc(ev.bezirk):""}${isMulti?` · Mehrtägig · ${mehrtaegigDayCount(ev)} Tage`:""}</div>
     </div>
     <div style="text-align:right;flex-shrink:0">
-      <div class="event-date" style="color:${past?"#e74c3c":"#555"}">${fmt(ev.datum)}</div>
+      <div class="event-date" style="color:${past?"#e74c3c":"#555"}">${dateHtml}</div>
       <div class="event-icons">${icons.join("")}</div>
     </div>
     <button class="small danger" style="flex-shrink:0;opacity:.7" onclick="event.stopPropagation();delPending('${ev._id}')">🗑</button>
   </div>`;
+  return mainRow + (expanded ? mehrtaegigDaysListHTML(ev) : '');
 }
 
 function renderGroup(g) {
@@ -1019,12 +1060,15 @@ function renderGroup(g) {
 function dupeRow(ev) {
   const check = isCheck(ev);
   const d = parseDatum(ev.datum);
+  const inApp = ev.inApp || appEvents.some(a=>a.name.trim().toLowerCase()===ev.name.trim().toLowerCase());
+  const similarApp = !inApp && similarInApp(ev.name, ev.bezirk).length > 0;
   return `<div class="dupe-row">
     <span style="color:#FAC775;font-size:11px;flex-shrink:0">↳</span>
     ${typBadge(ev.typ)}
     <div style="flex:1;min-width:0">
       <span style="font-weight:500;color:${check?"#7A4A00":"#333"}">${esc(ev.name)}</span>
       <span style="color:#bbb;margin-left:6px">${esc(ev.gemeinde)} · ${fmt(ev.datum)}</span>
+      ${inApp?`<span class="tag-inapp" style="margin-left:6px" title="Bereits in der App">✓ In App</span>`:similarApp?`<span style="font-size:10px;background:#E6F1FB;color:#0C447C;padding:1px 6px;border-radius:8px;font-weight:600;margin-left:6px" title="Ähnliches Event möglicherweise bereits in App">~App</span>`:""}
     </div>
     <div class="dupe-actions">
       <button class="small danger" onclick="event.stopPropagation();delPending('${ev._id}')">Löschen</button>
@@ -1615,11 +1659,22 @@ function appEventRowHTML(ev, opts) {
   const isChild = !!(opts && opts.isChild);
   const childCount = ev.isContainer ? appEvents.filter(e => e.containerId === ev._id).length : 0;
   const expanded = ev.isContainer && expandedContainers.has(ev._id);
+  // Ein Container gilt erst als "vergangen", wenn ALLE Tage vorbei sind (der
+  // letzte Kind-Tag entscheidet) — sonst würde der Header schon nach dem
+  // ersten Tag ausgegraut, obwohl das mehrtägige Event noch läuft. Einzelne
+  // Tage-Zeilen (isChild) grauen weiterhin nach ihrem eigenen Datum aus.
+  let pastDatum = ev.datum;
+  if (ev.isContainer) {
+    for (const k of appEvents) {
+      if (k.containerId === ev._id && (parseDatum(k.datum) || 0) > (parseDatum(pastDatum) || 0)) pastDatum = k.datum;
+    }
+  }
+  const past = isPast(pastDatum);
   const toggleBtn = ev.isContainer
     ? `<button class="icon-btn" style="flex-shrink:0;padding:2px 4px;font-size:11px" onclick="event.stopPropagation();toggleContainerExpand('${ev._id}')">${expanded?'▼':'▶'}</button>`
     : '';
   return `
-        <div class="event-row status-inapp${isChild?' child-row':''} ${selId===ev._id?"selected":""} ${isPast(ev.datum)?"past":""}"
+        <div class="event-row status-inapp${isChild?' child-row':''} ${selId===ev._id?"selected":""} ${past?"past":""}"
           style="${isChild?'margin-left:22px;padding-top:6px;padding-bottom:6px;background:var(--surface-2)':''}"
           onclick="selId=selId==='${ev._id}'?null:'${ev._id}';render()">
           ${toggleBtn}
@@ -1629,7 +1684,7 @@ function appEventRowHTML(ev, opts) {
             <div class="event-meta">${esc(ev.gemeinde)}${ev.bezirk?" · "+esc(ev.bezirk):""}${ev.isContainer?` · Container · ${childCount} Tage`:isChild?" · Tag eines Containers":""}</div>
             ${ev.mgrSrcIgAccount?`<div style="font-size:10px;color:#9D174D;margin-top:1px">📱 @${esc(ev.mgrSrcIgAccount)}</div>`:ev.mgrSrcQuelleTyp?`<div style="font-size:10px;color:#888;margin-top:1px">${{flyer:'📄 Flyer',web:'🌐 Web',instagram:'📱 Instagram'}[ev.mgrSrcQuelleTyp]||ev.mgrSrcQuelleTyp}</div>`:''}
           </div>
-          <div class="event-date" style="color:${isPast(ev.datum)?"#e74c3c":"#555"}">${fmt(ev.datum)}</div>
+          <div class="event-date" style="color:${past?"#e74c3c":"#555"}">${fmt(ev.datum)}</div>
         </div>`;
 }
 
@@ -2519,6 +2574,86 @@ function mirrorFlyerUploadToRecherche(effectiveDatum) {
     linkedIgAccount: uploadData.igUsername || '',
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   }).catch(e => console.warn('Recherche-Spiegelung fehlgeschlagen', e));
+}
+
+// ---- RECHERCHE-SPIEGELUNG: generisch für jeden appEvents-Eintrag ----
+// (Event-Anfrage-Freigabe, Backfill fehlender Einträge). Erwartet die Form,
+// wie sie appEvents (initFS()) liefert: gemeinde/lat/lng statt
+// standort/latitude/longitude, typ als Code ODER Klarname.
+function buildRechercheMirrorData(ev) {
+  const isContainer = !!ev.isContainer;
+  let von = ev.datum, bis = ev.datum;
+  if (isContainer) {
+    const kids = appEvents.filter(e => e.containerId === ev._id);
+    for (const k of kids) {
+      if (!bis || (parseDatum(k.datum) || 0) > (parseDatum(bis) || 0)) bis = k.datum;
+    }
+  }
+  const yr = getYear(von);
+  return {
+    name: ev.name,
+    datum: von,
+    uhrzeit: ev.uhrzeit || '20:00',
+    gemeinde: ev.gemeinde || '',
+    bezirk: ev.bezirk || deriveBezirkFromGemeinde(ev.gemeinde) || '',
+    adresse: ev.adresse || ev.gemeinde || '',
+    typ: normalizeTyp(ev.typ),
+    eintritt: ev.eintritt && ev.eintritt !== 'k.A.' ? ev.eintritt : '',
+    beschreibung: ev.beschreibung || '',
+    quelleTyp: ['web', 'flyer', 'instagram'].includes(ev.mgrSrcQuelleTyp) ? ev.mgrSrcQuelleTyp : '',
+    quelleLink: ev.mgrSrcQuelleLink || '',
+    quellen: [],
+    srcZitat: '', sicherheit: 'mittel',
+    latitude: ev.lat ?? null,
+    longitude: ev.lng ?? null,
+    status: yr >= 2026 ? 'confirmed' : 'check',
+    geprueft: true,
+    inApp: true,
+    notiz: '',
+    pinned: !!ev.pinned,
+    mehrtaegig: isContainer,
+    von: isContainer ? von : '',
+    bis: isContainer ? bis : '',
+    adminOnly: !!ev.adminOnly,
+    mgrSrcIgAccount: ev.mgrSrcIgAccount || '',
+    linkedIgAccount: ev.mgrSrcIgAccount || '',
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+}
+
+// Spiegelt ein bereits existierendes App-Event (appEvents-Form) in die
+// Recherche-Liste, sofern dort noch kein Treffer (Name+Datum) existiert.
+function mirrorAppEventToRecherche(ev) {
+  const data = buildRechercheMirrorData(ev);
+  const existing = findPendingMatchForMirror(ev.name, data.datum);
+  if (existing) {
+    return db.collection('pending_events').doc(existing._id).update({ inApp: true, geprueft: true })
+      .catch(e => console.warn('Recherche-Spiegelung fehlgeschlagen', e));
+  }
+  return db.collection('pending_events').add(data)
+    .catch(e => console.warn('Recherche-Spiegelung fehlgeschlagen', e));
+}
+
+// Holt alle App-Events (Container zählen als ein Eintrag, ihre Tage werden
+// übersprungen) nach, die noch keinen Recherche-Eintrag haben — z.B. Events,
+// die über Wege entstanden sind, die (noch) nicht spiegeln, oder die schon
+// vor Einführung dieser Spiegelung angelegt wurden.
+function backfillMissingRechercheEntries() {
+  const topLevel = appEvents.filter(e => !e.containerId);
+  const missing = topLevel.filter(e => !findPendingMatchForMirror(e.name, e.datum));
+  if (missing.length === 0) {
+    showToast('✓ Alle App-Events sind bereits in der Recherche-Liste');
+    return;
+  }
+  if (!confirm(`${missing.length} App-Event(s) fehlen in der Recherche-Liste (z.B. "${missing[0].name}"). Jetzt nachtragen?`)) return;
+  const batch = db.batch();
+  missing.forEach(ev => {
+    const ref = db.collection('pending_events').doc();
+    batch.set(ref, buildRechercheMirrorData(ev));
+  });
+  batch.commit().then(() => {
+    showToast(`✓ ${missing.length} fehlende Recherche-Eintrag/-Einträge nachgetragen`);
+  }).catch(e => alert('Fehler: ' + e.message));
 }
 
 function submitFlyerUpload() {
@@ -4135,6 +4270,17 @@ async function approveEventReq(requestId) {
 
   try {
     await batch.commit();
+    // Direkt aus einer Nutzer-Event-Anfrage veröffentlichte Events entstehen
+    // ohne Recherche-Eintrag — genau wie beim Flyer-Direktupload nachträglich
+    // in die Recherche-Liste spiegeln, damit dort wirklich alle App-Events sichtbar sind.
+    mirrorAppEventToRecherche({
+      _id: newRef.id, name: eventData.name, datum: eventData.datum,
+      uhrzeit: eventData.uhrzeit, gemeinde: eventData.standort, bezirk: '',
+      typ: eventData.typ, eintritt: eventData.eintritt, beschreibung: eventData.beschreibung,
+      adresse: eventData.adresse, lat: eventData.latitude, lng: eventData.longitude,
+      mgrSrcQuelleTyp: '', mgrSrcQuelleLink: '', mgrSrcIgAccount: '',
+      pinned: false, adminOnly: false, isContainer: false, containerId: null,
+    });
     selEventReqId = null;
     erEditData = {};
     showToast('✓ Event veröffentlicht');
