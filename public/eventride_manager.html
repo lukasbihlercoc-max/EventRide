@@ -538,6 +538,7 @@ let flyerUploadIndex = 0;
 let isFlyerMode = false;
 let appEditMode = false;
 let appEditData = {};
+let expandedContainers = new Set();
 
 // ---- IG ACCOUNTS STATE ----
 let igAccounts = [];
@@ -1600,9 +1601,48 @@ function submitAdd() {
 }
 
 // ---- IN APP TAB ----
+function toggleContainerExpand(id) {
+  if (expandedContainers.has(id)) expandedContainers.delete(id); else expandedContainers.add(id);
+  render();
+}
+
+function appEventRowHTML(ev, opts) {
+  const isChild = !!(opts && opts.isChild);
+  const childCount = ev.isContainer ? appEvents.filter(e => e.containerId === ev._id).length : 0;
+  const expanded = ev.isContainer && expandedContainers.has(ev._id);
+  const toggleBtn = ev.isContainer
+    ? `<button class="icon-btn" style="flex-shrink:0;padding:2px 4px;font-size:11px" onclick="event.stopPropagation();toggleContainerExpand('${ev._id}')">${expanded?'▼':'▶'}</button>`
+    : '';
+  return `
+        <div class="event-row status-inapp${isChild?' child-row':''} ${selId===ev._id?"selected":""} ${isPast(ev.datum)?"past":""}"
+          style="${isChild?'margin-left:22px;padding-top:6px;padding-bottom:6px;background:var(--surface-2)':''}"
+          onclick="selId=selId==='${ev._id}'?null:'${ev._id}';render()">
+          ${toggleBtn}
+          ${typBadge(ev.typ)}
+          <div style="flex:1;min-width:0">
+            <div class="event-name">${ev.pinned?'📌 ':''}${ev.adminOnly?'🔒 ':''}${isChild?'└ ':''}${esc(ev.name)}</div>
+            <div class="event-meta">${esc(ev.gemeinde)}${ev.bezirk?" · "+esc(ev.bezirk):""}${ev.isContainer?` · Container · ${childCount} Tage`:isChild?" · Tag eines Containers":""}</div>
+            ${ev.mgrSrcIgAccount?`<div style="font-size:10px;color:#9D174D;margin-top:1px">📱 @${esc(ev.mgrSrcIgAccount)}</div>`:ev.mgrSrcQuelleTyp?`<div style="font-size:10px;color:#888;margin-top:1px">${{flyer:'📄 Flyer',web:'🌐 Web',instagram:'📱 Instagram'}[ev.mgrSrcQuelleTyp]||ev.mgrSrcQuelleTyp}</div>`:''}
+          </div>
+          <div class="event-date" style="color:${isPast(ev.datum)?"#e74c3c":"#555"}">${fmt(ev.datum)}</div>
+        </div>`;
+}
+
 function renderInApp() {
   const sel = selId ? appEvents.find(e=>e._id===selId) : null;
-  const sorted = [...appEvents].sort((a,b) => {
+  // Nur Container + eigenständige Events auf oberster Ebene — Tage eines
+  // Containers werden ausschließlich ausgeklappt direkt darunter gerendert,
+  // damit ein mehrtägiges Event nicht als N einzelne Zeilen erscheint.
+  const topLevel = appEvents.filter(e => !e.containerId);
+  const childrenByContainer = {};
+  appEvents.forEach(e => {
+    if (e.containerId) {
+      (childrenByContainer[e.containerId] = childrenByContainer[e.containerId] || []).push(e);
+    }
+  });
+  Object.values(childrenByContainer).forEach(arr => arr.sort((a, b) => (parseDatum(a.datum) || 0) - (parseDatum(b.datum) || 0)));
+
+  const sorted = [...topLevel].sort((a,b) => {
     if (appSortMode === "createdAt") return (b.createdAt||0) - (a.createdAt||0);
     const da = parseDatum(a.datum), db2 = parseDatum(b.datum);
     if (!da && !db2) return 0; if (!da) return 1; if (!db2) return -1;
@@ -1620,16 +1660,13 @@ function renderInApp() {
       <div class="event-list-wrap">
         ${sorted.length===0
           ?`<div class="empty-state">Keine Events in Firebase gefunden.</div>`
-          :sorted.map(ev=>`
-        <div class="event-row status-inapp ${selId===ev._id?"selected":""} ${isPast(ev.datum)?"past":""}" onclick="selId=selId==='${ev._id}'?null:'${ev._id}';render()">
-          ${typBadge(ev.typ)}
-          <div style="flex:1;min-width:0">
-            <div class="event-name">${ev.pinned?'📌 ':''}${ev.adminOnly?'🔒 ':''}${ev.isContainer?'▼ ':ev.containerId?'└ ':''}${esc(ev.name)}</div>
-            <div class="event-meta">${esc(ev.gemeinde)}${ev.bezirk?" · "+esc(ev.bezirk):""}${ev.isContainer?" · Container":ev.containerId?" · Tag eines Containers":""}</div>
-            ${ev.mgrSrcIgAccount?`<div style="font-size:10px;color:#9D174D;margin-top:1px">📱 @${esc(ev.mgrSrcIgAccount)}</div>`:ev.mgrSrcQuelleTyp?`<div style="font-size:10px;color:#888;margin-top:1px">${{flyer:'📄 Flyer',web:'🌐 Web',instagram:'📱 Instagram'}[ev.mgrSrcQuelleTyp]||ev.mgrSrcQuelleTyp}</div>`:''}
-          </div>
-          <div class="event-date" style="color:${isPast(ev.datum)?"#e74c3c":"#555"}">${fmt(ev.datum)}</div>
-        </div>`).join("")}
+          :sorted.map(ev => {
+            let rows = appEventRowHTML(ev, {isChild:false});
+            if (ev.isContainer && expandedContainers.has(ev._id)) {
+              rows += (childrenByContainer[ev._id] || []).map(kid => appEventRowHTML(kid, {isChild:true})).join("");
+            }
+            return rows;
+          }).join("")}
       </div>
     </div>
     ${sel?`<div>${appEventDetail(sel)}</div>`:""}
@@ -2788,7 +2825,7 @@ function uploadFormHTML() {
     </label>
     <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
       <input type="checkbox" ${uploadData.mehrtaegig?'checked':''} style="width:15px;height:15px;accent-color:var(--accent)"
-        onchange="uploadData.mehrtaegig=this.checked;document.getElementById('upload-form-content').innerHTML=uploadFormHTML();initUploadAutocomplete();">
+        onchange="uploadData.mehrtaegig=this.checked;document.getElementById('upload-form-content').innerHTML=uploadFormHTML();document.getElementById('up-eintritt').value=uploadData.eintritt;document.getElementById('up-beschreibung').value=uploadData.beschreibung;initUploadAutocomplete();">
       📅 Mehrtägiges Event
     </label>
     <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
