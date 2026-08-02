@@ -310,6 +310,11 @@ String _eventDatumLabel(DateTime datum) {
 bool _isSameCalendarDay(DateTime a, DateTime b) =>
     a.year == b.year && a.month == b.month && a.day == b.day;
 
+DateTime _dateOnlyUtc(DateTime d) {
+  final utc = d.toUtc();
+  return DateTime.utc(utc.year, utc.month, utc.day);
+}
+
 /// Hauptkarte eines mehrtägigen Events (Container). Zeigt Name, Pin-Badge
 /// und Datumsbereich; ein Tap klappt die Liste der Veranstaltungstage
 /// (=eigenständige Events) auf/zu. Jeder Tag verhält sich wie ein normales
@@ -337,11 +342,17 @@ class EventContainerCard extends StatelessWidget {
         getBackgroundImage(container.typ) ?? "assets/image/default.jpg";
     final sortedChildren = [...children]
       ..sort((a, b) => a.datum.compareTo(b.datum));
-    // "Tag N" bezieht sich immer auf die Position im vollständigen Zeitraum,
-    // auch wenn wegen eines Filters nur ein Teil der Tage angezeigt wird.
+    // "Tag N" bezieht sich auf den festen Abstand zum Container-Startdatum
+    // (container.datum = erster Tag, wird nach dem Anlegen nie verändert) —
+    // NICHT auf die Position in der Liste. Bereits vergangene Tage werden
+    // serverseitig ausgeblendet (siehe eventHideAfter), die Liste schrumpft
+    // also mit der Zeit; über die Position würde z.B. der letzte, 5. Tag
+    // fälschlich als "Tag 1" erscheinen sobald Tag 1–4 verschwunden sind.
+    final containerStart = _dateOnlyUtc(container.datum);
     final dayNumberByChildId = <String, int>{
-      for (var i = 0; i < sortedChildren.length; i++)
-        sortedChildren[i].stabileId: i + 1,
+      for (final child in sortedChildren)
+        child.stabileId:
+            _dateOnlyUtc(child.datum).difference(containerStart).inDays + 1,
     };
     final forceExpanded = visibleChildren != null;
     final displayChildren = forceExpanded
