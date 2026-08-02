@@ -33,7 +33,12 @@ class ConnectivityService with ChangeNotifier, WidgetsBindingObserver {
     _connSub = Connectivity().onConnectivityChanged.listen((results) {
       final hasInterface = results.any((r) => r != ConnectivityResult.none);
       if (!hasInterface) {
-        _setOffline(true);
+        // Kein direktes _setOffline(true) — connectivity_plus meldet auch bei
+        // kurzen OS-Übergängen (z.B. App-Backgrounding) fälschlich "kein
+        // Interface", obwohl echtes Internet besteht. Läuft über dieselbe
+        // Fehlversuchs-Logik wie die Reachability-Checks, damit ein einzelnes
+        // Blip nicht sofort den Banner auslöst.
+        _registerFailure();
       } else {
         _checkReachability();
       }
@@ -53,6 +58,12 @@ class ConnectivityService with ChangeNotifier, WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      // Optimistisch zurücksetzen: während die App im Hintergrund war, kann
+      // _isOffline durch ein OS-Interface-Blip fälschlich auf true stehen.
+      // Ohne Reset würde dieser veraltete Zustand beim Zurückkehren für einen
+      // Frame aufblitzen, bevor der frische Check unten ihn korrigiert.
+      _consecutiveFailures = 0;
+      _setOffline(false);
       // Sofort neu prüfen statt auf den nächsten periodischen Tick zu warten —
       // sonst kann nach Rückkehr aus dem Hintergrund bis zu 20s ein veralteter
       // (evtl. falscher) Zustand angezeigt werden.
@@ -78,16 +89,21 @@ class ConnectivityService with ChangeNotifier, WidgetsBindingObserver {
       _setOffline(false);
     } catch (_) {
       if (myGeneration != _checkGeneration) return;
-      _consecutiveFailures++;
-      if (_consecutiveFailures >= 2) {
-        _setOffline(true);
-      } else {
-        // Erster Fehlschlag: kein sofortiges "offline" — kurz danach erneut
-        // prüfen statt bis zum nächsten 20s-Tick zu warten.
-        Future.delayed(const Duration(seconds: 3), () {
-          if (myGeneration == _checkGeneration) _checkReachability();
-        });
-      }
+      _registerFailure();
+    }
+  }
+
+  void _registerFailure() {
+    final myGeneration = _checkGeneration;
+    _consecutiveFailures++;
+    if (_consecutiveFailures >= 2) {
+      _setOffline(true);
+    } else {
+      // Erster Fehlschlag: kein sofortiges "offline" — kurz danach erneut
+      // prüfen statt bis zum nächsten 20s-Tick zu warten.
+      Future.delayed(const Duration(seconds: 3), () {
+        if (myGeneration == _checkGeneration) _checkReachability();
+      });
     }
   }
 
