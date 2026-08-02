@@ -66,6 +66,22 @@ if [ -n "$(git status --porcelain)" ]; then
   fi
   git push
   echo "[Git] Gepusht."
+
+  # Race Condition vermeiden: Codemagic loest den Build ueber die Branch-
+  # Referenz aus, die GitHub kurz nach einem Push noch nicht sofort ueber
+  # die API widerspiegelt. Ohne diese Wartezeit hat Codemagic gelegentlich
+  # den vorherigen Commit gebaut (z.B. alte pubspec.yaml-Version).
+  PUSHED_SHA=$(git rev-parse HEAD)
+  CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+  echo "[Git] Warte bis GitHub Commit $PUSHED_SHA auf $CURRENT_BRANCH zeigt..."
+  for _i in $(seq 1 15); do
+    REMOTE_SHA=$(git ls-remote origin "refs/heads/$CURRENT_BRANCH" | cut -f1)
+    if [ "$REMOTE_SHA" = "$PUSHED_SHA" ]; then
+      echo "[Git] GitHub ist aktuell."
+      break
+    fi
+    sleep 2
+  done
 else
   echo "[Git] Keine ungespeicherten Aenderungen."
 fi
