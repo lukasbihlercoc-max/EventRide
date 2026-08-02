@@ -30,6 +30,12 @@ final favouriteEventsNotifier = ValueNotifier<Set<String>>(<String>{});
 /// null = kein Chat aktiv geöffnet
 final activeChatConversationId = ValueNotifier<String?>(null);
 
+/// true, während eine Story-Creator-Aufnahme läuft (ab Bestätigung der
+/// Timing-Einstellungen bis Rückkehr von der aufgenommenen Detailseite).
+/// Blendet app-weit alle Admin-only-UI aus (Bearbeiten/Löschen, "+"-FAB,
+/// Test-Event-Badges), damit die Aufnahme die normale Nutzeransicht zeigt.
+final storyRecordingActiveNotifier = ValueNotifier<bool>(false);
+
 /// Explizite Auf-/Zuklapp-Wahl des Nutzers für mehrtägige Event-Container.
 /// Key = Container-id, value = true (explizit geöffnet) / false (explizit
 /// geschlossen). Fehlt ein Eintrag, wird der Container automatisch

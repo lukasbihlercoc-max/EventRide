@@ -103,7 +103,10 @@ class _LinkifiedTextState extends State<LinkifiedText> {
           url = url.substring(0, url.length - 1);
           end--;
         }
-        label = url;
+        // Als Linktext nur die Domain zeigen (z.B. "oeticket.com" statt der
+        // vollen, oft sehr langen URL) — "www." wirkt dabei überflüssig.
+        final host = Uri.tryParse(url)?.host ?? url;
+        label = host.startsWith('www.') ? host.substring(4) : host;
         onTap = () => _open(url);
       }
 
@@ -111,10 +114,7 @@ class _LinkifiedTextState extends State<LinkifiedText> {
       _recognizers.add(recognizer);
       spans.add(TextSpan(
         text: label,
-        style: const TextStyle(
-          color: Color(0xFFF5A04A),
-          decoration: TextDecoration.underline,
-        ),
+        style: const TextStyle(color: Color(0xFFF5A04A)),
         recognizer: recognizer,
       ));
       lastEnd = end;

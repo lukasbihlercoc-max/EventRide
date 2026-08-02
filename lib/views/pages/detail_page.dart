@@ -1,4 +1,5 @@
 // detail_page.dart
+import 'dart:async';
 import 'dart:io';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
@@ -8,6 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:my_app/config/story_creator_config.dart';
 import 'package:my_app/data/anfrage_daten.dart';
 import 'package:my_app/data/anfrage_service.dart';
 import 'package:my_app/utils/app_route.dart';
@@ -58,9 +60,18 @@ Future<void> _openEventNavigation(double lat, double lng) async {
 }
 
 class DetailPage extends StatelessWidget {
-  const DetailPage({super.key, required this.event});
+  const DetailPage({
+    super.key,
+    required this.event,
+    this.storyMode = false,
+    this.storyPreScrollPause = kStoryCreatorDefaultDetailPreScrollPauseDuration,
+    this.storyDetailScrollDuration = kStoryCreatorDefaultDetailScrollDuration,
+  });
 
   final Event event;
+  final bool storyMode;
+  final Duration storyPreScrollPause;
+  final Duration storyDetailScrollDuration;
 
   @override
   Widget build(BuildContext context) {
@@ -87,9 +98,10 @@ class DetailPage extends StatelessWidget {
           body: Column(
             children: [
               Expanded(
-                child: Scrollbar(
-                  thumbVisibility: true,
-                  child: SingleChildScrollView(
+                child: _StoryAutoScrollView(
+                  enabled: storyMode,
+                  preScrollPause: storyPreScrollPause,
+                  duration: storyDetailScrollDuration,
                   child: Center(
                     child: Material(
                     color: Colors.transparent,
@@ -270,7 +282,7 @@ class DetailPage extends StatelessWidget {
                             );
                           }),
                           SizedBox(height: height * 0.043),
-                          if (context.read<IAuthRepository>().isAdmin)
+                          if (!storyMode && context.read<IAuthRepository>().isAdmin)
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
@@ -333,8 +345,7 @@ class DetailPage extends StatelessWidget {
                     ),
                   ),
                 ),
-              ),
-            ),
+                ),
               ),
               Padding(
                 padding: EdgeInsets.fromLTRB(
@@ -403,6 +414,88 @@ class DetailPage extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Story Creator Mode: scrollt bei storyMode automatisch bis ans Ende
+// ---------------------------------------------------------------------------
+class _StoryAutoScrollView extends StatefulWidget {
+  const _StoryAutoScrollView({
+    required this.enabled,
+    required this.preScrollPause,
+    required this.duration,
+    required this.child,
+  });
+
+  final bool enabled;
+  final Duration preScrollPause;
+  final Duration duration;
+  final Widget child;
+
+  @override
+  State<_StoryAutoScrollView> createState() => _StoryAutoScrollViewState();
+}
+
+class _StoryAutoScrollViewState extends State<_StoryAutoScrollView> {
+  final _controller = ScrollController();
+  bool _armed = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (widget.enabled && !_armed) {
+      _armed = true;
+      _armAutoScroll();
+    }
+  }
+
+  void _armAutoScroll() {
+    final animation = ModalRoute.of(context)?.animation;
+
+    Future<void> start() async {
+      if (widget.preScrollPause > Duration.zero) {
+        await Future.delayed(widget.preScrollPause);
+      }
+      if (!mounted || !_controller.hasClients) return;
+      final target = _controller.position.maxScrollExtent;
+      if (target <= 0) return; // Inhalt passt schon in den Viewport
+      unawaited(_controller.animateTo(
+        target,
+        duration: widget.duration,
+        curve: kStoryCreatorDetailScrollCurve,
+      ));
+    }
+
+    if (animation == null || animation.isCompleted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => start());
+    } else {
+      void listener(AnimationStatus status) {
+        if (status == AnimationStatus.completed) {
+          animation.removeStatusListener(listener);
+          WidgetsBinding.instance.addPostFrameCallback((_) => start());
+        }
+      }
+
+      animation.addStatusListener(listener);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scrollbar(
+      thumbVisibility: true,
+      child: SingleChildScrollView(
+        controller: _controller,
+        child: widget.child,
+      ),
     );
   }
 }

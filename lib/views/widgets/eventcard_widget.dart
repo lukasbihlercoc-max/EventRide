@@ -108,7 +108,8 @@ class EventCard extends StatelessWidget {
     final backgroundImage =
         getBackgroundImage(event.typ) ?? "assets/image/default.jpg";
     final count = event.interessentenCount;
-    final isAdmin = context.read<IAuthRepository>().isAdmin;
+    final isAdmin = context.read<IAuthRepository>().isAdmin &&
+        !storyRecordingActiveNotifier.value;
 
     return Padding(
       padding: const EdgeInsets.symmetric(
@@ -467,7 +468,8 @@ class EventContainerCard extends StatelessWidget {
     required bool interactive,
   }) {
     final rangeLabel = _dateRangeLabel(sortedChildren);
-    final isAdmin = context.read<IAuthRepository>().isAdmin;
+    final isAdmin = context.read<IAuthRepository>().isAdmin &&
+        !storyRecordingActiveNotifier.value;
     return GestureDetector(
       onTap: interactive ? () => _toggleExpanded(expanded) : null,
       child: Stack(

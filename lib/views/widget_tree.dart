@@ -102,24 +102,32 @@ class WidgetTree extends StatelessWidget {
                 ),
               ),
 
-              // Floating Action Button – nur für Admin sichtbar
-              if (context.read<IAuthRepository>().isAdmin)
-                Positioned(
-                  bottom: 110,
-                  right: 24,
-                  child: FloatingActionButton(
-                    backgroundColor: const Color.fromARGB(193, 51, 85, 234),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        AppRoute(
-                          builder: (_) => EventsPage(event: null),
-                        ),
-                      );
-                    },
-                    child: const Icon(Icons.add),
-                  ),
-                ),
+              // Floating Action Button – nur für Admin sichtbar, und nicht
+              // während einer laufenden Story-Creator-Aufnahme (Nutzeransicht).
+              ValueListenableBuilder<bool>(
+                valueListenable: storyRecordingActiveNotifier,
+                builder: (context, storyRecording, _) {
+                  if (storyRecording || !context.read<IAuthRepository>().isAdmin) {
+                    return const SizedBox.shrink();
+                  }
+                  return Positioned(
+                    bottom: 110,
+                    right: 24,
+                    child: FloatingActionButton(
+                      backgroundColor: const Color.fromARGB(193, 51, 85, 234),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          AppRoute(
+                            builder: (_) => EventsPage(event: null),
+                          ),
+                        );
+                      },
+                      child: const Icon(Icons.add),
+                    ),
+                  );
+                },
+              ),
 
               // Navigationsleiste - 🟡 UNVERÄNDERT
               Positioned(

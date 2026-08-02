@@ -1,6 +1,8 @@
 // home_page.dart
 import 'dart:io';
 import 'dart:ui';
+import 'package:my_app/config/feature_flags.dart';
+import 'package:my_app/config/story_creator_config.dart';
 import 'package:my_app/utils/app_route.dart';
 import 'package:my_app/utils/platform_pickers.dart';
 import 'package:my_app/utils/geo_utils.dart';
@@ -9,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:my_app/data/notifiers.dart';
 import 'package:my_app/data/event_daten.dart';
+import 'package:my_app/views/pages/detail_page.dart';
 import 'package:my_app/views/pages/email_verification_page.dart';
 import 'package:my_app/views/widgets/background_widget.dart';
 import 'package:my_app/views/widgets/sizehelper_widget.dart';
@@ -492,6 +495,18 @@ class _HomePageState extends State<HomePage> {
   final _datumKey  = GlobalKey();
   final _typKey    = GlobalKey();
 
+  // ─── Story Creator Mode ─────────────────────────────────────────────────
+  final _listScrollController = ScrollController();
+  bool _storySelectMode = false;
+  Event? _storyStartEvent;
+  double? _storyStartOffset;
+  Duration _storyCountdownDuration = kStoryCreatorDefaultCountdownDuration;
+  Duration _storyCountdownPauseDuration = kStoryCreatorDefaultCountdownPauseDuration;
+  Duration _storyListScrollDuration = kStoryCreatorDefaultListScrollDuration;
+  Duration _storyPauseDuration = kStoryCreatorDefaultPauseDuration;
+  Duration _storyDetailPreScrollPause = kStoryCreatorDefaultDetailPreScrollPauseDuration;
+  Duration _storyDetailScrollDuration = kStoryCreatorDefaultDetailScrollDuration;
+
   static const _typOptionen = {
     'e1': 'Kirchtage & Feste',
     'e2': 'Feuerwehrfeste',
@@ -563,7 +578,297 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     controller.dispose();
+    _listScrollController.dispose();
     super.dispose();
+  }
+
+  // ─── Story Creator Mode ─────────────────────────────────────────────────
+
+  Future<void> _openStoryCreatorSettings() async {
+    if (_storySelectMode) {
+      setState(() {
+        _storySelectMode = false;
+        _storyStartEvent = null;
+      });
+      storyRecordingActiveNotifier.value = false;
+      return;
+    }
+    final confirmed = await _showStoryCreatorSettingsSheet();
+    if (!mounted || confirmed != true) return;
+    setState(() {
+      _storySelectMode = true;
+      _storyStartEvent = null;
+    });
+    // Ab hier bis zur Rückkehr von der Detailseite: App zeigt die normale
+    // Nutzeransicht, damit keine Admin-UI in der Aufnahme zu sehen ist.
+    storyRecordingActiveNotifier.value = true;
+    AppSnackbar.show(context, message: 'Startevent antippen');
+  }
+
+  Future<bool?> _showStoryCreatorSettingsSheet() {
+    return showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: _kAccentDark,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(_kGlassRadius)),
+      ),
+      builder: (sheetContext) {
+        var countdownMs = _storyCountdownDuration.inMilliseconds.toDouble();
+        var countdownPauseMs = _storyCountdownPauseDuration.inMilliseconds.toDouble();
+        var listMs = _storyListScrollDuration.inMilliseconds.toDouble();
+        var pauseMs = _storyPauseDuration.inMilliseconds.toDouble();
+        var detailPreScrollMs = _storyDetailPreScrollPause.inMilliseconds.toDouble();
+        var detailMs = _storyDetailScrollDuration.inMilliseconds.toDouble();
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            Widget slider({
+              required String label,
+              required double value,
+              required double min,
+              required double max,
+              required ValueChanged<double> onChanged,
+            }) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('$label: ${value.round()} ms',
+                      style: const TextStyle(color: Colors.white)),
+                  Slider(
+                    value: value,
+                    min: min,
+                    max: max,
+                    divisions: ((max - min) / 100).round(),
+                    activeColor: _kAccent,
+                    onChanged: (v) => setSheetState(() => onChanged(v)),
+                  ),
+                ],
+              );
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 16,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+              ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.8,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Story Creator Mode',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold)),
+                      const Text(
+                        'Danach erst Start-, dann Ziel-Event antippen.',
+                        style: TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
+                      const SizedBox(height: 12),
+                      slider(
+                        label: 'Countdown vor der Aufnahme',
+                        value: countdownMs,
+                        min: 0,
+                        max: 6000,
+                        onChanged: (v) => countdownMs = v,
+                      ),
+                      slider(
+                        label: 'Pause nach Countdown',
+                        value: countdownPauseMs,
+                        min: 0,
+                        max: 3000,
+                        onChanged: (v) => countdownPauseMs = v,
+                      ),
+                      slider(
+                        label: 'Scroll Start → Ziel-Event',
+                        value: listMs,
+                        min: 200,
+                        max: 3000,
+                        onChanged: (v) => listMs = v,
+                      ),
+                      slider(
+                        label: 'Pause vor Öffnen der Detailseite',
+                        value: pauseMs,
+                        min: 0,
+                        max: 2000,
+                        onChanged: (v) => pauseMs = v,
+                      ),
+                      slider(
+                        label: 'Pause auf Detailseite vor Scroll',
+                        value: detailPreScrollMs,
+                        min: 0,
+                        max: 3000,
+                        onChanged: (v) => detailPreScrollMs = v,
+                      ),
+                      slider(
+                        label: 'Detailseite → Ende scrollen',
+                        value: detailMs,
+                        min: 500,
+                        max: 8000,
+                        onChanged: (v) => detailMs = v,
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _kAccent,
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: () {
+                            _storyCountdownDuration =
+                                Duration(milliseconds: countdownMs.round());
+                            _storyCountdownPauseDuration =
+                                Duration(milliseconds: countdownPauseMs.round());
+                            _storyListScrollDuration =
+                                Duration(milliseconds: listMs.round());
+                            _storyPauseDuration =
+                                Duration(milliseconds: pauseMs.round());
+                            _storyDetailPreScrollPause = Duration(
+                                milliseconds: detailPreScrollMs.round());
+                            _storyDetailScrollDuration =
+                                Duration(milliseconds: detailMs.round());
+                            Navigator.pop(sheetContext, true);
+                          },
+                          child: const Text('Startevent auswählen'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Wird bei Tap auf ein Event im Auswahl-Modus aufgerufen: erster Tap
+  /// legt das Startevent fest, zweiter Tap das Zielevent und startet danach
+  /// sofort die Sequenz.
+  void _onStoryEventTap(Event event) {
+    if (!_listScrollController.hasClients) return;
+    if (_storyStartEvent == null) {
+      setState(() {
+        _storyStartEvent = event;
+        _storyStartOffset = _listScrollController.offset;
+      });
+      AppSnackbar.show(context, message: 'Zielevent antippen');
+      return;
+    }
+    final startEvent = _storyStartEvent!;
+    final startOffset = _storyStartOffset!;
+    final targetOffset = _listScrollController.offset;
+    setState(() {
+      _storySelectMode = false;
+      _storyStartEvent = null;
+      _storyStartOffset = null;
+    });
+    _runStoryCreatorSequence(
+      startEvent: startEvent,
+      startOffset: startOffset,
+      targetEvent: event,
+      targetOffset: targetOffset,
+    );
+  }
+
+  Future<void> _showStoryCountdown(Duration duration) async {
+    if (duration <= Duration.zero || !mounted) return;
+    final overlayState = Overlay.of(context);
+    final totalSeconds = (duration.inMilliseconds / 1000).ceil().clamp(1, 99);
+    final tickMs = duration.inMilliseconds / totalSeconds;
+    final countNotifier = ValueNotifier<int>(totalSeconds);
+    late final OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (_) => Positioned.fill(
+        child: AbsorbPointer(
+          child: Container(
+            color: Colors.black.withValues(alpha: 0.45),
+            alignment: Alignment.center,
+            child: ValueListenableBuilder<int>(
+              valueListenable: countNotifier,
+              builder: (_, value, __) => Text(
+                '$value',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 96,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    overlayState.insert(entry);
+    try {
+      for (var i = totalSeconds - 1; i >= 1; i--) {
+        await Future.delayed(Duration(milliseconds: tickMs.round()));
+        countNotifier.value = i;
+      }
+      await Future.delayed(Duration(milliseconds: tickMs.round()));
+    } finally {
+      entry.remove();
+    }
+  }
+
+  Future<void> _runStoryCreatorSequence({
+    required Event startEvent,
+    required double startOffset,
+    required Event targetEvent,
+    required double targetOffset,
+  }) async {
+    if (!_listScrollController.hasClients) return;
+
+    // 1) Ungefilmtes Positionieren beim Startevent (instant, per Pixel-Offset
+    // statt GlobalKey — funktioniert auch wenn die Karte inzwischen weit
+    // außerhalb des sichtbaren Bereichs unmounted wurde).
+    final maxExtent = _listScrollController.position.maxScrollExtent;
+    _listScrollController.jumpTo(startOffset.clamp(0.0, maxExtent));
+
+    // 2) Countdown, damit die Aufnahme gestartet werden kann.
+    await _showStoryCountdown(_storyCountdownDuration);
+    if (!mounted) return;
+
+    // 3) Stille Pause direkt danach.
+    await Future.delayed(_storyCountdownPauseDuration);
+    if (!mounted || !_listScrollController.hasClients) return;
+
+    // 4) Gefilmte Bewegung: Scroll vom Start- zum Ziel-Event (Pixel-Offset).
+    final clampedTarget = targetOffset.clamp(
+        0.0, _listScrollController.position.maxScrollExtent);
+    await _listScrollController.animateTo(
+      clampedTarget,
+      duration: _storyListScrollDuration,
+      curve: kStoryCreatorListScrollCurve,
+    );
+    if (!mounted) return;
+
+    // 5) Pause, dann Detailseite öffnen.
+    await Future.delayed(_storyPauseDuration);
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      AppRoute(
+        builder: (_) => DetailPage(
+          event: targetEvent,
+          storyMode: true,
+          storyPreScrollPause: _storyDetailPreScrollPause,
+          storyDetailScrollDuration: _storyDetailScrollDuration,
+        ),
+      ),
+    ).then((_) {
+      // Aufnahme beendet (zurück von der Detailseite) — Admin-UI wieder einblenden.
+      storyRecordingActiveNotifier.value = false;
+    });
   }
 
   void _precacheImages() {
@@ -674,6 +979,44 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ),
+
+            if (kStoryCreatorModeEnabled &&
+                context.read<IAuthRepository>().isAdmin) ...[
+              const SizedBox(width: 10),
+              // ── Story Creator Mode ──────────────────────────────────────────
+              _TapScaleWrapper(
+                child: GestureDetector(
+                  onTap: _openStoryCreatorSettings,
+                  child: Container(
+                    width: 34,
+                    height: 34,
+                    decoration: _storySelectMode
+                        ? BoxDecoration(
+                            color: _kAccent,
+                            borderRadius: BorderRadius.circular(50),
+                            boxShadow: [
+                              BoxShadow(
+                                color: _kAccent.withValues(alpha: 0.40),
+                                blurRadius: 12,
+                              ),
+                            ],
+                          )
+                        : BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(50),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.32),
+                            ),
+                          ),
+                    child: Icon(
+                      Icons.videocam_rounded,
+                      size: 18,
+                      color: _storySelectMode ? _kAccentDark : Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
 
             const SizedBox(width: 10),
 
@@ -852,6 +1195,7 @@ class _HomePageState extends State<HomePage> {
               selectedDatumModeNotifier,
               selectedDatumNotifier,
               selectedTypNotifier,
+              storyRecordingActiveNotifier,
             ]),
             builder: (context, _) {
               final query = searchTextNotifier.value.toLowerCase();
@@ -871,8 +1215,10 @@ class _HomePageState extends State<HomePage> {
               // Test-Events (adminOnly) sind clientseitig ausgeblendet für
               // alle außer Admins — echte Nutzer sollen sie nie zu Gesicht
               // bekommen, auch wenn eine Firestore-Rules-Lücke bei breiten
-              // Queries sie theoretisch mitliefern würde.
-              final isAdmin = context.read<IAuthRepository>().isAdmin;
+              // Queries sie theoretisch mitliefern würde. Während einer
+              // Story-Creator-Aufnahme gilt zusätzlich die Nutzeransicht.
+              final isAdmin = context.read<IAuthRepository>().isAdmin &&
+                  !storyRecordingActiveNotifier.value;
 
               // Kind-Events eines mehrtägigen Containers nach containerId
               // gruppieren (jeweils nach Datum sortiert) — sie erscheinen
@@ -946,6 +1292,7 @@ class _HomePageState extends State<HomePage> {
               }).toList();
 
               return CustomScrollView(
+                controller: _listScrollController,
                 physics: Platform.isIOS
                     ? const BouncingScrollPhysics(
                         parent: AlwaysScrollableScrollPhysics())
@@ -989,6 +1336,24 @@ class _HomePageState extends State<HomePage> {
                           );
                         } else {
                           card = EventCard(event: event);
+                        }
+                        if (_storySelectMode && !event.isContainer) {
+                          final isStoryStart =
+                              _storyStartEvent?.stabileId == event.stabileId;
+                          if (isStoryStart) {
+                            card = DecoratedBox(
+                              decoration: BoxDecoration(
+                                border: Border.all(color: _kAccent, width: 2),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: card,
+                            );
+                          }
+                          card = GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () => _onStoryEventTap(event),
+                            child: AbsorbPointer(child: card),
+                          );
                         }
                         // Dezenter zusätzlicher Abstand zwischen gepinnten
                         // und den restlichen Events.
